@@ -181,6 +181,7 @@ const OFF = /POSTPONED|CANCEL|SUSPENDED|DELAYED|FORFEIT|ABANDONED/;
 export function normTv(comp) {
   const list = [];
   for (const b of (comp?.geoBroadcasts?.length ? comp.geoBroadcasts : comp?.broadcasts) || []) {
+    if (b?.media && /radio/i.test(String(b.type?.shortName || ''))) continue; // TV and streaming only
     if (b?.media) list.push({ name: b.media.shortName || b.media.name, market: String(b.market?.type || b.market || '').toLowerCase(), stream: /stream/i.test(String(b.type?.shortName || '')) });
     else for (const n of b?.names || []) list.push({ name: n, market: String(b?.market || '').toLowerCase(), stream: false });
   }

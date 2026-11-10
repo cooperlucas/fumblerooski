@@ -371,3 +371,14 @@ test('college divisions: FBS by default, other divisions by group, missing ones 
   assert.deepEqual(lower.map((t) => t.div), ['FCS', 'FCS', 'Division II', 'Division III', 'Division III']);
   assert.equal((await getStandings('ncaam', 'd2')).groups.length >= 0, true); // hoops has no lower divisions: falls back to the default read
 });
+
+test('TV list skips radio and puts national TV first', async () => {
+  const { normTv } = await import('../src/data/espn.js');
+  const tv = normTv({ geoBroadcasts: [
+    { type: { shortName: 'Radio' }, market: { type: 'National' }, media: { shortName: 'ERADM' } },
+    { type: { shortName: 'Streaming' }, market: { type: 'National' }, media: { shortName: 'ESPN+' } },
+    { type: { shortName: 'TV' }, market: { type: 'National' }, media: { shortName: 'ESPN' } },
+    { type: { shortName: 'TV' }, market: { type: 'Home' }, media: { shortName: 'MSG' } },
+  ] });
+  assert.deepEqual(tv, { national: ['ESPN', 'ESPN+'], home: ['MSG'], away: [] });
+});
