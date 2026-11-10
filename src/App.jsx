@@ -867,6 +867,8 @@ function PlayerPage({ lg, id }) {
 
 /* ---------- Game ---------- */
 const PERIOD_WORD = { football: 'Q', basketball: 'Q', hockey: 'P', soccer: 'H', baseball: '' };
+// Halves read 1H / 2H (men's college hoops, soccer); everything else Q1, P1, or the bare inning.
+const perName = (L, n) => (L.periods === 2 || L.sport === 'soccer' ? `${n}H` : `${PERIOD_WORD[L.sport] ?? ''}${n}`);
 
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
 // like a late-80s broadcast graphic. Each line is the team's primary color with its secondary as the drop shadow.
@@ -878,7 +880,7 @@ function ScoreChart({ chart, game, L }) {
   const path = (k) => chart.points.map((p, i) => (i === 0 ? `M${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}` : chart.stepped ? `H${x(p.t).toFixed(1)} V${y(p[k]).toFixed(1)}` : `L${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}`)).join(' ');
   const end = chart.points[chart.points.length - 1];
   const reg = L.periods || chart.periods, word = PERIOD_WORD[L.sport] ?? '';
-  const label = (i) => (i < reg ? `${word}${i + 1}` : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
+  const label = (i) => (i < reg ? perName(L, i + 1) : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
   const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
   const cc = chartColors(game.away, game.home);
   const sides = [[game.away, 'a', cc.away.main, cc.away.second], [game.home, 'h', cc.home.main, cc.home.second]];
@@ -1001,7 +1003,7 @@ function ShotChart({ shots, game, lg }) {
       {periods.length > 1 ? (
         <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>
           <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>All</button>
-          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? `${LEAGUE[lg].periods === 2 ? 'H' : 'Q'}${p}` : 'OT'}</button>)}
+          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? perName(LEAGUE[lg], p) : 'OT'}</button>)}
         </div>
       ) : null}
       <div className="card pad shotbox">
@@ -1155,7 +1157,7 @@ function PlayByPlay({ pbp, game, L }) {
   let rows = pbp.filter((p) => p.period === cur);
   if (live) rows = [...rows].reverse();
   const reg = L.periods || 4, word = PERIOD_WORD[L.sport] ?? '';
-  const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? `${word || (L.sport === 'baseball' ? 'Inn ' : '')}${p}` : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
+  const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? (L.sport === 'baseball' ? `Inn ${p}` : perName(L, p)) : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
   const team = (id) => (id === game.home.id ? game.home : id === game.away.id ? game.away : null);
   return (
     <section className="sec">
@@ -1235,7 +1237,7 @@ function GamePage({ lg, id }) {
     d.stats.length ? ['stats', 'Team Stats'] : null,
   ].filter(Boolean);
   const tab = tabs.some(([k]) => k === picked) ? picked : 'summary';
-  const perLabel = (i) => (i < (L.periods || 4) || L.sport === 'baseball' ? `${PERIOD_WORD[L.sport] ?? ''}${i + 1}` : periods - (L.periods || 4) > 1 ? `OT${i - (L.periods || 4) + 1}` : 'OT');
+  const perLabel = (i) => (i < (L.periods || 4) || L.sport === 'baseball' ? perName(L, i + 1) : periods - (L.periods || 4) > 1 ? `OT${i - (L.periods || 4) + 1}` : 'OT');
   return (
     <>
       <SubHeader title={title} />
@@ -1293,7 +1295,7 @@ function GamePage({ lg, id }) {
                         <div className="prow" key={i}>
                           {t ? <Blob team={t} /> : <span style={{ width: 28 }} />}
                           <span className="txt">{p.kind ? <span className="kind" style={{ color: 'var(--yellow)' }}>{p.kind}</span> : null}{p.text}</span>
-                          <span className="sc">{Number.isFinite(p.away) && Number.isFinite(p.home) ? `${p.away}-${p.home}` : ''}<small>{p.period ? `${PERIOD_WORD[L.sport] ?? ''}${p.period}` : ''} {p.clock}</small></span>
+                          <span className="sc">{Number.isFinite(p.away) && Number.isFinite(p.home) ? `${p.away}-${p.home}` : ''}<small>{p.period ? perName(L, p.period) : ''} {p.clock}</small></span>
                         </div>); })}
                     </div>
                   </section>

@@ -178,6 +178,8 @@ const OFF = /POSTPONED|CANCEL|SUSPENDED|DELAYED|FORFEIT|ABANDONED/;
 // One game, the same shape no matter which endpoint it came from.
 // Where to watch. The scoreboard has geoBroadcasts and the game summary has the same shape under broadcasts;
 // older payloads use { market, names }. National TV comes first, then national streaming, then each team's local channel.
+// Men's college hoops plays halves: "18:40 - 1st" reads "18:40 - 1H".
+const halves = (lg, t) => (LEAGUE[lg]?.periods === 2 && LEAGUE[lg]?.sport === 'basketball' ? t.replace(/\b1st( Half)?\b/i, '1H').replace(/\b2nd( Half)?\b/i, '2H') : t);
 export function normTv(comp) {
   const list = [];
   for (const b of (comp?.geoBroadcasts?.length ? comp.geoBroadcasts : comp?.broadcasts) || []) {
@@ -204,7 +206,7 @@ export function normEvent(ev, lg) {
   return {
     id: String(ev?.id ?? comp.id ?? ''), lg, date, state,
     // Short label from the feed ("Final/OT", "4:12 - 3rd", "Halftime"). Screens format kickoff times themselves.
-    statusText: cleanText(type.shortDetail || type.detail || type.description || ''),
+    statusText: halves(lg, cleanText(type.shortDetail || type.detail || type.description || '')),
     // The feed gives undecided kickoff times a placeholder clock time; flag them so screens say TBD.
     tbd: state === 'pre' && (comp.timeValid === false || ev?.timeValid === false || /\bTBD\b/i.test(String(type.shortDetail || type.detail || ''))),
     period: st.period || 0,
