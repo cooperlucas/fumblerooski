@@ -93,7 +93,7 @@ export function liveColor(team) {
 }
 // Look up real colors for teams still showing a stand-in (a few team reads, remembered for good). True if any were learned.
 const colorBusy = new Set(), colorFails = new Map();
-export async function ensureColors(teams, cap = 12, pool = 6) {
+export async function ensureColors(teams, cap = 12, pool = 2) {
   const need = [];
   for (const t of teams || []) {
     const key = `${t?.lg}:${t?.id}`;
@@ -299,7 +299,7 @@ export async function getStandings(lg) {
 // then fall back to the teams inside standings, which is a read we know works.
 let teamsParams = [{ limit: '1000' }, { limit: '400' }, {}];
 const listMemo = new Map();
-function listTeams(lg) {
+export function listTeams(lg) {
   if (!listMemo.has(lg)) {
     const p = (async () => {
       let lastErr = null;

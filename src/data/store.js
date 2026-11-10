@@ -129,12 +129,19 @@ export function sortGames(games, favSet) {
 }
 
 /* ---------- team search index (cached on the device for a week) ---------- */
+// One league at a time with a short breath between: asking for every league at once gets some of the reads refused.
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function loadAllTeams() {
-  const saved = ls.get('fr.teams.v2', null);
-  if (!isDemo() && saved && Date.now() - saved.at < 7 * 864e5 && saved.teams?.length) return saved.teams;
-  const res = await Promise.allSettled(LEAGUES.map((l) => getTeams(l.id)));
-  const teams = res.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
-  if (!teams.length) throw res[0].reason;
-  if (!isDemo()) ls.set('fr.teams.v2', { at: Date.now(), teams });
+  const saved = ls.get('fr.teams.v3', null);
+  // A full index (every league's real team list, with colors) is good for a week; a patched one gets rebuilt within the hour.
+  if (!isDemo() && saved?.teams?.length && Date.now() - saved.at < (saved.full ? 7 * 864e5 : 36e5)) return saved.teams;
+  const teams = []; let full = true, firstErr = null;
+  for (const l of LEAGUES) {
+    try { const t = await getTeams(l.id); teams.push(...t); if (t.source !== 'team list') full = false; }
+    catch (e) { full = false; firstErr = firstErr || e; }
+    if (!isDemo()) await pause(120);
+  }
+  if (!teams.length) throw firstErr || new Error('No teams came back.');
+  if (!isDemo()) ls.set('fr.teams.v3', { at: Date.now(), teams, full });
   return teams;
 }

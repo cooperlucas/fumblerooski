@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, onColors, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -780,10 +780,14 @@ function Search() {
   const pq = useQuery(asked ? `psearch:${asked}` : null, () => searchPlayers(asked), () => 0);
   const players = asked && asked === term ? (pq.data || []) : [];
   const playersBusy = term.length >= 3 && (asked !== term || (pq.loading && !pq.data));
-  // Real colors for what is on screen, once typing pauses (so half-typed words do not queue up lookups).
-  useEffect(() => { if (!hits.length) return undefined; const h = setTimeout(() => ensureColors(hits, 10), 200); return () => clearTimeout(h); }, [hits]);
-  // And quietly fill in every pro team once, a few at a time, so later searches are right from the first letter.
-  useEffect(() => { if (q.data) ensureColors(q.data.filter((t) => !LEAGUE[t.lg]?.college), 400, 3); }, [q.data]);
+  // Real colors for what is on screen, once typing pauses. Lookups go two at a time (bursts get refused),
+  // and anything that failed gets a second try a moment later.
+  useEffect(() => {
+    if (!hits.length) return undefined;
+    let h2 = null;
+    const h = setTimeout(async () => { await ensureColors(hits, 10); h2 = setTimeout(() => ensureColors(hits, 10), 1500); }, 200);
+    return () => { clearTimeout(h); clearTimeout(h2); };
+  }, [hits]);
   const leagues = term ? LEAGUES.filter((l) => l.name.toLowerCase().includes(term) || l.short.toLowerCase().includes(term)) : [];
   const TeamRow = ({ t }) => (
     <button className="lrow" onClick={() => go(`team/${t.lg}/${t.id}`)}>
@@ -837,6 +841,7 @@ function About() {
     try { const r = await getTeams('nfl'); teamId = teamId || r[0]?.id; push('Team search', r.length > 0, `${r.length} teams, read from the ${r.source || 'feed'}`); } catch (e) { push('Team search', false, e.message); }
     if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
     else push('Team page', false, 'No team to test with');
+    try { const r = await listTeams('cfb'); push('Team colors', r.length > 0, `${r.length} college football teams with colors`); } catch (e) { push('Team colors', false, `Team list: ${e?.message || e}${e?.status ? ' (' + e.status + ')' : ''}`); }
     let playerId = null;
     if (teamId) { try { const r = await getRoster('nfl', teamId); const n = r.groups.reduce((k, g) => k + g.players.length, 0); playerId = r.groups[0]?.players[0]?.id; push('Roster', n > 0, `${n} players`); } catch (e) { push('Roster', false, e.message); } }
     if (playerId) { try { const r = await getPlayer('nfl', playerId); const miss = Object.entries(r.missing).filter(([, v]) => v).map(([k]) => k); push('Player page', !miss.length, `${r.player.name}: ${r.gamelog.seasons.reduce((k, x) => k + x.rows.length, 0)} games logged, ${r.career.length} career tables${miss.length ? ', did not load: ' + miss.join(', ') : ''}`); } catch (e) { push('Player page', false, e.message); } }
