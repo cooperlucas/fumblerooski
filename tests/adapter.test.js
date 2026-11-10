@@ -78,7 +78,6 @@ test('game page: stats, scoring plays without the sportsbook line, score chart',
   assert.ok(live.chart, 'live games get a chart too');
   const hoops = await getGame('nba', 'g10');
   assert.equal(hoops.stats[0].label, 'Field goals');
-  assert.equal(hoops.chart.stepped, false, 'no play-by-play in this fixture, so the chart uses quarter scores');
   assert.deepEqual(hoops.chart.points.at(-1), { t: 1, a: 118, h: 96 });
 });
 
@@ -163,4 +162,30 @@ test('score chart: overtime stretches the clock, live games stop at the current 
   assert.equal(c.periods, 5); assert.equal(c.bounds[3], 60 / 70);
   assert.deepEqual(c.points.at(-1), { t: 1, a: 24, h: 27 });
   assert.equal(c.points[3].t, 65 / 70);
+});
+
+test('football drives: field position, results, plays, and the live drive', async () => {
+  const fin = await getGame('nfl', 'g2');
+  assert.equal(fin.drives.length, 3);
+  const [td, punt, pick] = fin.drives;
+  assert.equal(td.side, 'home'); assert.equal(td.result, 'Touchdown'); assert.equal(td.isScore, true);
+  assert.equal(td.x0, 75); assert.equal(td.x1, 0, 'home team drives right to left, into the left end zone');
+  assert.equal(td.plays.length, 3); assert.equal(td.plays[0].down, '1st & 10 at OWN 25');
+  assert.equal(punt.side, 'away'); assert.equal(punt.x0, 22); assert.equal(punt.x1, 26);
+  assert.equal(punt.plays.length, 1, 'the play that mentions a sportsbook is dropped');
+  assert.equal(pick.turnover, true);
+  assert.equal(fin.drives.some((d) => d.live), false);
+  const live = await getGame('nfl', 'g1');
+  assert.equal(live.drives.length, 4); assert.equal(live.drives[3].live, true);
+  assert.deepEqual(fin.pbp, [], 'football reads by drive, not as one long list');
+});
+
+test('basketball shots and play-by-play', async () => {
+  const g = await getGame('nba', 'g10');
+  assert.equal(g.shots.length, 5, 'free throws are left off the shot chart');
+  assert.deepEqual(g.shots[0], { teamId: g.game.away.id, x: 25, y: 24, made: true, three: true, period: 1 });
+  assert.equal(g.shots[1].made, false);
+  assert.equal(g.pbp.length, 7);
+  assert.equal(g.pbp[0].scoring, true); assert.equal(g.pbp[1].scoring, false); assert.equal(g.pbp[5].period, 2);
+  assert.equal(g.chart.stepped, true, 'with play-by-play the score chart uses real times');
 });

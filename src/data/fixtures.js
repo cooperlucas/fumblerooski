@@ -157,8 +157,32 @@ function summary(lg, id) {
       mk(4, '3:05', h, 'Demo receiver 9 Yd pass from Demo QB (Kick good)', 'Passing Touchdown', as, hs),
     ];
   }
+  let drives, allPlays;
+  if (started && lg !== 'nba') {
+    const pl = (per, clock, text, down, s2e, e2e, extra = {}) => ({ text, period: { number: per }, clock: { displayValue: clock }, start: { downDistanceText: down, yardsToEndzone: s2e }, end: { yardsToEndzone: e2e }, awayScore: 0, homeScore: 0, ...extra });
+    const dr = (did, tid, result, isScore, desc, per, clock, where, list) => ({ id: did, team: { id: tid }, displayResult: result, isScore, description: desc, start: { period: { number: per }, clock: { displayValue: clock }, text: where }, plays: list });
+    const prev = [
+      dr('d1', h, 'Touchdown', true, '8 plays, 75 yards, 4:10', 1, '13:24', 'OWN 25', [pl(1, '13:24', 'Demo back up the middle for 6 yards', '1st & 10 at OWN 25', 75, 69), pl(1, '12:50', 'Demo QB pass deep right to Demo receiver for 41 yards', '2nd & 4 at OWN 31', 69, 28), pl(1, '9:14', 'Demo back 4 Yd Run (Kick good)', '1st & Goal at 4', 4, 0, { scoringPlay: true, homeScore: 7 })]),
+      dr('d2', a, 'Punt', false, '3 plays, 4 yards, 1:38', 1, '9:14', 'OWN 22', [pl(1, '9:14', 'Demo back left tackle for 3 yards', '1st & 10 at OWN 22', 78, 75), pl(1, '7:40', 'Demo punter punts 44 yards. Lions favored by 3 at DraftKings Sportsbook', '4th & 6 at OWN 26', 74, 74)]),
+      dr('d3', a, 'Interception', false, '5 plays, 31 yards, 2:02', 2, '11:00', 'OWN 30', [pl(2, '11:00', 'Demo QB pass short left to Demo receiver for 12 yards', '1st & 10 at OWN 30', 70, 58), pl(2, '9:10', 'Demo QB pass intercepted', '2nd & 8 at OPP 41', 41, 39)]),
+    ];
+    const cur = dr('d4', a, '', false, '2 plays, 9 yards, 0:48', 3, '5:00', 'OWN 40', [pl(3, '5:00', 'Demo back right end for 9 yards', '1st & 10 at OWN 40', 60, 51)]);
+    drives = g[8].type.state === 'in' ? { previous: prev, current: cur } : { previous: prev };
+  }
+  if (started && lg === 'nba') {
+    const sp = (per, clock, tid, text, made, val, x, y, A, H) => ({ text, type: { text: val === 3 ? 'Three Point Jumper' : 'Jump Shot' }, period: { number: per }, clock: { displayValue: clock }, team: { id: tid }, shootingPlay: true, scoringPlay: made, scoreValue: made ? val : 0, coordinate: { x, y }, awayScore: A, homeScore: H });
+    allPlays = [
+      sp(1, '11:40', a, 'D. Guard makes 25-foot three point jumper', true, 3, 25, 24, 3, 0),
+      sp(1, '11:10', h, 'D. Wing misses driving layup', false, 2, 27, 2, 3, 0),
+      sp(1, '10:30', a, 'D. Center makes dunk', true, 2, 25, 1, 5, 0),
+      sp(1, '9:55', h, 'D. Wing makes 22-foot three point jumper', true, 3, 3, 1, 5, 3),
+      { text: 'D. Guard makes free throw 1 of 2', type: { text: 'Free Throw - 1 of 2' }, period: { number: 1 }, clock: { displayValue: '9:20' }, team: { id: a }, shootingPlay: true, scoringPlay: true, scoreValue: 1, coordinate: { x: -214748340, y: -214748365 }, awayScore: 6, homeScore: 3 },
+      { text: 'D. Sixth defensive rebound', type: { text: 'Defensive Rebound' }, period: { number: 2 }, clock: { displayValue: '8:00' }, team: { id: a }, awayScore: 6, homeScore: 3 },
+      sp(2, '7:41', a, 'D. Sixth misses 18-foot jumper', false, 2, 38, 12, 6, 3),
+    ];
+  }
   return {
-    header: { id, competitions: [comp] }, boxscore: box, scoringPlays: plays,
+    header: { id, competitions: [comp] }, boxscore: box, scoringPlays: plays, drives, plays: allPlays,
     gameInfo: { venue: { fullName: 'Demo Stadium' } },
     pickcenter: [{ provider: { name: 'ESPN BET' }, details: 'HOME -3' }],
     winprobability: [{ homeWinPercentage: 0.61 }],

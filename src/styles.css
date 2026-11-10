@@ -204,3 +204,22 @@ h1, h2, h3, p { margin: 0; }
 .chart .lg b { font-size: 15px; margin-left: 4px; font-variant-numeric: tabular-nums; }
 .chart .ax { fill: #6F7AA3; font-size: 9px; font-weight: 800; font-family: var(--font); }
 .chart .per { fill: #8E99BF; font-size: 10px; font-weight: 900; font-style: italic; font-stretch: 125%; font-family: var(--font); letter-spacing: 0.06em; }
+
+/* drives */
+.drive { padding: 12px 14px; }
+.drive + .drive { border-top: 1px solid #232C50; }
+.dhead { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 0; border: none; background: transparent; text-align: left; }
+.dmain { flex: 1; min-width: 0; }
+.dres { display: flex; align-items: center; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; }
+.dsum { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--mute); }
+.dwhen { flex: none; font-size: 12px; font-weight: 800; color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dwhen i { font-style: normal; margin-left: 6px; color: var(--dim); }
+.field { display: block; width: 100%; height: auto; margin-top: 10px; }
+.dplays { list-style: none; margin: 10px 0 0; padding: 0; }
+.dplays li { padding: 8px 0; border-top: 1px dashed #232C50; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--soft); }
+.dplays b { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); margin-bottom: 2px; }
+/* shot chart */
+.shotbox .legend { display: flex; gap: 10px; margin-bottom: 12px; }
+.shotbox .lg { padding: 4px 10px; border-radius: 6px; color: #0C1124; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 11px; letter-spacing: 0.04em; box-shadow: 3px 3px 0 #6E3AB5; }
+.shotbox .lg b { font-size: 14px; margin-left: 4px; }
+.court { display: block; width: 100%; height: auto; }

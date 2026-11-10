@@ -343,6 +343,142 @@ function ScoreChart({ chart, game, L }) {
   );
 }
 
+/* ---------- football: drives ---------- */
+function DriveField({ d, game }) {
+  if (d.x0 == null || d.x1 == null) return null;
+  const W = 300, H = 26, ez = 22, fx = (v) => ez + (v / 100) * (W - ez * 2);
+  const a = fx(d.x0), b = fx(d.x1), dir = d.side === 'away' ? 1 : -1;
+  const color = d.isScore ? '#FFE135' : d.turnover ? '#FF3D7F' : '#22D3D6';
+  const tip = Math.abs(b - a) < 3 ? a + dir * 3 : b; // show at least a stub for a drive that went nowhere
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="field" aria-hidden="true">
+      <rect x="0" y="2" width={W} height={H - 4} rx="3" fill="#123524" />
+      <rect x="0" y="2" width={ez} height={H - 4} fill={game.away.color} /><rect x={W - ez} y="2" width={ez} height={H - 4} fill={game.home.color} />
+      {Array.from({ length: 9 }, (_, i) => <path key={i} d={`M${fx((i + 1) * 10)} 2 V${H - 2}`} stroke={i === 4 ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.22)'} />)}
+      <path d={`M${a} ${H / 2 + 2} H${tip}`} stroke="#6E3AB5" strokeWidth="7" transform="translate(2 2)" />
+      <path d={`M${a} ${H / 2} H${tip}`} stroke={color} strokeWidth="7" />
+      <path d={`M${tip + dir * 7} ${H / 2} L${tip} ${H / 2 - 7} V${H / 2 + 7} Z`} fill={color} stroke="#0C1124" strokeWidth="1" />
+    </svg>
+  );
+}
+function Drives({ drives, game }) {
+  const live = game.state === 'live';
+  const list = live ? [...drives].reverse() : drives; // newest first while the game is on
+  const [open, setOpen] = useState(() => drives.find((d) => d.live)?.id ?? null);
+  const team = (d) => (d.side === 'home' ? game.home : game.away);
+  return (
+    <section className="sec">
+      <H2>Drives</H2>
+      <div className="card">
+        {list.map((d) => { const t = team(d), isOpen = open === d.id; const color = d.isScore ? 'var(--yellow)' : d.turnover ? '#FF7AA6' : 'var(--teal)'; return (
+          <div className="drive" key={d.id}>
+            <button className="dhead" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.id)}>
+              <Blob team={t} />
+              <span className="dmain">
+                <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.result || 'Drive')}</span>
+                <span className="dsum">{[d.summary, d.startText ? `from ${d.startText}` : ''].filter(Boolean).join(' · ')}</span>
+              </span>
+              <span className="dwhen">{d.period ? `Q${d.period}` : ''} {d.clock}<i aria-hidden="true">{isOpen ? '▴' : '▾'}</i></span>
+            </button>
+            <DriveField d={d} game={game} />
+            {isOpen ? (
+              <ol className="dplays">
+                {d.plays.map((p, i) => <li key={i}>{p.down ? <b>{p.down}</b> : null}<span style={p.scoring ? { color: 'var(--yellow)', fontWeight: 800 } : undefined}>{p.text}</span></li>)}
+                {!d.plays.length ? <li>No plays listed for this drive.</li> : null}
+              </ol>
+            ) : null}
+          </div>); })}
+      </div>
+    </section>
+  );
+}
+
+/* ---------- basketball: shot chart ---------- */
+function ShotChart({ shots, game, lg }) {
+  const [side, setSide] = useState(0);
+  const [per, setPer] = useState(0);
+  const teams = [game.away, game.home];
+  const mine = shots.filter((s) => s.teamId === teams[side].id);
+  const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const shown = mine.filter((s) => !per || s.period === per);
+  const made = shown.filter((s) => s.made).length, threes = shown.filter((s) => s.three), made3 = threes.filter((s) => s.made).length;
+  // Court in feet: x 0 to 50, basket at (25, 0), baseline 5.25 behind it. Six px per foot.
+  const pro = lg === 'nba', K = 6, top = 5.25, depth = 40;
+  const X = (v) => v * K, Y = (v) => (v + top) * K;
+  const r3 = pro ? 23.75 : 22.15, corner = pro ? 22 : 21.65, yc = Math.sqrt(r3 * r3 - corner * corner), lane = pro ? 8 : 6;
+  const court = [
+    `M0 0 H${X(50)} V${Y(depth)} H0 Z`,
+    `M${X(25 - lane)} 0 V${Y(13.75)} H${X(25 + lane)} V0`,
+    `M${X(19)} ${Y(13.75)} A${6 * K} ${6 * K} 0 0 0 ${X(31)} ${Y(13.75)}`,
+    `M${X(25 - corner)} 0 V${Y(yc)} A${r3 * K} ${r3 * K} 0 0 0 ${X(25 + corner)} ${Y(yc)} V0`,
+    `M${X(22)} ${Y(-1.25)} H${X(28)}`,
+  ].join(' ');
+  const pctTxt = (m, n) => (n ? ` · ${Math.round((100 * m) / n)}%` : '');
+  return (
+    <section className="sec">
+      <H2>Shot Chart</H2>
+      <div className="seg" role="group" aria-label="Team" style={{ marginTop: 10 }}>
+        {teams.map((t, i) => <button key={t.id} aria-pressed={side === i} onClick={() => setSide(i)}>{t.name}</button>)}
+      </div>
+      {periods.length > 1 ? (
+        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>
+          <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>All</button>
+          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? `${LEAGUE[lg].periods === 2 ? 'H' : 'Q'}${p}` : 'OT'}</button>)}
+        </div>
+      ) : null}
+      <div className="card pad shotbox">
+        <div className="legend">
+          <span className="lg" style={{ background: '#FFE135' }}>MADE <b>{made}</b></span>
+          <span className="lg" style={{ background: '#FF7AA6' }}>MISSED <b>{shown.length - made}</b></span>
+        </div>
+        <div role="img" aria-label={`${teams[side].name} shots: ${made} made of ${shown.length}.`}>
+          <svg viewBox={`-6 -6 ${X(50) + 12} ${Y(depth) + 12}`} className="court" aria-hidden="true">
+            <rect x="0" y="0" width={X(50)} height={Y(depth)} fill="#10162C" />
+            <path d={court} fill="none" stroke="#6E3AB5" strokeWidth="3" transform="translate(2.5 2.5)" />
+            <path d={court} fill="none" stroke="#22D3D6" strokeWidth="3" strokeLinejoin="miter" />
+            <circle cx={X(25)} cy={Y(0)} r="5" fill="none" stroke="#FF7A1A" strokeWidth="3" />
+            {shown.filter((s) => !s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <path key={'m' + i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke="#FF7AA6" strokeWidth="2.6" strokeLinecap="square" />; })}
+            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <rect key={'k' + i} x={x - 5} y={y - 5} width="10" height="10" fill="#FFE135" stroke="#0C1124" strokeWidth="1.6" />; })}
+          </svg>
+        </div>
+        <p className="stamp" style={{ marginTop: 10 }}>Field goals {made}-{shown.length}{pctTxt(made, shown.length)} · Threes {made3}-{threes.length}{pctTxt(made3, threes.length)}</p>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- play-by-play (not football) ---------- */
+function PlayByPlay({ pbp, game, L }) {
+  const periods = [...new Set(pbp.map((p) => p.period))].sort((a, b) => a - b);
+  const [per, setPer] = useState(null);
+  const [show, setShow] = useState(false);
+  const cur = per ?? periods[periods.length - 1];
+  const live = game.state === 'live';
+  let rows = pbp.filter((p) => p.period === cur);
+  if (live) rows = [...rows].reverse();
+  const reg = L.periods || 4, word = PERIOD_WORD[L.sport] ?? '';
+  const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? `${word || (L.sport === 'baseball' ? 'Inn ' : '')}${p}` : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
+  const team = (id) => (id === game.home.id ? game.home : id === game.away.id ? game.away : null);
+  return (
+    <section className="sec">
+      <div className="sechead"><H2>Play-by-Play</H2><button className="link" aria-expanded={show} onClick={() => setShow(!show)}>{show ? 'Hide' : `Show ${pbp.length} plays`}</button></div>
+      {show ? (
+        <>
+          {periods.length > 1 ? <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>{periods.map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{label(p)}</button>)}</div> : null}
+          <div className="card pad">
+            {rows.map((p, i) => { const t = team(p.teamId); return (
+              <div className="prow" key={i}>
+                {t ? <Blob team={t} /> : <span style={{ width: 28, flex: 'none' }} />}
+                <span className="txt" style={p.scoring ? { fontWeight: 800 } : { color: 'var(--soft)' }}>{p.text}</span>
+                <span className="sc">{p.scoring && Number.isFinite(p.away) && Number.isFinite(p.home) ? <span style={{ color: 'var(--yellow)' }}>{p.away}-{p.home}</span> : ''}<small>{p.clock}</small></span>
+              </div>); })}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 const COL_TIPS = {
   '+/-': 'Plus/minus: how many points the team outscored the other team by while this player was on the floor.',
   'C/ATT': 'Completions out of pass attempts.', TGTS: 'Targets: passes thrown to this player.', TFL: 'Tackles for loss.',
@@ -430,7 +566,7 @@ function GamePage({ lg, id }) {
               </section>
             ) : null}
 
-            {d.plays.length ? (
+            {d.plays.length && !d.drives.length ? (
               <section className="sec">
                 <H2>Scoring</H2>
                 <div className="card pad">
@@ -445,6 +581,9 @@ function GamePage({ lg, id }) {
             ) : null}
 
             {d.chart ? <ScoreChart chart={d.chart} game={g} L={L} /> : null}
+
+            {d.drives.length ? <Drives drives={d.drives} game={g} /> : null}
+            {d.shots.length ? <ShotChart shots={d.shots} game={g} lg={lg} /> : null}
 
             {d.box.length ? <BoxScore box={d.box} game={g} sport={L.sport} /> : null}
 
@@ -463,6 +602,8 @@ function GamePage({ lg, id }) {
                 </div>
               </section>
             ) : null}
+
+            {d.pbp.length ? <PlayByPlay pbp={d.pbp} game={g} L={L} /> : null}
 
             {!started && g.state === 'pre' ? <Empty>Scoring and stats show up here once the game starts.</Empty> : null}
             <Stamp at={q.updatedAt} live={g.state === 'live'} />

@@ -387,6 +387,63 @@ function startersOf(box, ids) {
   return out;
 }
 
+/* ---------- football drives ---------- */
+// Field position runs 0 to 100 left to right, with the away team driving right and the home team driving left.
+export function normDrives(drives, awayId, homeId, live) {
+  const list = [...(drives?.previous || [])];
+  const cur = drives?.current;
+  if (cur && !list.some((d) => String(d.id) === String(cur.id))) list.push(cur);
+  const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
+  return list.map((d, i) => {
+    const teamId = String(d.team?.id ?? '');
+    const plays = (d.plays || []).map((p) => ({
+      text: cleanText(p.text),
+      down: cleanText(p.start?.downDistanceText || p.start?.shortDownDistanceText || ''),
+      period: p.period?.number || 0, clock: p.clock?.displayValue || '',
+      scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
+    })).filter((p) => p.text);
+    const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
+    const from = num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone), to = num(last?.end?.yardsToEndzone ?? d.end?.yardsToEndzone);
+    const side = teamId === String(homeId) ? 'home' : teamId === String(awayId) ? 'away' : null;
+    const pos = (toEnd) => (toEnd == null || !side ? null : Math.max(0, Math.min(100, side === 'away' ? 100 - toEnd : toEnd)));
+    const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    return {
+      id: String(d.id ?? i), teamId, side,
+      result, isScore: d.isScore === true,
+      turnover: /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true,
+      summary: cleanText(d.description || ''),
+      period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
+      startText: cleanText(d.start?.text || ''),
+      x0: pos(from), x1: pos(to),
+      plays,
+      live: !!live && !!cur && String(d.id) === String(cur.id),
+    };
+  }).filter((d) => d.side && (d.plays.length || d.summary));
+}
+
+/* ---------- basketball shots ---------- */
+// Feed coordinates are in feet on a half court: x across (0 to 50), y out from the basket. Free throws carry junk values.
+export function normShots(rawPlays) {
+  return (rawPlays || []).filter((p) => p.shootingPlay && p.coordinate && !/free throw/i.test(`${p.type?.text || ''} ${p.text || ''}`)).map((p) => ({
+    teamId: String(p.team?.id ?? ''),
+    x: Number(p.coordinate.x), y: Number(p.coordinate.y),
+    made: p.scoringPlay === true,
+    three: Number(p.scoreValue) === 3 || /three point|3-pt|3pt/i.test(`${p.type?.text || ''} ${p.text || ''}`),
+    period: p.period?.number || 0,
+  })).filter((sh) => sh.teamId && Number.isFinite(sh.x) && Number.isFinite(sh.y) && sh.x >= -2 && sh.x <= 52 && sh.y >= -6 && sh.y <= 95);
+}
+
+/* ---------- play-by-play (everything that is not football, which reads by drive) ---------- */
+export function normPlays(rawPlays) {
+  let pa = 0, ph = 0;
+  return (rawPlays || []).map((p) => {
+    const a = Number(p.awayScore), h = Number(p.homeScore);
+    const scored = p.scoringPlay === true || (Number.isFinite(a) && Number.isFinite(h) && (a !== pa || h !== ph));
+    if (Number.isFinite(a) && Number.isFinite(h)) { pa = a; ph = h; }
+    return { text: cleanText(p.text), period: p.period?.number || 0, clock: p.clock?.displayValue || '', teamId: String(p.team?.id ?? ''), scoring: scored, away: a, home: h };
+  }).filter((p) => p.text);
+}
+
 export async function getGame(lg, id) {
   const L = LEAGUE[lg];
   const data = await get(url(SITE, lg, '/summary', { event: id }));
@@ -415,6 +472,9 @@ export async function getGame(lg, id) {
     box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus),
     plays,
     chart: started ? scoreSeries(game, timeline, L) : null,
+    drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
+    shots: L.sport === 'basketball' ? normShots(data.plays) : [],
+    pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),
   };
 }
