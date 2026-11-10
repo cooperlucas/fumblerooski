@@ -51,7 +51,7 @@ function lumOf(color) {
 export function Blob({ team, size = 28, radius }) {
   const light = lumOf(team.color) > 0.33;
   return (
-    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: team.color, color: light ? '#0C1124' : '#fff', fontSize: Math.max(8, Math.round(size * (team.abbr.length > 3 ? 0.22 : 0.3))) }}>
+    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: team.color, color: light ? '#0C1124' : '#fff', overflow: 'hidden', fontStretch: team.abbr.length > 3 ? '100%' : undefined, fontSize: Math.max(7, Math.round(size * (team.abbr.length > 3 ? 0.25 : 0.3))) }}>
       {team.abbr}
     </span>
   );

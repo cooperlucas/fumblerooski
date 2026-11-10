@@ -16,7 +16,7 @@ export default function App() {
   if (name === '') body = <Home />;
   else if (name === 'scores') body = <Scores />;
   else if (name === 'leagues') body = <Leagues />;
-  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a} lg={a} />; }
+  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = 'scores'; body = <GamePage key={a + b} lg={a} id={b} />; }
@@ -163,10 +163,11 @@ function Leagues() {
   );
 }
 
-function LeaguePage({ lg }) {
+function LeaguePage({ lg, focus }) {
   const L = LEAGUE[lg];
   const [tab, setTab] = useState('standings');
   const [by, setBy] = useState(null);
+  const [all, setAll] = useState(false);
   const st = useQuery(`standings:${lg}`, () => getStandings(lg), () => 600000);
   const sb = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   return (
@@ -183,23 +184,28 @@ function LeaguePage({ lg }) {
           !st.data.groups.length ? <Empty>No standings for {L.name} right now.</Empty> : (() => {
             const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];
             const view = views.find((v) => v.id === by) || views[0];
+            // Coming from a team page: show just that team's group, with the team lit up.
+            const has = (gr) => gr.rows.some((r) => r.team.id === String(focus));
+            const mine = focus && !all ? view.groups.filter(has) : [];
+            const shown = mine.length ? mine : view.groups;
             return (<>
             {views.length > 1 ? (
               <div className="seg sub" role="group" aria-label="Group standings by">
                 {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => setBy(v.id)}>{v.label}</button>)}
               </div>
             ) : null}
-            {view.groups.map((gr, i) => (
+            {shown.map((gr, i) => (
               <div className="card" key={view.id + gr.name + i}>
                 <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>{gr.col2Label}</span></div>
                 {gr.rows.map((r, j) => (
-                  <button key={r.team.id} className="srow" onClick={() => go(`team/${lg}/${r.team.id}`)}>
+                  <button key={r.team.id} className={'srow' + (focus && r.team.id === String(focus) ? ' me' : '')} aria-current={focus && r.team.id === String(focus) ? 'true' : undefined} onClick={() => go(`team/${lg}/${r.team.id}`)}>
                     <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}</span>
                     <span className="v">{r.overall}</span><span className="v2">{r.col2}</span>
                   </button>
                 ))}
               </div>
             ))}
+            {mine.length && mine.length < view.groups.length ? <div style={{ textAlign: 'center', marginTop: 14 }}><button className="btn" onClick={() => setAll(true)}>All {L.short} standings</button></div> : null}
             </>);
           })()
       )}
@@ -245,7 +251,7 @@ function TeamPage({ lg, id }) {
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned to Home' : 'Pin to Home'}</button>
-              <button className="btn" onClick={() => go(`league/${lg}`)}><LgTag lg={lg} /> Standings</button>
+              <button className="btn" onClick={() => go(`league/${lg}/${id}`)}><LgTag lg={lg} /> Standings</button>
             </div>
             <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
               <button aria-pressed={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>

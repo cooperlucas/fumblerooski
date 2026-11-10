@@ -252,3 +252,6 @@ h1, h2, h3, p { margin: 0; }
 .pbox tr.span th + th { box-shadow: -1px 0 0 #232C50; }
 .pbox .who small.res { display: block; font-size: 11px; font-weight: 700; color: var(--mute); }
 .pbox .who small.res.w { color: var(--lime); }
+
+.srow.me { background: rgba(255, 190, 46, 0.14); box-shadow: inset 4px 0 0 var(--yellow); }
+.srow.me .nm, .srow.me .pos { color: var(--yellow); }
