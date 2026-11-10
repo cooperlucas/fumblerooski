@@ -32,23 +32,42 @@ export function brighten(color, min = 0.15) {
   for (let i = 0; i < 40 && lum(out) < min; i++) { l = Math.min(0.92, l + 0.02); out = toHex(fromHsl([h, s, l])); }
   return out;
 }
+// The light theme needs the opposite fix: dark team colors already read on cream, but white and pale gold vanish.
+export function darken(color, max = 0.42) {
+  if (!isHex(color) || lum(color) <= max) return isHex(color) ? color.toUpperCase() : String(color || '#0C1124');
+  let [h, s, l] = toHsl(rgb(color));
+  let out = color;
+  for (let i = 0; i < 50 && lum(out) > max; i++) { l = Math.max(0.08, l - 0.02); out = toHex(fromHsl([h, s, l])); }
+  return out;
+}
+export const isLight = () => {
+  if (typeof document === 'undefined') return false;
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t) return t === 'light';
+  try { return matchMedia('(prefers-color-scheme: light)').matches; } catch { return false; }
+};
 const dist = (a, b) => (isHex(a) && isHex(b) ? Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i])) : 999);
 const TOO_CLOSE = 95;
 
 // Each side gets { main, second }: the line is the team's primary color, its drop shadow the team's secondary.
 // If the two primaries look alike, the away team flips to its secondary for the line.
-function pair(team) {
-  const main = brighten(team.color);
+function pair(team, light) {
+  const fit = light ? darken : brighten;
+  const main = fit(team.color);
   let second = isHex(team.color2) ? team.color2.toUpperCase() : null;
-  if (!second || dist(second, main) < 70) second = lum(main) > 0.45 ? '#0C1124' : '#F5F5F7'; // no real second color: plain contrast
+  if (!second || dist(second, main) < 70) second = lum(main) > 0.45 ? '#0C1124' : light ? '#C9C2AE' : '#F5F5F7'; // no real second color: plain contrast
   return { main, second };
 }
-export function chartColors(away, home) {
-  const h = pair(home);
-  let a = pair(away);
-  if (dist(a.main, h.main) < TOO_CLOSE) {
-    const flipped = { main: brighten(a.second), second: brighten(away.color) };
-    a = dist(flipped.main, h.main) >= TOO_CLOSE ? flipped : { main: '#F5F5F7', second: brighten(away.color) };
+export function chartColors(away, home, light = isLight()) {
+  const fit = light ? darken : brighten;
+  const close = light ? 60 : TOO_CLOSE; // on cream, a maroon and a scarlet still read apart; on navy, lifted they merge
+  const h = pair(home, light);
+  let a = pair(away, light);
+  if (dist(a.main, h.main) < close) {
+    // Swap to the away team's second color for the line, and keep its real primary as the shadow.
+    const raw = isHex(away.color) ? away.color.toUpperCase() : a.main;
+    const flipped = { main: fit(a.second), second: raw };
+    a = dist(flipped.main, h.main) >= close ? flipped : { main: light ? '#0C1124' : '#F5F5F7', second: raw };
   }
   return { away: a, home: h };
 }

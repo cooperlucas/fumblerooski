@@ -201,7 +201,12 @@ test('chart colors: primary for the line, secondary for its shadow, and never tw
   assert.notEqual(a.away.main, a.home.main);
   // two red teams: the away side flips, secondary on the line and primary as the shadow
   const b = chartColors({ color: '#C8102E', color2: '#FFB612' }, { color: '#BA0C2F', color2: '#FFFFFF' });
-  assert.equal(b.away.main, '#FFB612'); assert.equal(b.away.second, brighten('#C8102E'));
+  assert.equal(b.away.main, '#FFB612'); assert.equal(b.away.second, '#C8102E'); // shadow keeps the team's true color
+  // light theme: maroon Missouri State and scarlet SMU both read on cream, so each keeps its own primary
+  const ms = chartColors({ color: '#5E0009', color2: '#FFFFFF' }, { color: '#A80000', color2: '#0033A1' }, true);
+  assert.equal(ms.away.main, '#5E0009'); assert.equal(ms.home.main, '#A80000');
+  // light theme: white would vanish on cream, so it is darkened
+  assert.ok(lum(chartColors({ color: '#FFFFFF', color2: '#000000' }, { color: '#00338D' }, true).away.main) <= 0.45);
   // no second color on file: a plain contrasting shadow, and white for the line on a clash
   assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#00338D' }).away.second, '#F5F5F7');
   assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#BA0C2F' }).away.main, '#F5F5F7');
