@@ -76,8 +76,8 @@ function Home() {
         {favs.length ? (
           <div className="teamrow">
             {favs.map((t) => { const l = lineFor(t); return (
-              <button key={favKey(t)} className="teamcard" onClick={l.open} aria-label={`${t.name}: ${l.text}`}>
-                <Blob team={t} size={44} radius={12} />
+              <button key={favKey(t)} className="teamcard" onClick={l.open} aria-label={`${t.name}, ${LEAGUE[t.lg]?.short || ''}: ${l.text}`}>
+                <span className="top"><Blob team={t} size={44} radius={12} /><LgTag lg={t.lg} /></span>
                 <span className="nm">{t.name}</span>
                 <span className="ln" style={{ background: l.bg, color: l.fg }}>{l.text}</span>
               </button>); })}
