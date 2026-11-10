@@ -441,3 +441,8 @@ button.pick.date { cursor: pointer; }
 .teambar .btn { min-width: 0; }
 .teambar .pick { flex: none; }
 .teambar .pick select { min-height: 46px; }
+
+/* Where to watch */
+.grow .gtv { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.htv { margin-top: 10px; text-align: center; font-size: 12px; font-weight: 800; color: #fff; }
+.htv .tvb { display: inline-block; margin-right: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.18); font-size: 10px; letter-spacing: 0.08em; vertical-align: 1px; }

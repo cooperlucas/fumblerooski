@@ -1257,6 +1257,12 @@ function GamePage({ lg, id }) {
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
               </div>
+              {g.state !== 'final' && (g.tv?.national?.length || g.tv?.home?.length || g.tv?.away?.length) ? (
+                <p className="htv">
+                  <span className="tvb">TV</span>
+                  {[g.tv.national.join(' · '), g.tv.away.length ? `${g.away.abbr}: ${g.tv.away.join(', ')}` : '', g.tv.home.length ? `${g.home.abbr}: ${g.tv.home.join(', ')}` : ''].filter(Boolean).join('  ·  ')}
+                </p>
+              ) : null}
               {g.note || d.venue ? <p style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{[g.note, d.venue].filter(Boolean).join(' · ')}</p> : null}
             </div>
 

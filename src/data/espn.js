@@ -176,6 +176,20 @@ function normSide(c, lg) {
 const OFF = /POSTPONED|CANCEL|SUSPENDED|DELAYED|FORFEIT|ABANDONED/;
 
 // One game, the same shape no matter which endpoint it came from.
+// Where to watch. The scoreboard has geoBroadcasts and the game summary has the same shape under broadcasts;
+// older payloads use { market, names }. National TV comes first, then national streaming, then each team's local channel.
+export function normTv(comp) {
+  const list = [];
+  for (const b of (comp?.geoBroadcasts?.length ? comp.geoBroadcasts : comp?.broadcasts) || []) {
+    if (b?.media) list.push({ name: b.media.shortName || b.media.name, market: String(b.market?.type || b.market || '').toLowerCase(), stream: /stream/i.test(String(b.type?.shortName || '')) });
+    else for (const n of b?.names || []) list.push({ name: n, market: String(b?.market || '').toLowerCase(), stream: false });
+  }
+  const clean = list.map((x) => ({ ...x, name: cleanText(x.name || '') })).filter((x) => x.name);
+  const pick = (m, stream) => [...new Set(clean.filter((x) => x.market === m && x.stream === stream).map((x) => x.name))];
+  const national = [...pick('national', false), ...pick('national', true)];
+  return { national, home: pick('home', false), away: pick('away', false) };
+}
+
 export function normEvent(ev, lg) {
   const comp = ev?.competitions?.[0] || ev || {};
   const cs = comp.competitors || [];
@@ -197,6 +211,7 @@ export function normEvent(ev, lg) {
     home: normSide(homeC, lg),
     away: normSide(awayC, lg),
     note: cleanText(comp.notes?.[0]?.headline || ''),
+    tv: normTv(comp),
   };
 }
 
