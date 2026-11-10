@@ -30,13 +30,13 @@ export default function App() {
   }, []);
   const [, repaint] = useState(0);
   useEffect(() => onColors(() => repaint((n) => n + 1)), []);
-  const [name = '', a, b] = parts;
+  const [name = '', a, b, c] = parts;
   const root = ROOTS.has(name);
   let title = '', body, tab = name;
   if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
-  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} />; }
+  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
@@ -136,7 +136,7 @@ function Board({ games, pick, favSet, title }) {
         const list = sortGames(shown.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
         return (
           <div className="card" key={l.id}>
-            <button className="lghead" onClick={() => go(`league/${l.id}/scores`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
+            <button className="lghead" onClick={() => go(`league/${l.id}/scores${l.sport === 'football' ? '' : '/' + ymdOf(new Date([...list].map((g) => g.date).sort()[0]))}`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
             {list.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
           </div>
         );
@@ -230,14 +230,14 @@ function gameDayFor(dates, today) {
 const ymdOf = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 const dateOf = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), 12);
 const dashOf = (s) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-function LeagueScores({ lg }) {
+function LeagueScores({ lg, startDay }) {
   const L = LEAGUE[lg];
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const base = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   const [wk, setWk] = useSticky('wk', null); // 'type:week'
   const [yr, setYr] = useSticky('yr', null); // football season year; null = this season
-  const [day, setDay] = useSticky('day', null); // 'YYYYMMDD'
+  const [day, setDay] = useSticky('day', startDay || null); // 'YYYYMMDD'
   const [cal, setCal] = useState(false);
   const [month, setMonth] = useState(null); // first of the month shown in the calendar
   const b = base.data;
@@ -349,7 +349,7 @@ function Leagues() {
   );
 }
 
-function LeaguePage({ lg, focus, start }) {
+function LeaguePage({ lg, focus, start, startDay }) {
   const L = LEAGUE[lg];
   const [tab, setTab] = useSticky('tab', start || 'standings');
   const [by, setBy] = useSticky('by', null);
@@ -389,9 +389,9 @@ function LeaguePage({ lg, focus, start }) {
       <div className="seg" role="group" aria-label="View">
         <button aria-pressed={tab === 'standings'} onClick={() => setTab('standings')}>Standings</button>
         {L.college ? <button aria-pressed={tab === 'rankings'} onClick={() => setTab('rankings')}>Rankings</button> : null}
-        <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Scores</button>
+        <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Schedule</button>
       </div>
-      {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? <LeagueScores lg={lg} /> : (
+      {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? <LeagueScores lg={lg} startDay={startDay} /> : (
         (st.loading && !st.data) || hunting ? <>{divPicker}<Loading rows={6} /></> : st.error && !st.data ? <>{divPicker}<Problem error={st.error} retry={st.reload} /></> :
           !st.data.groups.length ? <>{divPicker}<Empty>{divs.length > 1 ? `The scores feed has no ${divs.find((d) => d.id === div)?.label} standings.` : `No standings for ${L.name} right now.`}</Empty></> : (() => {
             const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];
