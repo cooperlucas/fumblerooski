@@ -342,6 +342,7 @@ test('rankings: playoff committee first, movement, votes, others and dropped', a
   assert.deepEqual(r.polls.map((p) => p.name), ['CFP Rankings', 'AP Poll', 'Coaches Poll']);
   const ap = r.polls[1];
   assert.equal(ap.ranks[0].rank, 1);
+  assert.equal(ap.released, '2026-11-08T19:00Z');
   assert.equal(ap.ranks[0].move, 1);   // was 2, now 1
   assert.equal(ap.ranks[1].move, -1);  // was 1, now 2
   assert.equal(ap.ranks[2].move, 0);

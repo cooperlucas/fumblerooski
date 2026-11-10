@@ -82,7 +82,17 @@ function Ticker() {
 }
 
 /* ---------- Scores ---------- */
-const DAYS = [-3, -2, -1, 0, 1, 2, 3];
+const DAYS = [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7];
+const ymdDash = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Small-college teams (D2, D3 and the like) turn up as opponents, but the feed has no rosters or player pages for them.
+// A college team counts as covered when it is in its league's standings; pro leagues are always covered.
+function useCovered(lg) {
+  const college = !!LEAGUE[lg]?.college;
+  const st = useQuery(college ? `standings:${lg}` : null, () => getStandings(lg), () => 600000);
+  return useMemo(() => (college ? new Set((st.data?.groups || []).flatMap((g) => g.rows.map((r) => r.team.id))) : null), [college, st.data]);
+}
+const isCovered = (set, id) => !set || set.has(String(id));
 // Until noon, today's games have not started, so lead with last night's results and put today's slate under them.
 const MORNING_UNTIL = 12;
 const isMorning = () => new Date().getHours() < MORNING_UNTIL;
@@ -95,7 +105,7 @@ function Board({ games, pick, favSet, title }) {
   return (
     <>
       {title ? <div className="sechead" style={{ marginTop: 22 }}><H2>{title}</H2></div> : null}
-      {!shown.length ? <Empty>No games.</Empty> : null}
+      {!shown.length ? <Empty>No {pick === 'all' ? '' : LEAGUE[pick].short + ' '}games.</Empty> : null}
       {mine.length ? (
         <div className="card">
           <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
@@ -128,6 +138,10 @@ function Scores() {
   const both = [...last, ...today];
   const leagues = LEAGUES.filter((l) => both.some((g) => g.lg === l.id));
   const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
+  const inPick = (g) => pick === 'all' || g.lg === pick;
+  const showLast = morning && last.some(inPick); // nothing last night in this league: go straight to today
+  const far = !DAYS.includes(off);
+  const pickDate = (v) => { const [yy, mm, dd] = v.split('-').map(Number); if (!yy) return; const t = new Date(yy, mm - 1, dd, 12); setOff(Math.round((t - dayOffset(0)) / 864e5)); };
   const busy = (q.loading && !q.data) || (morning && y.loading && !y.data);
   const err = q.error && !q.data ? q : null;
   return (
@@ -139,10 +153,18 @@ function Scores() {
             <span>{d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
           </button>); })}
       </div>
-      {busy ? <Loading rows={5} /> : err ? <Problem error={err.error} retry={err.reload} /> : !both.length ? <Empty>No games on this day.</Empty> : (
+      <div className="datebar">
+        <label className="pick date">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style={{ position: 'static' }}><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M3 10 H21 M8 3 V7 M16 3 V7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
+          <span>{far ? dayOffset(off).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Any date'}</span>
+          <input type="date" aria-label="Go to any date" value={ymdDash(dayOffset(off))} min="2002-01-01" max={`${new Date().getFullYear() + 1}-12-31`} onChange={(e) => pickDate(e.target.value)} />
+        </label>
+        {off !== 0 ? <button className="link" onClick={() => setOff(0)}>Back to today</button> : null}
+      </div>
+      {busy ? <Loading rows={5} /> : err ? <Problem error={err.error} retry={err.reload} /> : !both.length ? <Empty>No games on {off === 0 ? 'the board today' : dayOffset(off).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.</Empty> : (
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
-            <H2>{morning && last.length ? 'Last Night' : off === 0 ? 'Today' : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
+            <H2>{showLast ? 'Last Night' : off === 0 ? 'Today' : far ? dayOffset(off).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
             {leagues.length > 1 ? (
               <label className="pick">
                 <span style={{ position: 'absolute', left: -9999 }}>League</span>
@@ -154,7 +176,7 @@ function Scores() {
               </label>
             ) : null}
           </div>
-          {morning && last.length ? (
+          {showLast ? (
             <>
               <Board games={last} pick={pick} favSet={favSet} />
               <Board games={today} pick={pick} favSet={favSet} title="Today" />
@@ -260,7 +282,7 @@ function Rankings({ lg, focus }) {
   return (
     <>
       <div className="sechead" style={{ marginTop: 14 }}>
-        <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{p.note}</span>
+        <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{[p.note, p.released && !isNaN(new Date(p.released)) ? `Released ${new Date(p.released).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}` : ''].filter(Boolean).join(' · ')}</span>
         {polls.length > 1 ? <Picker label="Poll" value={p.id} onChange={setPid}>{polls.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Picker> : <b className="ptitle">{p.name}</b>}
       </div>
       <div className="card" style={{ marginTop: 10 }}>
@@ -393,7 +415,9 @@ function TeamPage({ lg, id }) {
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
   const sched = q.data?.schedule || [];
-  const [view, setView] = useState('schedule');
+  const [viewRaw, setView] = useState('schedule');
+  const full = isCovered(useCovered(lg), id);
+  const view = full ? viewRaw : 'schedule';
   const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
@@ -426,10 +450,12 @@ function TeamPage({ lg, id }) {
               <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned' : 'Pin Team'}</button>
               <button className="btn" onClick={() => go(`league/${lg}/${id}`)}><LgTag lg={lg} /> Standings</button>
             </div>
-            <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
-              <button aria-pressed={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>
-              <button aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button>
-            </div>
+            {full ? (
+              <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
+                <button aria-pressed={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>
+                <button aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button>
+              </div>
+            ) : <div style={{ marginTop: 14 }}><H2>Schedule</H2></div>}
             {view === 'schedule' ? (
               <section className="sec" style={{ marginTop: 12 }}>
                 {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
@@ -794,6 +820,7 @@ function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];
   const cur = box[side];
+  const linkPlayers = isCovered(useCovered(game.lg), teams[side].id); // no player pages for small-college opponents
   const hasBench = sport === 'basketball';
   const noPm = sport === 'basketball' && cur.groups.length > 0 && !cur.groups.some((g) => g.labels.includes('+/-'));
   return (
@@ -812,7 +839,7 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.id ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
+                    <tr><th scope="row" className="who">{r.id && linkPlayers ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
                   </React.Fragment>
                 ))}
                 {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}

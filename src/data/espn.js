@@ -42,10 +42,9 @@ const lum = (h) => {
   const n = parseInt(h, 16), c = [n >> 16 & 255, n >> 8 & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 };
-function hashColor(s) {
-  let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return `hsl(${h % 360} 55% 38%)`;
-}
+// No known color (mostly small colleges the feed barely describes): a plain slate chip, not a made-up team color.
+// Kept as an hsl() string on purpose: anything not starting with # reads as "stand-in" to the color lookups.
+function hashColor() { return 'hsl(226 20% 36%)'; }
 // A team chip needs a color that shows up on a navy screen with white letters.
 export function teamColor(color, alt, seed) {
   const a = hexOk(color) ? color : null, b = hexOk(alt) ? alt : null;
@@ -499,14 +498,15 @@ export async function searchPlayers(text) {
 /* ---------- college polls ---------- */
 // Polls in the order fans care about: the Playoff committee when it is out, then AP, then Coaches.
 const POLL_ORDER = (p) => (/playoff|cfp/i.test(p.name + p.type) ? 0 : /\bap\b/i.test(p.name + ' ' + p.type) ? 1 : /coach|usa/i.test(p.name + p.type) ? 2 : 3);
-export async function getRankings(lg) {
-  const d = await get(url(SITE, lg, '/rankings'));
+function normPolls(d, lg) {
   const team = (r) => normTeam({ ...(r.team || {}), id: r.team?.id ?? r.id }, lg);
-  const polls = (d.rankings || []).map((p) => ({
+  return (d?.rankings || []).map((p) => ({
     id: String(p.id ?? p.type ?? p.name ?? ''),
     name: cleanText(p.shortName || p.name || 'Poll'),
     full: cleanText(p.name || p.shortName || 'Poll'),
     type: String(p.type || ''),
+    week: Number(p.occurrence?.number) || 0,
+    released: p.date || p.lastUpdated || null, // when this poll came out
     note: cleanText(p.occurrence?.displayValue || p.headline || ''),
     ranks: (p.ranks || []).map((r) => {
       const cur = Number(r.current), prev = Number(r.previous);
@@ -520,6 +520,24 @@ export async function getRankings(lg) {
     others: (p.others || []).map((r) => ({ team: team(r), points: Number(r.points) || 0 })).filter((r) => r.team.id && r.points).sort((a, b) => b.points - a.points),
     dropped: (p.droppedOut || []).map((r) => team(r)).filter((t) => t.id),
   })).filter((p) => p.ranks.length);
+}
+const isPlayoff = (p) => /playoff|cfp/i.test(p.name + p.full + p.type);
+export async function getRankings(lg) {
+  const d = await get(url(SITE, lg, '/rankings'));
+  const polls = normPolls(d, lg);
+  // The committee's ranking comes out Tuesday night, two days after the polls. Between Sunday and Tuesday the feed
+  // lists only the new week's polls, so go back a week for the standing playoff ranking.
+  if (lg === 'cfb' && polls.length && !polls.some(isPlayoff)) {
+    const week = Math.max(...polls.map((p) => p.week), Number(d.latestWeek?.number) || 0);
+    const season = d.latestSeason?.year || d.season?.year;
+    for (const back of week > 1 ? [week - 1, week - 2] : []) {
+      if (back < 1) continue;
+      try {
+        const old = normPolls(await get(url(SITE, lg, '/rankings', { seasontype: '2', week: String(back), ...(season ? { season: String(season) } : {}) })), lg).find(isPlayoff);
+        if (old && old.week && old.week !== week) { polls.push({ ...old, note: `${old.note || 'Last week'} · new ranking Tuesday night` }); break; }
+      } catch { /* no playoff ranking to show */ }
+    }
+  }
   polls.sort((a, b) => POLL_ORDER(a) - POLL_ORDER(b));
   return { lg, polls };
 }

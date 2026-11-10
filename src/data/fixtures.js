@@ -286,7 +286,7 @@ function teamStatsFx(lg) {
 /* ---------- polls ---------- */
 function rankingsFx(lg) {
   const rows = T[lg] || T.cfb;
-  const poll = (id, name, shortName, type, order, pts) => ({ id, name, shortName, type, headline: `${name} Week 11`, occurrence: { displayValue: 'Week 11' },
+  const poll = (id, name, shortName, type, order, pts) => ({ id, name, shortName, type, headline: `${name} Week 11`, date: '2026-11-08T19:00Z', occurrence: { number: 11, displayValue: 'Week 11' },
     ranks: order.map((k, i) => ({ current: i + 1, previous: [2, 1, 3, 0, 4, 7][i] ?? i + 1, points: pts ? 1550 - i * 61 : 0, firstPlaceVotes: pts && i < 2 ? 40 - i * 25 : 0, recordSummary: `${9 - i}-${i}`, team: { id: rows[k % rows.length][0], location: rows[k % rows.length][2], name: rows[k % rows.length][1], abbreviation: rows[k % rows.length][3] } })),
     others: pts ? [{ points: 44, team: { id: 'x9', location: 'Demo Tech', abbreviation: 'DT' } }] : [], droppedOut: pts ? [{ team: { id: 'x8', location: 'Slipping State', abbreviation: 'SLIP' } }] : [] });
   const order = rows.map((_, i) => i);
