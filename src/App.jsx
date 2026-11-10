@@ -634,7 +634,9 @@ function TeamPage({ lg, id }) {
   const polls = useQuery(LEAGUE[lg].college ? `rankings:${lg}` : null, () => getRankings(lg), () => 1800000).data?.polls || [];
   const pollRanks = polls.map((p) => ({ name: /cfp|playoff/i.test(p.name + p.type) ? 'CFP' : /\bap\b/i.test(p.name) ? 'AP' : /coach|usa/i.test(p.name + p.type) ? 'Coaches' : p.name, r: p.ranks.find((x) => x.team.id === String(id))?.rank }))
     .filter((x) => x.r && ['CFP', 'AP', 'Coaches'].includes(x.name));
-  const topRank = pollRanks[0]?.r || q.data?.rank || null;
+  // The gold number is the main poll only (CFP when it is out, else AP). Ranked elsewhere: just the small poll line.
+  const mainPoll = polls[0];
+  const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || null);
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
@@ -660,7 +662,7 @@ function TeamPage({ lg, id }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
                 <p>{[q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {topRank ? <p className="hrank"><b>No. {topRank}</b>{pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                {topRank || pollRanks.length ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
