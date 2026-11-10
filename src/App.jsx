@@ -145,57 +145,157 @@ function Board({ games, pick, favSet, title }) {
   );
 }
 
+// The day's best games per league for Top Events: your teams, then live, then ranked matchups, then by start time.
+const RANKED = (g) => (g.away.rank ? 1 : 0) + (g.home.rank ? 1 : 0);
+function topOf(games, favSet, n) {
+  const order = { live: 0, pre: 1, final: 2, off: 3 };
+  return [...games].sort((a, b) => (isFavGame(b, favSet) - isFavGame(a, favSet)) || (order[a.state] - order[b.state]) || (RANKED(b) - RANKED(a)) || String(a.date).localeCompare(String(b.date))).slice(0, n);
+}
+
 function Scores() {
-  const [off, setOff] = useSticky('off', 0);
-  const [lg, setLg] = useSticky('lg', 'all');
+  const [lg, setLg] = useSticky('lg', 'top');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const q = useDay(off);
-  const today = q.data?.games || [];
-  const both = today; // last night's finals ride the ticker until noon; the board itself is just the chosen day
-  const leagues = LEAGUES.filter((l) => both.some((g) => g.lg === l.id));
-  const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
-  const far = !DAYS.includes(off);
-  const pickDate = (v) => { const [yy, mm, dd] = v.split('-').map(Number); if (!yy) return; const t = new Date(yy, mm - 1, dd, 12); setOff(Math.round((t - dayOffset(0)) / 864e5)); };
-  const busy = q.loading && !q.data;
-  const err = q.error && !q.data ? q : null;
+  const day = useDay(0);
+  const pickL = LEAGUE[lg] ? lg : null;
+  // A league's own slate: today, or this week for football.
+  const sb = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const today = day.data?.games || [];
+  const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
+  const leagues = LEAGUES.filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+  const q = pickL ? sb : day;
   return (
     <>
-      <div className="chips" role="group" aria-label="Day">
-        {DAYS.map((n) => { const d = dayOffset(n); return (
-          <button key={n} className="daychip" aria-pressed={off === n} onClick={() => setOff(n)}>
-            <b>{n === 0 ? 'TODAY' : d.toLocaleDateString([], { weekday: 'short' }).toUpperCase()}</b>
-            <span>{d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-          </button>); })}
+      <div className="chips" role="group" aria-label="League">
+        <button className="chipb" aria-pressed={!pickL} onClick={() => setLg('top')}>Top Events</button>
+        {LEAGUES.map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
-      <div className="datebar">
-        <label className="pick date">
-          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style={{ position: 'static' }}><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M3 10 H21 M8 3 V7 M16 3 V7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
-          <span>{far ? dayOffset(off).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Any date'}</span>
-          <input type="date" aria-label="Go to any date" value={ymdDash(dayOffset(off))} min="2002-01-01" max={`${new Date().getFullYear() + 1}-12-31`} onChange={(e) => pickDate(e.target.value)} />
-        </label>
-        {off !== 0 ? <button className="link" onClick={() => setOff(0)}>Back to today</button> : null}
-      </div>
-      {busy ? <Loading rows={5} /> : err ? <Problem error={err.error} retry={err.reload} /> : !both.length ? <Empty>No games on {off === 0 ? 'the board today' : dayOffset(off).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.</Empty> : (
+      {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
+        !today.length ? <Empty>No games on the board today.</Empty> : (
+          <>
+            {mine.length ? (
+              <div className="card" style={{ marginTop: 14 }}>
+                <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
+                {mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}
+              </div>
+            ) : null}
+            {leagues.map((l) => {
+              const all = today.filter((g) => g.lg === l.id && !isFavGame(g, favSet));
+              return (
+                <div className="card" key={l.id} style={{ marginTop: 14 }}>
+                  <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: l.color }}>{l.name}</b>
+                    <button className="link" onClick={() => setLg(l.id)}>See all{all.length > 4 ? ` ${all.length}` : ''} ›</button></div>
+                  {topOf(all, favSet, 4).map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
+                </div>
+              );
+            })}
+          </>
+        )
+      ) : (
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
-            <H2>{off === 0 ? 'Today' : far ? dayOffset(off).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
-            {leagues.length > 1 ? (
-              <label className="pick">
-                <span style={{ position: 'absolute', left: -9999 }}>League</span>
-                <select value={pick} onChange={(e) => setLg(e.target.value)}>
-                  <option value="all">All leagues</option>
-                  {leagues.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}
-                </select>
-                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </label>
-            ) : null}
+            <H2>{LEAGUE[pickL].name}</H2>
+            <button className="link" onClick={() => go(`league/${pickL}`)}>Standings ›</button>
           </div>
-          <Board games={today} pick={pick} favSet={favSet} />
-          {!favs.length ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
+          {sb.data.weeks && sb.data.current.week ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</p> : null}
+          {sb.data.games.length ? <Board games={sb.data.games} pick="all" favSet={favSet} /> : <Empty>No {LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
         </>
       )}
-      <Stamp at={q.updatedAt} live={both.some((g) => g.state === 'live')} />
+      {!favs.length && !pickL ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
+      <Stamp at={q.updatedAt} live={(q.data?.games || []).some((g) => g.state === 'live')} />
+    </>
+  );
+}
+
+/* ---------- A league's scores, by week (football) or by day with a calendar ---------- */
+const ymdOf = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+const dateOf = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), 12);
+const dashOf = (s) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+function LeagueScores({ lg }) {
+  const L = LEAGUE[lg];
+  const favs = useFavs();
+  const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
+  const base = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const [wk, setWk] = useSticky('wk', null); // 'type:week'
+  const [day, setDay] = useSticky('day', null); // 'YYYYMMDD'
+  const [cal, setCal] = useState(false);
+  const [month, setMonth] = useState(null); // first of the month shown in the calendar
+  const b = base.data;
+  const weekMode = !!b?.weeks?.length;
+  const curWk = b?.current?.week ? `${b.current.type}:${b.current.week}` : null;
+  const wkKey = wk || curWk;
+  const today = ymdOf(new Date());
+  const dayKey = day || today;
+  const [wt, wn] = (wkKey || '').split(':').map(Number);
+  const isBase = weekMode ? wkKey === curWk : dayKey === (b?.current?.day ? b.current.day.replace(/-/g, '') : today);
+  const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${wkKey}` : `board:${lg}:d${dayKey}`) : null,
+    () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt }) : getScoreboard(lg, dayKey)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
+  const q = isBase ? base : sel;
+  const dates = useMemo(() => new Set([...(b?.dates || []), ...(sel.data?.dates || [])].map((x) => x.replace(/-/g, ''))), [b, sel.data]);
+  if (base.loading && !b) return <Loading rows={5} />;
+  if (base.error && !b) return <Problem error={base.error} retry={base.reload} />;
+
+  const pickDay = (s) => { setDay(s); setCal(false); };
+  const strip = Array.from({ length: 7 }, (_, i) => { const d = dateOf(dayKey); d.setDate(d.getDate() + i - 3); return ymdOf(d); });
+  const m0 = month || (() => { const d = dateOf(dayKey); d.setDate(1); return d; })();
+  const grid = (() => {
+    const first = new Date(m0.getFullYear(), m0.getMonth(), 1, 12);
+    const cells = Array(first.getDay()).fill(null);
+    const n = new Date(m0.getFullYear(), m0.getMonth() + 1, 0).getDate();
+    for (let i = 1; i <= n; i++) cells.push(ymdOf(new Date(m0.getFullYear(), m0.getMonth(), i, 12)));
+    return cells;
+  })();
+  const shiftMonth = (k) => setMonth(new Date(m0.getFullYear(), m0.getMonth() + k, 1, 12));
+  const games = q.data?.games || [];
+  return (
+    <>
+      {weekMode ? (
+        <div className="sechead" style={{ marginTop: 14 }}>
+          <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{(b.weeks.find((w) => `${w.type}:${w.week}` === wkKey) || {}).detail || ''}</span>
+          <Picker label="Week" value={wkKey || ''} onChange={setWk}>{b.weeks.map((w) => <option key={`${w.type}:${w.week}`} value={`${w.type}:${w.week}`}>{w.label}</option>)}</Picker>
+        </div>
+      ) : (
+        <>
+          <div className="chips" role="group" aria-label="Day" style={{ marginTop: 10 }}>
+            {strip.map((s) => { const d = dateOf(s); return (
+              <button key={s} className="daychip" aria-pressed={s === dayKey} onClick={() => pickDay(s)}>
+                <b>{s === today ? 'TODAY' : d.toLocaleDateString([], { weekday: 'short' }).toUpperCase()}</b>
+                <span>{d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                {dates.has(s) ? <i className="gdot" aria-label="Games" /> : <i className="gdot off" />}
+              </button>); })}
+          </div>
+          <div className="datebar">
+            <button className="pick date" onClick={() => { setMonth(null); setCal(!cal); }} aria-expanded={cal}>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style={{ position: 'static' }}><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M3 10 H21 M8 3 V7 M16 3 V7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
+              <span>{dateOf(dayKey).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            </button>
+            {dayKey !== today ? <button className="link" onClick={() => pickDay(today)}>Today</button> : null}
+          </div>
+          {cal ? (
+            <div className="card pad calbox">
+              <div className="calhead">
+                <button className="round sm" aria-label="Previous month" onClick={() => shiftMonth(-1)}>‹</button>
+                <b>{m0.toLocaleDateString([], { month: 'long', year: 'numeric' })}</b>
+                <button className="round sm" aria-label="Next month" onClick={() => shiftMonth(1)}>›</button>
+              </div>
+              <div className="calgrid">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((x, i) => <span key={'h' + i} className="dow">{x}</span>)}
+                {grid.map((s, i) => s ? (
+                  <button key={s} className={'cday' + (s === dayKey ? ' on' : '') + (s === today ? ' now' : '')} onClick={() => pickDay(s)} aria-label={dateOf(s).toDateString() + (dates.has(s) ? ', games' : '')}>
+                    {+s.slice(6)}{dates.has(s) ? <i className="gdot" /> : null}
+                  </button>
+                ) : <span key={'e' + i} />)}
+              </div>
+              <label className="link" style={{ display: 'block', textAlign: 'center', marginTop: 10, position: 'relative' }}>Jump to another year
+                <input type="date" aria-label="Pick any date" value={dashOf(dayKey)} min="2002-01-01" onChange={(e) => { const v = e.target.value.replace(/-/g, ''); if (v.length === 8) { pickDay(v); setMonth(null); } }} style={{ position: 'absolute', inset: 0, opacity: 0 }} />
+              </label>
+            </div>
+          ) : null}
+        </>
+      )}
+      {q.loading && !q.data ? <Loading rows={4} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> :
+        games.length ? <Board games={games} pick="all" favSet={favSet} /> : <Empty>No {L.short} games {weekMode ? 'this week' : 'on this day'}.</Empty>}
+      <Stamp at={q.updatedAt} live={games.some((g) => g.state === 'live')} />
     </>
   );
 }
@@ -249,7 +349,6 @@ function LeaguePage({ lg, focus }) {
     const groups = [...st.data.groups].sort((x, y) => y.rows.some((r) => r.team.id === String(focus)) - x.rows.some((r) => r.team.id === String(focus)));
     ensureColors(groups.flatMap((g) => g.rows.map((r) => r.team)), 36);
   }, [st.data, focus]);
-  const sb = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   return (
     <>
       <div className="seg" role="group" aria-label="View">
@@ -257,10 +356,7 @@ function LeaguePage({ lg, focus }) {
         {L.college ? <button aria-pressed={tab === 'rankings'} onClick={() => setTab('rankings')}>Rankings</button> : null}
         <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Scores</button>
       </div>
-      {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? (
-        sb.loading && !sb.data ? <Loading /> : sb.error && !sb.data ? <Problem error={sb.error} retry={sb.reload} /> :
-          sb.data.games.length ? <div className="card">{sb.data.games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}</div> : <Empty>No {L.short} games on the current slate.</Empty>
-      ) : (
+      {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? <LeagueScores lg={lg} /> : (
         (st.loading && !st.data) || hunting ? <>{divPicker}<Loading rows={6} /></> : st.error && !st.data ? <>{divPicker}<Problem error={st.error} retry={st.reload} /></> :
           !st.data.groups.length ? <>{divPicker}<Empty>{divs.length > 1 ? `The scores feed has no ${divs.find((d) => d.id === div)?.label} standings.` : `No standings for ${L.name} right now.`}</Empty></> : (() => {
             const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];

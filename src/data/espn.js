@@ -202,11 +202,24 @@ export function normEvent(ev, lg) {
 
 /* ---------- scoreboard ---------- */
 // day: 'YYYYMMDD' or undefined for the feed's current slate.
-export async function getScoreboard(lg, day) {
+// day: 'YYYYMMDD'. week: { week, type, year } for football's week-by-week slates.
+export async function getScoreboard(lg, day, week) {
   const L = LEAGUE[lg];
-  const data = await get(url(SITE, lg, '/scoreboard', { ...(L.params || {}), ...(day ? { dates: day } : {}) }));
+  const wk = week ? { week: String(week.week), seasontype: String(week.type), ...(week.year ? { dates: String(week.year) } : {}) } : {};
+  const data = await get(url(SITE, lg, '/scoreboard', { ...(L.params || {}), ...(day ? { dates: day } : {}), ...wk }));
   const games = (data.events || []).map((e) => normEvent(e, lg)).filter((g) => g.id && g.home.id && g.away.id);
-  return { lg, games, season: data.leagues?.[0]?.season?.type?.name || '' };
+  const Lg = data.leagues?.[0] || {};
+  const cal = Lg.calendar || [];
+  // Football's calendar is weeks; everyone else's is the list of dates that have games (used for the calendar dots).
+  const weeks = Lg.calendarType === 'list' ? cal.flatMap((t) => (t.entries || []).map((e) => ({ week: Number(e.value), type: Number(t.value), label: cleanText(e.label || ''), detail: cleanText(e.detail || ''), start: e.startDate, end: e.endDate })))
+    .filter((w) => w.week && w.type !== 4 && (w.type !== 1 || L.sport === 'football' && !L.college)) : null;
+  const dates = Lg.calendarType === 'day' ? cal.map((x) => String(x).slice(0, 10)) : null;
+  return {
+    lg, games, season: Lg.season?.type?.name || '',
+    year: Number(data.season?.year || Lg.season?.year) || null,
+    weeks, dates,
+    current: weeks ? { week: Number(data.week?.number) || null, type: Number(data.season?.type) || null } : { day: data.day?.date || null },
+  };
 }
 
 /* ---------- standings ---------- */
@@ -290,23 +303,26 @@ export const DIVISIONS = {
 // Divisions whose teams the feed covers in full (rosters, player pages).
 export const FULL_DIVISIONS = { cfb: ['fbs', 'fcs'], ncaam: ['d1'], ncaaw: ['d1'] };
 const groupWorks = new Map(); // 'lg:div' -> the group id that answered
-async function divisionRead(lg, div) {
+async function divisionRead(lg, div, season) {
   const d = (DIVISIONS[lg] || []).find((x) => x.id === div);
-  if (!d || !d.groups.length) return get(url(V2, lg, '/standings'));
+  const yr = season ? { season: String(season) } : {};
+  if (!d || !d.groups.length) return get(url(V2, lg, '/standings', yr));
   const tries = groupWorks.has(`${lg}:${div}`) ? [groupWorks.get(`${lg}:${div}`)] : d.groups;
   for (const g of tries) {
     try {
-      const data = await get(url(V2, lg, '/standings', { group: g }));
+      const data = await get(url(V2, lg, '/standings', { group: g, ...yr }));
       if (entryTeams(data).length) { groupWorks.set(`${lg}:${div}`, g); return data; }
     } catch { /* try the next id */ }
   }
   return { children: [] }; // the feed has no standings for this division
 }
-export async function getStandings(lg, div) {
+// season: the feed's season year (basketball and hockey count the year a season ends: 2027 = 2026-27). Empty = current.
+export async function getStandings(lg, div, season) {
   const L = LEAGUE[lg];
+  const yr = season ? { season: String(season) } : {};
   const [conf, div3] = await Promise.allSettled([
-    L.college ? divisionRead(lg, div) : get(url(V2, lg, '/standings')),
-    L.college ? Promise.reject(new Error('skip')) : get(url(V2, lg, '/standings', { level: '3' })),
+    L.college ? divisionRead(lg, div, season) : get(url(V2, lg, '/standings', yr)),
+    L.college ? Promise.reject(new Error('skip')) : get(url(V2, lg, '/standings', { level: '3', ...yr })),
   ]);
   if (conf.status !== 'fulfilled') throw conf.reason;
   // Standings rows usually carry no team colors: pull the team list once so the chips are the real colors.
@@ -316,7 +332,10 @@ export async function getStandings(lg, div) {
   const views = divisions.length > groups.length
     ? [{ id: 'division', label: 'Division', groups: divisions }, { id: 'conference', label: groups.length > 1 ? 'Conference' : 'League', groups }]
     : [{ id: 'conference', label: 'Conference', groups }];
-  return { lg, groups, views };
+  // Seasons the feed keeps, newest first, for the year picker.
+  const seasons = (conf.value.seasons || []).map((x) => ({ year: Number(x.year), label: String(x.seasonYears && L.sport !== 'football' && L.sport !== 'baseball' ? x.seasonYears : x.year) }))
+    .filter((x) => x.year).sort((a, b) => b.year - a.year).slice(0, 15);
+  return { lg, groups, views, seasons, season: Number(conf.value.children?.[0]?.standings?.season || conf.value.season?.year) || seasons[0]?.year || null };
 }
 
 /* ---------- teams ---------- */

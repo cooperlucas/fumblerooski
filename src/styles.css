@@ -360,3 +360,23 @@ h1, h2, h3, p { margin: 0; }
 .srow .col:last-child { color: var(--ink); font-weight: 800; }
 .dscore { display: inline-flex; gap: 4px; margin-left: 10px; padding: 2px 8px; border-radius: 6px; background: #232C50; color: var(--soft); font-stretch: 100%; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; vertical-align: 2px; }
 .dscore b { color: var(--ink); }
+
+/* league calendar */
+.daychip { position: relative; }
+.gdot { display: block; width: 5px; height: 5px; margin-top: 3px; border-radius: 50%; background: var(--yellow); }
+.gdot.off { background: transparent; }
+.daychip[aria-pressed="true"] .gdot { background: var(--bg); }
+button.pick.date { cursor: pointer; }
+.calbox { margin-top: 10px; }
+.calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calhead b { font-stretch: 112%; font-style: italic; font-weight: 900; }
+.round.sm { width: 34px; height: 34px; font-size: 20px; font-weight: 900; color: var(--ink); }
+.calgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.calgrid .dow { font-size: 10px; font-weight: 800; color: var(--dim); padding: 4px 0; }
+.cday { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 40px; border: none; border-radius: 10px; background: transparent; color: var(--ink); font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
+.cday .gdot { margin-top: 2px; }
+.cday.now { box-shadow: inset 0 0 0 1px var(--line3); }
+.cday.on { background: var(--yellow); color: var(--bg); }
+.cday.on .gdot { background: var(--bg); }
+.lghead .link { font-size: 12px; }
+.lghead .link { margin-left: auto; }
