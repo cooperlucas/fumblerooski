@@ -7,10 +7,35 @@ import { liveColor } from './data/espn.js';
 /* ---------- navigation: plain hash routes so the phone's back button just works ---------- */
 // The demo-locked preview keeps its route in memory instead, since its host does not pass path-style hashes through.
 const mem = { stack: [''], subs: new Set() };
+// Coming back to a screen (back button or swipe) should put it back the way it was: same filters, same scroll.
+// Going to a screen fresh starts it clean.
+let forward = false, wentBack = false;
+if (typeof window !== 'undefined') window.addEventListener('popstate', () => { wentBack = !forward; forward = false; });
+const sticky = new Map(); // path -> { name: value, scroll: number }
+let lastPath = null;
+// Called by the app on every render with the current path: decides whether this visit restores or starts clean.
+export function enterRoute(path) {
+  if (path === lastPath) return false;
+  lastPath = path;
+  const back = wentBack; wentBack = false;
+  if (!back) sticky.delete(path);
+  return back;
+}
+const bucket = (path) => { if (!sticky.has(path)) sticky.set(path, {}); return sticky.get(path); };
+// useState that survives leaving the screen and coming back to it.
+export function useSticky(name, init) {
+  const path = lastPath;
+  const b = bucket(path);
+  const [v, setV] = React.useState(() => (name in b ? b[name] : typeof init === 'function' ? init() : init));
+  const set = React.useCallback((x) => setV((old) => { const nv = typeof x === 'function' ? x(old) : x; bucket(path)[name] = nv; return nv; }), [path, name]);
+  return [v, set];
+}
+export const saveScroll = (top) => { if (lastPath != null) bucket(lastPath).scroll = top; };
+export const savedScroll = (path) => sticky.get(path)?.scroll || 0;
 const tell = () => mem.subs.forEach((f) => f());
-export const go = (path) => { if (demoLocked) { mem.stack.push(path); tell(); } else location.hash = '#/' + path; };
+export const go = (path) => { if (demoLocked) { mem.stack.push(path); tell(); } else { forward = true; location.hash = '#/' + path; } };
 export const back = () => {
-  if (demoLocked) { if (mem.stack.length > 1) mem.stack.pop(); else mem.stack = ['']; tell(); }
+  if (demoLocked) { wentBack = true; if (mem.stack.length > 1) mem.stack.pop(); else mem.stack = ['']; tell(); }
   else if (history.length > 1) history.back(); else go('');
 };
 const split = (p) => p.split('/').filter(Boolean).map(decodeURIComponent);

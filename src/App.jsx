@@ -3,13 +3,31 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
-import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
+import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
 
 export default function App() {
   const parts = useRoute();
+  const path = parts.join('/');
+  const back = enterRoute(path);
+  // Back to a screen: return to where it was scrolled, once its content is there to scroll.
+  useEffect(() => {
+    const target = back ? savedScroll(path) : 0;
+    if (!target) return undefined;
+    let tries = 0;
+    const t = setInterval(() => {
+      const el = document.querySelector('.page');
+      if (el) { el.scrollTop = target; if (Math.abs(el.scrollTop - target) < 4 || ++tries > 40) clearInterval(t); } else if (++tries > 40) clearInterval(t);
+    }, 50);
+    return () => clearInterval(t);
+  }, [path]);
+  useEffect(() => {
+    const on = (e) => { if (e.target?.classList?.contains('page')) saveScroll(e.target.scrollTop); };
+    document.addEventListener('scroll', on, true);
+    return () => document.removeEventListener('scroll', on, true);
+  }, []);
   const [, repaint] = useState(0);
   useEffect(() => onColors(() => repaint((n) => n + 1)), []);
   const [name = '', a, b] = parts;
@@ -128,8 +146,8 @@ function Board({ games, pick, favSet, title }) {
 }
 
 function Scores() {
-  const [off, setOff] = useState(0);
-  const [lg, setLg] = useState('all');
+  const [off, setOff] = useSticky('off', 0);
+  const [lg, setLg] = useSticky('lg', 'all');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const q = useDay(off);
@@ -206,12 +224,12 @@ function Leagues() {
 
 function LeaguePage({ lg, focus }) {
   const L = LEAGUE[lg];
-  const [tab, setTab] = useState('standings');
-  const [by, setBy] = useState(null);
-  const [all, setAll] = useState(false);
+  const [tab, setTab] = useSticky('tab', 'standings');
+  const [by, setBy] = useSticky('by', null);
+  const [all, setAll] = useSticky('all', false);
   const divs = DIVISIONS[lg] || [];
-  const [div, setDiv] = useState(divs[0]?.id);
-  const [hunting, setHunting] = useState(!!focus && divs.length > 1);
+  const [div, setDiv] = useSticky('div', divs[0]?.id);
+  const [hunting, setHunting] = useSticky('hunting', !!focus && divs.length > 1);
   const st = useQuery(`standings:${lg}${divs.length ? ':' + div : ''}`, () => getStandings(lg, div), () => 600000);
   // From a team page: if the team is not in this division, step down the divisions until we find it.
   useEffect(() => {
@@ -322,9 +340,9 @@ const Picker = ({ label, value, onChange, children }) => (
 );
 const remember = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* fine */ } } };
 function Stats({ start }) {
-  const [lg, setLgRaw] = useState(() => start || (LEAGUE[remember.get('fr.stats.lg', '')] ? remember.get('fr.stats.lg', '') : 'nfl'));
+  const [lg, setLgRaw] = useSticky('lg', () => start || (LEAGUE[remember.get('fr.stats.lg', '')] ? remember.get('fr.stats.lg', '') : 'nfl'));
   const setLg = (v) => { setLgRaw(v); remember.set('fr.stats.lg', v); };
-  const [view, setView] = useState('leaders');
+  const [view, setView] = useSticky('view', 'leaders');
   return (
     <>
       <div className="sechead" style={{ marginTop: 4 }}>
@@ -363,7 +381,7 @@ function useLeaderFilters(lg) {
 function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   const filters = useLeaderFilters(lg);
-  const [fid, setFid] = useState('all');
+  const [fid, setFid] = useSticky('filter:' + lg, 'all');
   if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
   if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
@@ -475,7 +493,7 @@ function TeamPage({ lg, id }) {
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
   const sched = q.data?.schedule || [];
-  const [viewRaw, setView] = useState('schedule');
+  const [viewRaw, setView] = useSticky('view', 'schedule');
   const full = isCovered(useCovered(lg), id);
   const view = full ? viewRaw : 'schedule';
   const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
@@ -549,7 +567,7 @@ const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th
 const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
 function PlayerPage({ lg, id }) {
   const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
-  const [tab, setTab] = useState('season');
+  const [tab, setTab] = useSticky('tab', 'season');
   const d = q.data, p = d?.player;
   const color = p?.team?.color || '#2B3352';
   const log = d?.gamelog, career = d?.career || [];
@@ -922,7 +940,7 @@ function GamePage({ lg, id }) {
   const title = g ? `${g.away.abbr} at ${g.home.abbr}` : L.name;
   const started = g && (g.state === 'live' || g.state === 'final');
   const periods = g ? Math.max(g.home.lines.length, g.away.lines.length) : 0;
-  const [picked, setTab] = useState('summary');
+  const [picked, setTab] = useSticky('tab', 'summary');
   // Only offer the sections this game actually has.
   const tabs = !d || !started ? [] : [
     ['summary', 'Summary'],
