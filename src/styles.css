@@ -403,3 +403,4 @@ button.pick.date { cursor: pointer; }
 .lghead .link { margin-left: auto; }
 .filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .filters .pick select { max-width: 46vw; text-overflow: ellipsis; }
+.board .brk { display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 5px; background: #FFBE2E; color: #0C1124; font-size: 11px; font-style: normal; text-shadow: none; vertical-align: 2px; }

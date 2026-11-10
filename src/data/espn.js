@@ -162,7 +162,7 @@ const recordOf = (c) => {
 };
 
 function normSide(c, lg) {
-  const rank = c?.curatedRank?.current;
+  const rank = Number(c?.curatedRank?.current ?? c?.rank) || null; // the game page's header calls it rank
   return {
     ...normTeam(c?.team, lg),
     score: scoreOf(c),
@@ -1159,7 +1159,7 @@ export async function getGame(lg, id) {
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
     pitch: L.sport === 'soccer' ? normPitch(data, game) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
-    venue: cleanText(data.gameInfo?.venue?.fullName || ''),
+    venue: [data.gameInfo?.venue?.fullName, [data.gameInfo?.venue?.address?.city, data.gameInfo?.venue?.address?.state || data.gameInfo?.venue?.address?.country].filter(Boolean).join(', ')].filter(Boolean).map(cleanText).join(' · '),
     preview: started ? null : normPreview(data, game, lg),
   };
 }

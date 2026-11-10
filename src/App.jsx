@@ -1141,7 +1141,7 @@ function GamePage({ lg, id }) {
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
-                    <span className="nm">{t.rank ? `${t.rank} ` : ''}{t.name}</span>
+                    <span className="nm">{t.rank ? <span className="brk">{t.rank}</span> : null}{t.name}</span>
                     <span className="rc">{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
