@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, onColors, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -10,6 +10,8 @@ const ROOTS = new Set(['', 'scores', 'leagues']);
 
 export default function App() {
   const parts = useRoute();
+  const [, repaint] = useState(0);
+  useEffect(() => onColors(() => repaint((n) => n + 1)), []);
   const [name = '', a, b] = parts;
   const root = ROOTS.has(name);
   let title = '', body, tab = name;
@@ -169,13 +171,10 @@ function LeaguePage({ lg, focus }) {
   const [by, setBy] = useState(null);
   const [all, setAll] = useState(false);
   const st = useQuery(`standings:${lg}`, () => getStandings(lg), () => 600000);
-  const [, recolor] = useState(0);
   useEffect(() => {
-    if (!st.data) return undefined;
-    let on = true;
+    if (!st.data) return;
     const groups = [...st.data.groups].sort((x, y) => y.rows.some((r) => r.team.id === String(focus)) - x.rows.some((r) => r.team.id === String(focus)));
-    ensureColors(groups.flatMap((g) => g.rows.map((r) => r.team)), 36).then((got) => { if (got && on) recolor((n) => n + 1); });
-    return () => { on = false; };
+    ensureColors(groups.flatMap((g) => g.rows.map((r) => r.team)), 36);
   }, [st.data, focus]);
   const sb = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   return (
@@ -787,8 +786,7 @@ function Search() {
   const pq = useQuery(asked ? `psearch:${asked}` : null, () => searchPlayers(asked), () => 0);
   const players = asked && asked === term ? (pq.data || []) : [];
   const playersBusy = term.length >= 3 && (asked !== term || (pq.loading && !pq.data));
-  const [, recolor] = useState(0);
-  useEffect(() => { let on = true; ensureColors(hits, 12).then((got) => { if (got && on) recolor((n) => n + 1); }); return () => { on = false; }; }, [hits]);
+  useEffect(() => { ensureColors(hits, 12); }, [hits]);
   const leagues = term ? LEAGUES.filter((l) => l.name.toLowerCase().includes(term) || l.short.toLowerCase().includes(term)) : [];
   const TeamRow = ({ t }) => (
     <button className="lrow" onClick={() => go(`team/${t.lg}/${t.id}`)}>

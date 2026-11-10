@@ -65,10 +65,14 @@ function loadBook() {
   if (!hasStore()) return;
   try { const o = JSON.parse(localStorage.getItem('fr.colors.v1') || '{}'); for (const k of Object.keys(o)) if (!book.has(k)) book.set(k, o[k]); } catch { /* carry on without it */ }
 }
+// Screens listen here so chips repaint the moment a real color is learned, whichever screen asked for it.
+const colorSubs = new Set(); let colorPing = null;
+export function onColors(fn) { colorSubs.add(fn); return () => colorSubs.delete(fn); }
 function learn(key, color, alt) {
   const old = book.get(key);
   if (old && old[0] === color && old[1] === alt) return;
   book.set(key, [color, alt]);
+  if (colorSubs.size && !colorPing) colorPing = setTimeout(() => { colorPing = null; colorSubs.forEach((f) => f()); }, 60);
   if (!hasStore() || bookTimer) return;
   bookTimer = setTimeout(() => { bookTimer = null; try { localStorage.setItem('fr.colors.v1', JSON.stringify(Object.fromEntries(book))); } catch { /* full or private mode */ } }, 800);
 }
