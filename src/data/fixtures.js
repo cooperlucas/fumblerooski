@@ -290,12 +290,21 @@ function rankingsFx(lg) {
     ranks: order.map((k, i) => ({ current: i + 1, previous: [2, 1, 3, 0, 4, 7][i] ?? i + 1, points: pts ? 1550 - i * 61 : 0, firstPlaceVotes: pts && i < 2 ? 40 - i * 25 : 0, recordSummary: `${9 - i}-${i}`, team: { id: rows[k % rows.length][0], location: rows[k % rows.length][2], name: rows[k % rows.length][1], abbreviation: rows[k % rows.length][3] } })),
     others: pts ? [{ points: 44, team: { id: 'x9', location: 'Demo Tech', abbreviation: 'DT' } }] : [], droppedOut: pts ? [{ team: { id: 'x8', location: 'Slipping State', abbreviation: 'SLIP' } }] : [] });
   const order = rows.map((_, i) => i);
-  return { rankings: [poll('1', 'AP Top 25', 'AP Poll', 'ap', order, true), poll('2', 'AFCA Coaches Poll', 'Coaches Poll', 'usa', [...order].reverse(), true), poll('21', 'College Football Playoff Rankings', 'CFP Rankings', 'cfp', order, false)].filter((p) => lg === 'cfb' || p.type !== 'cfp') };
+  // Like the live site feed: AP and Coaches only. The playoff ranking comes from the core service (coreCfpFx).
+  return { latestSeason: { year: 2026 }, latestWeek: { number: 11 }, rankings: [poll('1', 'AP Top 25', 'AP Poll', 'ap', order, true), poll('2', 'AFCA Coaches Poll', 'Coaches Poll', 'usa', [...order].reverse(), true)] };
+}
+function coreCfpFx(week) {
+  if (week !== 11) return { ranks: [] };
+  const rows = T.cfb;
+  return { id: '21', name: 'College Football Playoff Rankings', date: '2026-11-04T01:00Z', occurrence: { number: 11, displayValue: 'Week 11' },
+    ranks: rows.map((r, i) => ({ current: i + 1, previous: i === 0 ? 2 : i === 1 ? 1 : i + 1, record: { summary: `${9 - i}-${i}` }, team: { $ref: `http://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2026/teams/${r[0]}?lang=en` } })) };
 }
 
 export async function demoFetch(u) {
   const { pathname, searchParams } = new URL(u);
   if (pathname.endsWith('/common/v3/search')) return playerSearch(searchParams.get('query'));
+  const core = pathname.match(/\/leagues\/college-football\/seasons\/\d+\/types\/2\/weeks\/(\d+)\/rankings\/21$/);
+  if (core) return coreCfpFx(Number(core[1]));
   const m = pathname.match(/\/sports\/[^/]+\/([^/]+)\/(.*)$/);
   const lg = m && SPORT[m[1]];
   const rest = m ? m[2] : '';

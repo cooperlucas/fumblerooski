@@ -340,6 +340,9 @@ test('rankings: playoff committee first, movement, votes, others and dropped', a
   const { getRankings } = await import('../src/data/espn.js');
   const r = await getRankings('cfb');
   assert.deepEqual(r.polls.map((p) => p.name), ['CFP Rankings', 'AP Poll', 'Coaches Poll']);
+  assert.equal(r.polls[0].ranks[0].team.name, 'Ohio State'); // named from standings
+  assert.equal(r.polls[0].ranks[0].move, 1);
+  assert.equal(r.polls[0].released, '2026-11-04T01:00Z');
   const ap = r.polls[1];
   assert.equal(ap.ranks[0].rank, 1);
   assert.equal(ap.released, '2026-11-08T19:00Z');

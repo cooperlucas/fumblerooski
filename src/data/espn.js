@@ -526,21 +526,44 @@ function normPolls(d, lg) {
   })).filter((p) => p.ranks.length);
 }
 const isPlayoff = (p) => /playoff|cfp/i.test(p.name + p.full + p.type);
+const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/college-football';
+async function coreCfp(d, polls) {
+  const week = Math.max(Number(d.latestWeek?.number) || 0, ...polls.map((p) => p.week));
+  const now = new Date();
+  const season = Number(d.latestSeason?.year || d.season?.year) || (now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear());
+  if (!week) return null;
+  let names = null;
+  for (const w of [week + 1, week, week - 1, week - 2]) {
+    if (w < 1) continue;
+    let r;
+    try { r = await get(`${CORE}/seasons/${season}/types/2/weeks/${w}/rankings/21?lang=en&region=us`); } catch { continue; }
+    if (!Array.isArray(r?.ranks) || !r.ranks.length) continue;
+    if (!names) {
+      names = new Map();
+      try { (await getStandings('cfb')).groups.forEach((g) => g.rows.forEach((x) => names.set(x.team.id, x.team))); } catch { /* ids only */ }
+    }
+    const idOf = (x) => String(x?.team?.id ?? /\/teams\/(\d+)/.exec(String(x?.team?.$ref || ''))?.[1] ?? '');
+    const ranks = r.ranks.map((x) => {
+      const id = idOf(x), known = names.get(id), cur = Number(x.current), prev = Number(x.previous);
+      const team = known || normTeam({ id, displayName: `Team ${id}`, abbreviation: '' }, 'cfb');
+      return { rank: cur, team, record: String(x.record?.summary || x.recordSummary || ''), points: 0, firstPlace: 0, move: !prev ? 'new' : prev === cur ? 0 : prev - cur };
+    }).filter((x) => x.rank && x.team.id).sort((a, b) => a.rank - b.rank);
+    if (!ranks.length) continue;
+    return {
+      id: '21', name: 'CFP Rankings', full: cleanText(r.name || 'College Football Playoff Rankings'), type: 'cfp',
+      week: w, note: cleanText(r.occurrence?.displayValue || `Week ${w}`), released: releasedOf(r, null),
+      ranks, others: [], dropped: [],
+    };
+  }
+  return null;
+}
 export async function getRankings(lg) {
   const d = await get(url(SITE, lg, '/rankings'));
   const polls = normPolls(d, lg);
-  // The committee's ranking comes out Tuesday night, two days after the polls. Between Sunday and Tuesday the feed
-  // lists only the new week's polls, so go back a week for the standing playoff ranking.
+  // The site feed often leaves the committee's ranking out. The feed's core service keeps every week of it (poll 21),
+  // with teams as links, so names come from the standings. Try this week, then the weeks before it.
   if (lg === 'cfb' && polls.length && !polls.some(isPlayoff)) {
-    const week = Math.max(...polls.map((p) => p.week), Number(d.latestWeek?.number) || 0);
-    const season = d.latestSeason?.year || d.season?.year;
-    for (const back of week > 1 ? [week - 1, week - 2] : []) {
-      if (back < 1) continue;
-      try {
-        const old = normPolls(await get(url(SITE, lg, '/rankings', { seasontype: '2', week: String(back), ...(season ? { season: String(season) } : {}) })), lg).find(isPlayoff);
-        if (old && old.week && old.week !== week) { polls.push({ ...old, note: `${old.note || 'Last week'} · new ranking Tuesday night` }); break; }
-      } catch { /* no playoff ranking to show */ }
-    }
+    try { const cfp = await coreCfp(d, polls); if (cfp) polls.push(cfp); } catch { /* the polls still show */ }
   }
   polls.sort((a, b) => POLL_ORDER(a) - POLL_ORDER(b));
   return { lg, polls };
