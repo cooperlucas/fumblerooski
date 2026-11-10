@@ -338,7 +338,7 @@ function Leagues() {
         <div className="card">
           {LEAGUES.map((l) => { const n = count(l.id), season = q.data?.seasons?.[l.id]; return (
             <button key={l.id} className="lrow" onClick={() => go(`league/${l.id}`)}>
-              <span className="blob" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 12, background: l.color, color: '#0C1124', fontSize: l.short.length > 3 ? 9 : 11 }}>{l.short}</span>
+              <span className="blob" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 12, background: l.color, color: '#0C1124', overflow: 'hidden', fontStretch: l.short.length > 4 ? '100%' : undefined, fontSize: l.short.length > 4 ? 9 : l.short.length > 3 ? 10 : 11 }}>{l.short}</span>
               <span className="nm">{l.name}<span className="sub">{n ? `${n} ${n === 1 ? 'game' : 'games'} today` : season || 'No games today'}</span></span>
               <span className="chev" aria-hidden="true">›</span>
             </button>); })}
