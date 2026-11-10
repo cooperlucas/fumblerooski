@@ -443,6 +443,13 @@ export async function getRecords(lg) {
   return out;
 }
 
+// Short team names (Minnesota, not Minnesota Timberwolves) by id, from the standings. Last-five lists only carry full names.
+export async function getTeamNames(lg) {
+  const out = {};
+  try { (await getStandings(lg, DIVISIONS[lg]?.[0]?.id)).groups.forEach((g) => g.rows.forEach((r) => { out[r.team.id] = r.team.name; })); } catch { /* full names then */ }
+  return out;
+}
+
 /* ---------- players ---------- */
 const expOf = (a) => {
   const e = a?.experience;

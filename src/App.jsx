@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll } from './ui.jsx';
@@ -664,7 +664,7 @@ function TeamPage({ lg, id }) {
   };
   return (
     <>
-      <SubHeader title={t ? t.full : LEAGUE[lg].name} />
+      <SubHeader title={t ? (t.full.length > 18 ? t.name : t.full) : LEAGUE[lg].name} />
       <Page>
         {q.loading && !q.data ? <Loading rows={6} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : (
           <>
@@ -1263,6 +1263,7 @@ function GamePage({ lg, id }) {
 
 /* ---------- Before the game: how the two teams stack up ---------- */
 function Preview({ p, game, lg }) {
+  const names = useQuery(`names:${lg}`, () => getTeamNames(lg), () => 0).data || {};
   const cc = chartColors(game.away, game.home);
   const both = [game.away, game.home];
   const [l5, setL5] = useSticky('l5', game.away.id);
@@ -1333,7 +1334,7 @@ function Preview({ p, game, lg }) {
             {(p.last5[l5] || p.last5[game.away.id] || p.last5[game.home.id] || []).map((e) => (
               <button key={e.id} className="lrow" onClick={() => e.id && go(`game/${lg}/${e.id}`)}>
                 {e.opp ? <Blob team={e.opp} /> : null}
-                <span className="nm">{e.at === '@' ? 'at' : 'vs'} {e.opp?.name || ''}<span className="sub">{e.date ? new Date(e.date).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' }) : ''}</span></span>
+                <span className="nm">{e.at === '@' ? 'at' : 'vs'} {names[e.opp?.id] || e.opp?.name || ''}<span className="sub">{e.date ? new Date(e.date).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' }) : ''}</span></span>
                 <span className="res">{e.result ? <b style={{ background: e.result === 'W' ? 'var(--win-bg)' : 'var(--rule)', color: e.result === 'W' ? 'var(--lime)' : 'var(--soft)' }}>{e.result}</b> : null}{e.score}</span>
               </button>
             ))}

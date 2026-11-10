@@ -72,6 +72,27 @@ function lumOf(color) {
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 
+/* ---------- event names (bowls, playoffs, tournaments) trimmed to fit one line ---------- */
+// Bowl names without their sponsors. Longest first, so "New Orleans" wins over "Orleans".
+const BOWLS = ['Salute to Veterans', 'First Responder', 'Armed Forces', 'Independence', 'Myrtle Beach', 'Boca Raton', 'New Orleans', 'New Mexico', 'Las Vegas',
+  'Music City', 'Gasparilla', 'Celebration', 'Birmingham', 'Pinstripe', "Duke's Mayo", 'Pop-Tarts', 'ReliaQuest', 'Camellia', 'Quick Lane', 'Guaranteed Rate', 'Rate',
+  'Holiday', 'Liberty', 'Citrus', 'Alamo', 'Gator', 'Fenway', 'Frisco', 'Arizona', 'Texas', 'Military', 'Cure', 'Rose', 'Sugar', 'Orange', 'Cotton', 'Peach', 'Fiesta',
+  'Outback', 'Sun', 'Potato', 'Hawaiʻi', 'Hawaii', 'Bahamas', 'LA', 'Lending Tree', 'LendingTree', '68 Ventures', 'GameAbove Sports', 'Cheez-It'];
+const coreBowl = (name) => {
+  const n = name.replace(/\s+Classic$/i, '');
+  const hit = BOWLS.find((b) => new RegExp(`(^|\\s)${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+Bowl$`, 'i').test(n));
+  return hit ? `${hit} Bowl` : n;
+};
+export function shortEvent(note) {
+  let n = String(note || '').replace(/\s+-\s+Rescheduled.*$/i, '').replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '').trim();
+  n = n.replace(/College Football Playoff/gi, 'CFP').replace(/NCAA (Men's|Women's) Basketball Championship/i, 'NCAA Tournament')
+    .replace(/\bNational Championship\b/i, 'Title Game').replace(/\s+Region\b/i, '').replace(/\bFirst Round\b/i, '1st Round').replace(/\bSecond Round\b/i, '2nd Round');
+  const at = /^(.*?)\s+at the\s+(.+)$/i.exec(n); // "CFP Quarterfinal at the Allstate Sugar Bowl"
+  if (at) return `${at[1]} · ${coreBowl(at[2])}`;
+  if (/\bBowl(\s+Classic)?$/i.test(n)) return coreBowl(n);
+  return n.replace(/\s+-\s+/g, ' · ');
+}
+
 /* ---------- building blocks ---------- */
 // Teams are a colored chip with their abbreviation. No logos: those need a license.
 export function Blob({ team, size = 28, radius }) {
@@ -104,7 +125,7 @@ export function GameRow({ g, showLg = true }) {
   return (
     <button className="grow" onClick={() => go(`game/${g.lg}/${g.id}`)}
       aria-label={`${g.away.name} ${pre ? 'at' : g.away.score + ','} ${g.home.name}${pre ? '' : ' ' + g.home.score}, ${label}`}>
-      <span className="sides">{g.note ? <span className="gnote">{g.note.replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '')}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
+      <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
         {g.state === 'final' && !sameDay(new Date(g.date), new Date()) && !isNaN(new Date(g.date)) ? <span className="gdate">{fmtDate(g.date)}</span> : null}
