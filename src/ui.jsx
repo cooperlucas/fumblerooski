@@ -2,6 +2,7 @@
 import React from 'react';
 import { LEAGUE } from './data/leagues.js';
 import { isDemo, setDemo, demoLocked } from './data/store.js';
+import { liveColor } from './data/espn.js';
 
 /* ---------- navigation: plain hash routes so the phone's back button just works ---------- */
 // The demo-locked preview keeps its route in memory instead, since its host does not pass path-style hashes through.
@@ -49,9 +50,10 @@ function lumOf(color) {
 /* ---------- building blocks ---------- */
 // Teams are a colored chip with their abbreviation. No logos: those need a license.
 export function Blob({ team, size = 28, radius }) {
-  const light = lumOf(team.color) > 0.33;
+  const bg = liveColor(team);
+  const light = lumOf(bg) > 0.33;
   return (
-    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: team.color, color: light ? '#0C1124' : '#fff', overflow: 'hidden', fontStretch: team.abbr.length > 3 ? '100%' : undefined, fontSize: Math.max(7, Math.round(size * (team.abbr.length > 3 ? 0.25 : 0.3))) }}>
+    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: bg, color: light ? '#0C1124' : '#fff', overflow: 'hidden', fontStretch: team.abbr.length > 3 ? '100%' : undefined, fontSize: Math.max(7, Math.round(size * (team.abbr.length > 3 ? 0.25 : 0.3))) }}>
       {team.abbr}
     </span>
   );

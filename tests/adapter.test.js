@@ -265,3 +265,14 @@ test('college standings: CONF column is the conference record, not games behind'
   const c = await getStandings('cfb');
   assert.match(c.groups[0].rows[1].col2, /^\d+-\d+$/);
 });
+
+test('team colors: a stand-in color is replaced once the real one is known, across college sports', async () => {
+  const { liveColor, ensureColors, normTeam } = await import('../src/data/espn.js');
+  const stale = { id: '194', lg: 'ncaam', name: 'Ohio State', color: 'hsl(200 55% 38%)' };
+  normTeam({ id: '194', displayName: 'Ohio State Buckeyes', color: 'ba0c2f', alternateColor: 'ffffff' }, 'cfb');
+  assert.equal(liveColor(stale), '#BA0C2F');
+  const lions = { id: '8', lg: 'nfl', name: 'Lions', color: 'hsl(10 55% 38%)' };
+  assert.equal(await ensureColors([{ id: '99999', lg: 'nope', color: 'hsl(1 55% 38%)' }]), false);
+  await ensureColors([lions]);
+  assert.equal(liveColor(lions), '#0076B6');
+});

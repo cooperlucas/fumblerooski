@@ -72,14 +72,42 @@ function learn(key, color, alt) {
   if (!hasStore() || bookTimer) return;
   bookTimer = setTimeout(() => { bookTimer = null; try { localStorage.setItem('fr.colors.v1', JSON.stringify(Object.fromEntries(book))); } catch { /* full or private mode */ } }, 800);
 }
-const knowsColor = (t, lg) => hexOk(t?.color) || (loadBook(), book.has(`${lg}:${t?.id}`));
+// A school has the same id in every college sport, so a color learned in one covers the others.
+const COLLEGE = LEAGUES.filter((l) => l.college).map((l) => l.id);
+function bookGet(lg, id) {
+  loadBook();
+  let k = book.get(`${lg}:${id}`);
+  if (!k && LEAGUE[lg]?.college) for (const o of COLLEGE) { k = book.get(`${o}:${id}`); if (k) break; }
+  return k;
+}
+const knowsColor = (t, lg) => hexOk(t?.color) || !!bookGet(lg, t?.id);
+// Teams saved earlier (search index, pinned teams) may carry a stand-in color: use the real one once we know it.
+export function liveColor(team) {
+  if (!team || /^#/.test(team.color || '')) return team?.color;
+  const k = team.id && team.lg ? bookGet(team.lg, team.id) : null;
+  return k ? teamColor(k[0], k[1], team.name) : team.color;
+}
+// Look up real colors for teams still showing a stand-in (a few team reads, remembered for good). True if any were learned.
+const colorTried = new Set();
+export async function ensureColors(teams, cap = 12) {
+  const need = [];
+  for (const t of teams || []) {
+    const key = `${t?.lg}:${t?.id}`;
+    if (!t?.id || !LEAGUE[t.lg] || /^#/.test(t.color || '') || bookGet(t.lg, t.id) || colorTried.has(key)) continue;
+    colorTried.add(key); need.push(t);
+    if (need.length >= cap) break;
+  }
+  if (!need.length) return false;
+  const res = await Promise.allSettled(need.map((t) => get(url(SITE, t.lg, `/teams/${encodeURIComponent(t.id)}`)).then((d) => normTeam(d.team?.id ? d.team : { ...(d.team || {}), id: t.id }, t.lg))));
+  return res.some((r) => r.status === 'fulfilled');
+}
 
 export function normTeam(t, lg) {
   t = t || {};
   if (t.id != null) {
     const key = `${lg}:${t.id}`;
     if (hexOk(t.color)) learn(key, String(t.color), hexOk(t.alternateColor) ? String(t.alternateColor) : null);
-    else { loadBook(); const k = book.get(key); if (k) t = { ...t, color: k[0], alternateColor: k[1] }; }
+    else { const k = bookGet(lg, t.id); if (k) t = { ...t, color: k[0], alternateColor: k[1] }; }
   }
   // Game pages do not send the short name, so build it: schools go by place ("Virginia Tech"), pros by nickname ("Bills").
   const name = t.shortDisplayName || (LEAGUE[lg]?.college ? t.location : t.name) || t.displayName || t.name || t.location || 'TBD';
