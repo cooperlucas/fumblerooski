@@ -250,7 +250,8 @@ test('players: roster, profile with game log and career, search, and no betting 
   assert.equal(p.gamelog.seasons[0].rows.length, 3);
   assert.equal(p.gamelog.seasons[0].rows[0].opp, 'CLE');
   assert.equal(p.career[0].rows.at(-1).season, '2026');
-  assert.equal(p.career[0].rows[0].team, 'CIN');
+  assert.equal(p.career[0].rows[0].team, 'CLE'); // earlier season on another team, named from the team list
+  assert.equal(p.career[0].rows.at(-1).team, 'CIN');
   assert.equal(p.career[0].totals[3], '7,829');
   const hits = await searchPlayers('de');
   assert.ok(hits.some((h) => h.lg === 'cfb' && h.name === 'Kevin Demo'));

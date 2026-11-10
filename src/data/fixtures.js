@@ -245,7 +245,7 @@ function playerLog(lg) {
 function playerCareer(lg) {
   const nba = lg === 'nba';
   const tm = T[lg][0];
-  const cat = (name, displayName, labels, rows, totals) => ({ name, displayName, labels, statistics: rows.map(([y, st]) => ({ season: { year: y, displayName: String(y) }, teamId: tm[0], stats: st })), totals });
+  const cat = (name, displayName, labels, rows, totals) => ({ name, displayName, labels, statistics: rows.map(([y, st]) => ({ season: { year: y, displayName: String(y) }, teamId: y === 2024 ? T[lg][1][0] : tm[0], stats: st })), totals });
   return {
     teams: { [tm[0]]: { abbreviation: tm[3] } },
     categories: nba

@@ -319,7 +319,7 @@ function PlayerPage({ lg, id }) {
                 {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{x.value}</b><span>{x.label}</span></div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
-                    <div className="ptitle">{c.row.season} {c.title}{c.row.team ? <small> {c.row.team}</small> : null}</div>
+                    <div className="ptitle">{c.row.season} {c.title}</div>
                     <div className="kv">{c.labels.map((l, i) => <div key={i}><span>{l}</span><b>{c.row.stats[i] ?? ''}</b></div>)}</div>
                   </div>
                 ))}
@@ -355,7 +355,7 @@ function PlayerPage({ lg, id }) {
                   <table>
                     <thead><tr><th scope="col" className="who">{c.title}</th>{c.labels.map((l, i) => <th scope="col" key={i}>{l}</th>)}</tr></thead>
                     <tbody>
-                      {c.rows.map((r, i) => <tr key={r.season + r.team + i}><th scope="row" className="who">{r.season}{r.team ? <small> {r.team}</small> : null}</th>{c.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}</tr>)}
+                      {c.rows.map((r, i) => <tr key={r.season + r.team + i}><th scope="row" className="who">{r.season}{r.team && r.team !== p.team?.abbr ? <small className="was"> {r.team}</small> : null}</th>{c.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}</tr>)}
                       {c.totals ? <tr className="tot"><th scope="row" className="who">Career</th>{c.labels.map((_, j) => <td key={j}>{c.totals[j] ?? ''}</td>)}</tr> : null}
                     </tbody>
                   </table>

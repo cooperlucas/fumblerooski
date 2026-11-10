@@ -362,7 +362,8 @@ function normCareer(d) {
     rows: (c.statistics || []).map((x) => ({
       year: Number(x.season?.year) || 0,
       season: String(x.season?.displayName || x.season?.year || ''),
-      team: String(d.teams?.[x.teamId]?.abbreviation || x.teamAbbreviation || '').toUpperCase(),
+      teamId: String(x.teamId ?? x.team?.id ?? ''), teamSlug: String(x.teamSlug || ''),
+      team: String(x.team?.abbreviation || x.teamAbbreviation || '').toUpperCase(),
       stats: (x.stats || []).map((v) => String(v ?? '')),
     })).filter((r) => r.stats.length).sort((x, y) => x.year - y.year),
     totals: Array.isArray(c.totals) && c.totals.length ? c.totals.map((v) => String(v ?? '')) : null,
@@ -379,6 +380,17 @@ export async function getPlayer(lg, id) {
   ]);
   if (info.status === 'rejected' && log.status === 'rejected' && stats.status === 'rejected') throw info.reason;
   const a = info.status === 'fulfilled' ? (info.value.athlete || info.value || {}) : {};
+  // Name the team for each career season (a transfer's old school). The stats read may list its teams;
+  // if not, the league's team list knows every id.
+  const career = stats.status === 'fulfilled' ? normCareer(stats.value) : [];
+  const need = career.flatMap((c) => c.rows).filter((r) => !r.team && r.teamId);
+  if (need.length) {
+    const known = new Map();
+    const tv = stats.value.teams;
+    (Array.isArray(tv) ? tv : Object.entries(tv || {}).map(([k, v]) => ({ id: k, ...v }))).forEach((t) => { if (t?.abbreviation) known.set(String(t.id), String(t.abbreviation).toUpperCase()); });
+    if (need.some((r) => !known.has(r.teamId))) { try { (await listTeams(lg)).forEach((t) => { if (!known.has(t.id)) known.set(t.id, t.abbr); }); } catch { /* fall through to the slug */ } }
+    need.forEach((r) => { r.team = known.get(r.teamId) || r.teamSlug.split('-')[0].slice(0, 8).toUpperCase(); });
+  }
   const sum = a.statsSummary || {};
   const born = a.displayBirthPlace || [a.birthPlace?.city, a.birthPlace?.state || a.birthPlace?.country].filter(Boolean).join(', ');
   return {
@@ -394,7 +406,7 @@ export async function getPlayer(lg, id) {
       items: (sum.statistics || []).map((x) => ({ label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? '') })).filter((x) => x.label && x.value).slice(0, 4),
     },
     gamelog: log.status === 'fulfilled' ? normGamelog(log.value) : { labels: [], spans: [], seasons: [] },
-    career: stats.status === 'fulfilled' ? normCareer(stats.value) : [],
+    career,
     missing: { info: info.status === 'rejected', gamelog: log.status === 'rejected', career: stats.status === 'rejected' },
   };
 }
