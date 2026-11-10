@@ -630,6 +630,11 @@ function TeamPage({ lg, id }) {
   const view = full ? viewRaw : 'schedule';
   const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
   const recs = useQuery(`records:${lg}`, () => getRecords(lg), () => 600000).data || {};
+  // Ranked colleges: show where they sit in each poll (CFP, AP, Coaches).
+  const polls = useQuery(LEAGUE[lg].college ? `rankings:${lg}` : null, () => getRankings(lg), () => 1800000).data?.polls || [];
+  const pollRanks = polls.map((p) => ({ name: /cfp|playoff/i.test(p.name + p.type) ? 'CFP' : /\bap\b/i.test(p.name) ? 'AP' : /coach|usa/i.test(p.name + p.type) ? 'Coaches' : p.name, r: p.ranks.find((x) => x.team.id === String(id))?.rank }))
+    .filter((x) => x.r && ['CFP', 'AP', 'Coaches'].includes(x.name));
+  const topRank = pollRanks[0]?.r || q.data?.rank || null;
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
@@ -655,6 +660,7 @@ function TeamPage({ lg, id }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
                 <p>{[q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
+                {topRank ? <p className="hrank"><b>No. {topRank}</b>{pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

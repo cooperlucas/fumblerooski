@@ -399,10 +399,14 @@ export async function getTeam(lg, id) {
   if (info.status === 'rejected' && sched.status === 'rejected') throw info.reason;
   const t = info.status === 'fulfilled' ? (info.value.team || {}) : (sched.value.team || {});
   const record = t.record?.items?.[0]?.summary || t.recordSummary || '';
+  // The team read has no poll rank, but its next game carries the ranking the feed shows on scoreboards.
+  const me = (t.nextEvent?.[0]?.competitions?.[0]?.competitors || []).find((c) => String(c.team?.id ?? c.id) === String(t.id ?? id));
+  const rankNow = Number(me?.curatedRank?.current ?? me?.rank) || null;
   const events = sched.status === 'fulfilled' ? (sched.value.events || []) : [];
   return {
     team: normTeam(t.id ? t : { ...t, id }, lg),
     record: String(record || ''),
+    rank: rankNow && rankNow <= 25 ? rankNow : null,
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
     standing: (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule: events.map((e) => normEvent(e, lg)).filter((g) => g.id),
