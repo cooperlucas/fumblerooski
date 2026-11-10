@@ -404,14 +404,19 @@ export function normDrives(drives, awayId, homeId, live) {
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
     })).filter((p) => p.text);
     const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
-    const from = num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone), to = num(last?.end?.yardsToEndzone ?? d.end?.yardsToEndzone);
+    const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    const kind = d.isScore === true && /touchdown|\btd\b/i.test(result) ? 'td' : d.isScore === true && /field goal|\bfg\b/i.test(result) ? 'fg'
+      : /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true ? 'turnover' : 'other';
+    const from = num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
+    // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
+    // after a punt or field goal it is where the ball landed, not where the offense got to.
+    const gained = num(d.yards) ?? num((String(d.description || '').match(/(-?\d+)\s+yards?/i) || [])[1]);
+    const to = from == null ? null : kind === 'td' ? 0 : gained != null ? from - gained : num(last?.end?.yardsToEndzone ?? d.end?.yardsToEndzone);
     const side = teamId === String(homeId) ? 'home' : teamId === String(awayId) ? 'away' : null;
     const pos = (toEnd) => (toEnd == null || !side ? null : Math.max(0, Math.min(100, side === 'away' ? 100 - toEnd : toEnd)));
-    const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
     return {
       id: String(d.id ?? i), teamId, side,
-      result, isScore: d.isScore === true,
-      turnover: /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true,
+      result, kind, isScore: d.isScore === true, turnover: kind === 'turnover',
       summary: cleanText(d.description || ''),
       period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
       startText: cleanText(d.start?.text || ''),

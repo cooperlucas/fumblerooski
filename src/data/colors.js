@@ -25,6 +25,7 @@ const fromHsl = ([h, s, l]) => {
 // Lightening this way keeps scarlet red and navy blue, where mixing with white would turn them pink and gray.
 export function brighten(color, min = 0.15) {
   if (!isHex(color)) return String(color || '').replace(/(\d+)%\)$/, '64%)') || '#F5F5F7'; // hsl fallback colors
+  if (lum(color) >= min) return color.toUpperCase(); // already reads on navy: leave it exactly as the team has it
   let [h, s, l] = toHsl(rgb(color));
   if (s > 0.08) s = Math.max(s, 0.6);
   let out = toHex(fromHsl([h, s, l]));
@@ -34,13 +35,20 @@ export function brighten(color, min = 0.15) {
 const dist = (a, b) => (isHex(a) && isHex(b) ? Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i])) : 999);
 const TOO_CLOSE = 95;
 
-// Returns { away, home } line colors. Home keeps its main color; away switches to its second color (or white) on a clash.
+// Each side gets { main, second }: the line is the team's primary color, its drop shadow the team's secondary.
+// If the two primaries look alike, the away team flips to its secondary for the line.
+function pair(team) {
+  const main = brighten(team.color);
+  let second = isHex(team.color2) ? team.color2.toUpperCase() : null;
+  if (!second || dist(second, main) < 70) second = lum(main) > 0.45 ? '#0C1124' : '#F5F5F7'; // no real second color: plain contrast
+  return { main, second };
+}
 export function chartColors(away, home) {
-  const h = brighten(home.color);
-  let a = brighten(away.color);
-  if (dist(a, h) < TOO_CLOSE) {
-    const options = [away.color2 ? brighten(away.color2) : null, home.color2 ? null : null, '#F5F5F7', '#22D3D6'].filter(Boolean);
-    a = options.find((o) => dist(o, h) >= TOO_CLOSE) || '#F5F5F7';
+  const h = pair(home);
+  let a = pair(away);
+  if (dist(a.main, h.main) < TOO_CLOSE) {
+    const flipped = { main: brighten(a.second), second: brighten(away.color) };
+    a = dist(flipped.main, h.main) >= TOO_CLOSE ? flipped : { main: '#F5F5F7', second: brighten(away.color) };
   }
   return { away: a, home: h };
 }

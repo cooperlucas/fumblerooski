@@ -166,17 +166,19 @@ test('score chart: overtime stretches the clock, live games stop at the current 
 
 test('football drives: field position, results, plays, and the live drive', async () => {
   const fin = await getGame('nfl', 'g2');
-  assert.equal(fin.drives.length, 3);
-  const [td, punt, pick] = fin.drives;
-  assert.equal(td.side, 'home'); assert.equal(td.result, 'Touchdown'); assert.equal(td.isScore, true);
+  assert.equal(fin.drives.length, 4);
+  const [td, punt, pick, fg] = fin.drives;
+  assert.equal(td.side, 'home'); assert.equal(td.result, 'Touchdown'); assert.equal(td.kind, 'td');
   assert.equal(td.x0, 75); assert.equal(td.x1, 0, 'home team drives right to left, into the left end zone');
   assert.equal(td.plays.length, 3); assert.equal(td.plays[0].down, '1st & 10 at OWN 25');
-  assert.equal(punt.side, 'away'); assert.equal(punt.x0, 22); assert.equal(punt.x1, 26);
+  assert.equal(punt.side, 'away'); assert.equal(punt.kind, 'other'); assert.equal(punt.x0, 22); assert.equal(punt.x1, 26);
   assert.equal(punt.plays.length, 1, 'the play that mentions a sportsbook is dropped');
-  assert.equal(pick.turnover, true);
+  assert.equal(pick.kind, 'turnover'); assert.equal(pick.turnover, true);
+  assert.equal(fg.kind, 'fg'); assert.equal(fg.x0, 70);
+  assert.equal(fg.x1, 30, 'a field goal drive stops where the offense got to (40 yards), not at the goal line where the kick landed');
   assert.equal(fin.drives.some((d) => d.live), false);
   const live = await getGame('nfl', 'g1');
-  assert.equal(live.drives.length, 4); assert.equal(live.drives[3].live, true);
+  assert.equal(live.drives.length, 5); assert.equal(live.drives.at(-1).live, true);
   assert.deepEqual(fin.pbp, [], 'football reads by drive, not as one long list');
 });
 
@@ -190,19 +192,21 @@ test('basketball shots and play-by-play', async () => {
   assert.equal(g.chart.stepped, true, 'with play-by-play the score chart uses real times');
 });
 
-test('chart colors: team colors, brightened for navy, and never two lines that look the same', async () => {
+test('chart colors: primary for the line, secondary for its shadow, and never two lines that look the same', async () => {
   const { chartColors, lum, inkOn, brighten } = await import('../src/data/colors.js');
-  const navy = { color: '#00274C', color2: '#FFCB05' }, scarlet = { color: '#BA0C2F', color2: '#FFFFFF' };
-  const a = chartColors(navy, scarlet);
-  assert.ok(lum(a.away) >= 0.15, 'dark navy is lifted so it shows up'); assert.ok(lum(a.home) >= 0.15);
-  assert.notEqual(a.away, a.home);
-  // two red teams: the away side falls back to its second color
+  const bills = { color: '#00338D', color2: '#D50A0A' }, vikings = { color: '#4F2683', color2: '#FFC62F' };
+  const a = chartColors(bills, vikings);
+  assert.ok(lum(a.away.main) >= 0.15, 'dark blue is lifted so it shows up');
+  assert.equal(a.away.second, '#D50A0A'); assert.equal(a.home.second, '#FFC62F');
+  assert.notEqual(a.away.main, a.home.main);
+  // two red teams: the away side flips, secondary on the line and primary as the shadow
   const b = chartColors({ color: '#C8102E', color2: '#FFB612' }, { color: '#BA0C2F', color2: '#FFFFFF' });
-  assert.equal(b.away, '#FFB612');
+  assert.equal(b.away.main, '#FFB612'); assert.equal(b.away.second, brighten('#C8102E'));
+  // no second color on file: a plain contrasting shadow, and white for the line on a clash
+  assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#00338D' }).away.second, '#F5F5F7');
+  assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#BA0C2F' }).away.main, '#F5F5F7');
   assert.equal(brighten('#FFB612'), '#FFB612', 'a color that already reads is left alone');
   const red = brighten('#BA0C2F'); assert.ok(parseInt(red.slice(1, 3), 16) > 200 && parseInt(red.slice(3, 5), 16) < 110, 'scarlet stays red, not pink: ' + red);
-  // two red teams with no usable second color: white
-  assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#BA0C2F' }).away, '#F5F5F7');
   assert.equal(inkOn('#FFB612'), '#0C1124'); assert.equal(inkOn('#1D428A'), '#FFFFFF');
   const g = (await getScoreboard('nfl')).games[0];
   assert.match(g.home.color2, /^#[0-9A-F]{6}$/);

@@ -166,6 +166,7 @@ function summary(lg, id) {
       dr('d2', a, 'Punt', false, '3 plays, 4 yards, 1:38', 1, '9:14', 'OWN 22', [pl(1, '9:14', 'Demo back left tackle for 3 yards', '1st & 10 at OWN 22', 78, 75), pl(1, '7:40', 'Demo punter punts 44 yards. Lions favored by 3 at DraftKings Sportsbook', '4th & 6 at OWN 26', 74, 74)]),
       dr('d3', a, 'Interception', false, '5 plays, 31 yards, 2:02', 2, '11:00', 'OWN 30', [pl(2, '11:00', 'Demo QB pass short left to Demo receiver for 12 yards', '1st & 10 at OWN 30', 70, 58), pl(2, '9:10', 'Demo QB pass intercepted', '2nd & 8 at OPP 41', 41, 39)]),
     ];
+    prev.push(dr('d5', h, 'Field Goal', true, '6 plays, 40 yards, 2:30', 2, '2:34', 'OWN 30', [pl(2, '2:34', 'Demo back right guard for 5 yards', '1st & 10 at OWN 30', 70, 65), pl(2, '0:04', 'Demo kicker 47 yard field goal is GOOD', '4th & 3 at OPP 30', 30, 0, { scoringPlay: true, homeScore: 10 })]));
     const cur = dr('d4', a, '', false, '2 plays, 9 yards, 0:48', 3, '5:00', 'OWN 40', [pl(3, '5:00', 'Demo back right end for 9 yards', '1st & 10 at OWN 40', 60, 51)]);
     drives = g[8].type.state === 'in' ? { previous: prev, current: cur } : { previous: prev };
   }

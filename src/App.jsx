@@ -293,7 +293,7 @@ function TeamPage({ lg, id }) {
 const PERIOD_WORD = { football: 'Q', basketball: 'Q', hockey: 'P', soccer: 'H', baseball: '' };
 
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
-// like a late-80s broadcast graphic. Each line is that team's own color, brightened to read on navy.
+// like a late-80s broadcast graphic. Each line is the team's primary color with its secondary as the drop shadow.
 function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1)))); const f = raw / pow; return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow); }
 function ScoreChart({ chart, game, L }) {
   const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 14, y1 = 158;
@@ -305,22 +305,22 @@ function ScoreChart({ chart, game, L }) {
   const label = (i) => (i < reg ? `${word}${i + 1}` : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
   const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
   const cc = chartColors(game.away, game.home);
-  const sides = [[game.away, 'a', cc.away], [game.home, 'h', cc.home]];
+  const sides = [[game.away, 'a', cc.away.main, cc.away.second], [game.home, 'h', cc.home.main, cc.home.second]];
   return (
     <section className="sec">
       <H2>Score Chart</H2>
       <div className="card pad chart">
         <div className="legend">
-          {sides.map(([t, k, c]) => <span key={k} className="lg" style={{ background: c, color: inkOn(c) }}>{t.abbr} <b>{end[k]}</b></span>)}
+          {sides.map(([t, k, c, c2]) => <span key={k} className="lg" style={{ background: c, color: inkOn(c), boxShadow: `3px 3px 0 ${c2}` }}>{t.abbr} <b>{end[k]}</b></span>)}
         </div>
         <div role="img" aria-label={`Score over time. ${game.away.name} ${end.a}, ${game.home.name} ${end.h}.`}>
           <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
             {ticks.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} stroke={v === 0 ? '#3A4672' : '#232C50'} strokeWidth={v === 0 ? 2 : 1} /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">{v}</text></g>)}
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} stroke="#2C3762" strokeDasharray="2 4" />)}
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={i} x={x((a + b) / 2)} y={H - 18} textAnchor="middle" className="per">{label(i)}</text>; })}
-            {sides.map(([, k]) => <path key={'s' + k} d={path(k)} transform="translate(3 3)" fill="none" stroke="#6E3AB5" strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
+            {sides.map(([, k, , c2]) => <path key={'s' + k} d={path(k)} transform="translate(3 3)" fill="none" stroke={c2} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
             {sides.map(([, k, c]) => <path key={k} d={path(k)} fill="none" stroke={c} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
-            {sides.map(([, k, c]) => <rect key={'e' + k} x={x(end.t) - 5} y={y(end[k]) - 5} width="10" height="10" fill={c} stroke="#0C1124" strokeWidth="2" />)}
+            {sides.map(([, k, c, c2]) => <rect key={'e' + k} x={x(end.t) - 5} y={y(end[k]) - 5} width="10" height="10" fill={c} stroke={c2} strokeWidth="2" />)}
             <path d={`M${x0} ${H - 8} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 5} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 2} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
           </svg>
         </div>
@@ -330,20 +330,34 @@ function ScoreChart({ chart, game, L }) {
 }
 
 /* ---------- football: drives ---------- */
+// Touchdowns and field goals read differently at a glance:
+// a touchdown is a solid gold bar that runs into a lit-up end zone; a field goal is a lime bar that stops at the
+// spot of the kick, with a dotted kick sailing through the uprights.
+const DRIVE_COLOR = { td: '#FFBE2E', fg: '#9BE33A', turnover: '#FF3D7F', other: '#22D3D6' };
 function DriveField({ d, game }) {
   if (d.x0 == null || d.x1 == null) return null;
-  const W = 300, H = 26, ez = 22, fx = (v) => ez + (v / 100) * (W - ez * 2);
+  const W = 300, H = 30, ez = 22, mid = H / 2, fx = (v) => ez + (v / 100) * (W - ez * 2);
   const a = fx(d.x0), b = fx(d.x1), dir = d.side === 'away' ? 1 : -1;
-  const color = d.isScore ? '#FFBE2E' : d.turnover ? '#FF3D7F' : '#22D3D6';
+  const color = DRIVE_COLOR[d.kind] || DRIVE_COLOR.other;
   const tip = Math.abs(b - a) < 3 ? a + dir * 3 : b; // show at least a stub for a drive that went nowhere
+  const goal = dir === 1 ? W - ez : ez; // the goal line this offense is driving at
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="field" aria-hidden="true">
       <rect x="0" y="2" width={W} height={H - 4} rx="3" fill="#123524" />
       <rect x="0" y="2" width={ez} height={H - 4} fill={game.away.color} /><rect x={W - ez} y="2" width={ez} height={H - 4} fill={game.home.color} />
       {Array.from({ length: 9 }, (_, i) => <path key={i} d={`M${fx((i + 1) * 10)} 2 V${H - 2}`} stroke={i === 4 ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.22)'} />)}
-      <path d={`M${a} ${H / 2 + 2} H${tip}`} stroke="#6E3AB5" strokeWidth="7" transform="translate(2 2)" />
-      <path d={`M${a} ${H / 2} H${tip}`} stroke={color} strokeWidth="7" />
-      <path d={`M${tip + dir * 7} ${H / 2} L${tip} ${H / 2 - 7} V${H / 2 + 7} Z`} fill={color} stroke="#0C1124" strokeWidth="1" />
+      {d.kind === 'td' ? <rect x={dir === 1 ? W - ez : 0} y="2" width={ez} height={H - 4} fill="none" stroke={color} strokeWidth="3" /> : null}
+      <path d={`M${a} ${mid + 2} H${tip}`} stroke="#6E3AB5" strokeWidth="7" transform="translate(2 2)" />
+      <path d={`M${a} ${mid} H${tip}`} stroke={color} strokeWidth="7" />
+      {d.kind === 'fg' ? (
+        <>
+          <rect x={tip - 3.5} y={mid - 7} width="7" height="14" fill={color} stroke="#0C1124" strokeWidth="1" />
+          <path d={`M${tip + dir * 6} ${mid} H${goal + dir * 8}`} stroke={color} strokeWidth="2.5" strokeDasharray="2 5" strokeLinecap="round" />
+          <path d={`M${goal + dir * 11} ${mid - 9} V${mid + 9} M${goal + dir * 11} ${mid} H${goal + dir * 4}`} stroke="#F5F5F7" strokeWidth="2.5" strokeLinecap="round" fill="none" transform={`rotate(${dir === 1 ? 0 : 0})`} />
+        </>
+      ) : (
+        <path d={`M${tip + dir * (d.kind === 'td' ? 10 : 7)} ${mid} L${tip} ${mid - (d.kind === 'td' ? 9 : 7)} V${mid + (d.kind === 'td' ? 9 : 7)} Z`} fill={color} stroke="#0C1124" strokeWidth="1" />
+      )}
     </svg>
   );
 }
@@ -356,7 +370,7 @@ function Drives({ drives, game }) {
     <section className="sec">
       <H2>Drives</H2>
       <div className="card">
-        {list.map((d) => { const t = team(d), isOpen = open === d.id; const color = d.isScore ? 'var(--yellow)' : d.turnover ? '#FF7AA6' : 'var(--teal)'; return (
+        {list.map((d) => { const t = team(d), isOpen = open === d.id; const color = d.kind === 'td' ? 'var(--yellow)' : d.kind === 'fg' ? 'var(--lime)' : d.turnover ? '#FF7AA6' : 'var(--teal)'; return (
           <div className="drive" key={d.id}>
             <button className="dhead" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.id)}>
               <Blob team={t} />
