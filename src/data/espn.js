@@ -406,7 +406,7 @@ function normCareer(d) {
       stats: (x.stats || []).map((v) => String(v ?? '')),
     })).filter((r) => r.stats.length).sort((x, y) => x.year - y.year),
     totals: Array.isArray(c.totals) && c.totals.length ? c.totals.map((v) => String(v ?? '')) : null,
-  })).filter((c) => c.rows.length && c.labels.length);
+  })).filter((c) => c.rows.length && c.labels.length && !/misc/i.test(c.key + ' ' + c.title)); // the misc table is ejections, flagrants and ratings nobody asks for
 }
 
 // One player: who they are, this season, game by game, and the career. Any piece can be missing.
