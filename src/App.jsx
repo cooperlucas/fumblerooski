@@ -230,6 +230,7 @@ function LeagueScores({ lg }) {
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const base = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   const [wk, setWk] = useSticky('wk', null); // 'type:week'
+  const [yr, setYr] = useSticky('yr', null); // football season year; null = this season
   const [day, setDay] = useSticky('day', null); // 'YYYYMMDD'
   const [cal, setCal] = useState(false);
   const [month, setMonth] = useState(null); // first of the month shown in the calendar
@@ -240,9 +241,13 @@ function LeagueScores({ lg }) {
   const today = ymdOf(new Date());
   const dayKey = day || (b?.dates ? gameDayFor(b.dates.map((x) => x.replace(/-/g, '')), today) : today);
   const [wt, wn] = (wkKey || '').split(':').map(Number);
-  const isBase = weekMode ? wkKey === curWk : dayKey === (b?.current?.day ? b.current.day.replace(/-/g, '') : today);
-  const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${wkKey}` : `board:${lg}:d${dayKey}`) : null,
-    () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt }) : getScoreboard(lg, dayKey)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
+  const isBase = weekMode ? !yr && wkKey === curWk : dayKey === (b?.current?.day ? b.current.day.replace(/-/g, '') : today);
+  const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${yr || ''}:${wkKey}` : `board:${lg}:d${dayKey}`) : null,
+    () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt, year: yr || undefined }) : getScoreboard(lg, dayKey)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
+  // Past seasons have their own week list (bowl names, playoff rounds), which comes back with that season's slate.
+  const weekList = (yr && sel.data?.weeks?.length ? sel.data.weeks : b?.weeks) || [];
+  const thisYear = b?.year || new Date().getFullYear();
+  const years = Array.from({ length: thisYear - 2001 }, (_, i) => thisYear - i);
   const q = isBase ? base : sel;
   const dates = useMemo(() => new Set([...(b?.dates || []), ...(sel.data?.dates || [])].map((x) => x.replace(/-/g, ''))), [b, sel.data]);
   if (base.loading && !b) return <Loading rows={5} />;
@@ -263,10 +268,13 @@ function LeagueScores({ lg }) {
   return (
     <>
       {weekMode ? (
-        <div className="sechead" style={{ marginTop: 14 }}>
-          <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{(b.weeks.find((w) => `${w.type}:${w.week}` === wkKey) || {}).detail || ''}</span>
-          <Picker label="Week" value={wkKey || ''} onChange={setWk}>{b.weeks.map((w) => <option key={`${w.type}:${w.week}`} value={`${w.type}:${w.week}`}>{w.label}</option>)}</Picker>
-        </div>
+        <>
+          <div className="filters">
+            <Picker label="Season" value={String(yr || thisYear)} onChange={(v) => { const y = Number(v); if (y === thisYear) { setYr(null); setWk(null); } else { setYr(y); setWk('2:1'); } }}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</Picker>
+            <Picker label="Week" value={wkKey || ''} onChange={setWk}>{weekList.map((w) => <option key={`${w.type}:${w.week}`} value={`${w.type}:${w.week}`}>{w.label}</option>)}</Picker>
+          </div>
+          <p className="stamp" style={{ textAlign: 'right', margin: '6px 2px 0' }}>{(weekList.find((w) => `${w.type}:${w.week}` === wkKey) || {}).detail || ''}</p>
+        </>
       ) : (
         <>
           <div className="chips" role="group" aria-label="Day" style={{ marginTop: 10 }}>
