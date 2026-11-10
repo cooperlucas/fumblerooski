@@ -55,7 +55,8 @@ export function teamColor(color, alt, seed) {
 
 export function normTeam(t, lg) {
   t = t || {};
-  const name = t.shortDisplayName || t.displayName || t.name || t.location || 'TBD';
+  // Game pages do not send the short name, so build it: schools go by place ("Virginia Tech"), pros by nickname ("Bills").
+  const name = t.shortDisplayName || (LEAGUE[lg]?.college ? t.location : t.name) || t.displayName || t.name || t.location || 'TBD';
   const abbr = String(t.abbreviation || name).toUpperCase().slice(0, 4);
   return {
     id: String(t.id ?? ''), lg,

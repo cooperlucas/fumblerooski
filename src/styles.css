@@ -223,3 +223,10 @@ h1, h2, h3, p { margin: 0; }
 .shotbox .lg { padding: 4px 10px; border-radius: 6px; color: #0C1124; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 11px; letter-spacing: 0.04em; box-shadow: 3px 3px 0 #6E3AB5; }
 .shotbox .lg b { font-size: 14px; margin-left: 4px; }
 .court { display: block; width: 100%; height: auto; }
+
+/* game page sections: one at a time, picked from a row that stays put while you scroll */
+.gtabs { position: sticky; top: -10px; z-index: 3; display: flex; gap: 8px; overflow-x: auto; margin: 12px -18px 0; padding: 10px 18px; background: var(--bg); border-bottom: 1px solid var(--line2); scrollbar-width: none; }
+.gtabs::-webkit-scrollbar { display: none; }
+.gtab.solo > .sec { margin-top: 12px; }
+.gtab.solo > .sec > .h2, .gtab.solo > .sec > .sechead { display: none; }
+.gtab.solo > .sec > .seg:first-of-type { margin-top: 0 !important; }

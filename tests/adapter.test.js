@@ -211,3 +211,10 @@ test('chart colors: primary for the line, secondary for its shadow, and never tw
   const g = (await getScoreboard('nfl')).games[0];
   assert.match(g.home.color2, /^#[0-9A-F]{6}$/);
 });
+
+test('team names on game pages: schools by place, pros by nickname', async () => {
+  const { normTeam } = await import('../src/data/espn.js');
+  assert.equal(normTeam({ id: '1', displayName: 'Virginia Tech Hokies', location: 'Virginia Tech', name: 'Hokies', abbreviation: 'VT' }, 'cfb').name, 'Virginia Tech');
+  assert.equal(normTeam({ id: '2', displayName: 'Buffalo Bills', location: 'Buffalo', name: 'Bills', abbreviation: 'BUF' }, 'nfl').name, 'Bills');
+  assert.equal(normTeam({ id: '3', displayName: 'Ohio State Buckeyes', shortDisplayName: 'Ohio State', location: 'Ohio State', name: 'Buckeyes' }, 'cfb').full, 'Ohio State Buckeyes');
+});

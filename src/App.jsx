@@ -451,7 +451,7 @@ function ShotChart({ shots, game, lg }) {
 function PlayByPlay({ pbp, game, L }) {
   const periods = [...new Set(pbp.map((p) => p.period))].sort((a, b) => a - b);
   const [per, setPer] = useState(null);
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   const cur = per ?? periods[periods.length - 1];
   const live = game.state === 'live';
   let rows = pbp.filter((p) => p.period === cur);
@@ -523,6 +523,17 @@ function GamePage({ lg, id }) {
   const title = g ? `${g.away.abbr} at ${g.home.abbr}` : L.name;
   const started = g && (g.state === 'live' || g.state === 'final');
   const periods = g ? Math.max(g.home.lines.length, g.away.lines.length) : 0;
+  const [picked, setTab] = useState('summary');
+  // Only offer the sections this game actually has.
+  const tabs = !d || !started ? [] : [
+    ['summary', 'Summary'],
+    d.drives.length ? ['drives', 'Drives'] : null,
+    d.shots.length ? ['shots', 'Shot Chart'] : null,
+    d.pbp.length ? ['plays', 'Plays'] : null,
+    d.box.length ? ['box', 'Box Score'] : null,
+    d.stats.length ? ['stats', 'Team Stats'] : null,
+  ].filter(Boolean);
+  const tab = tabs.some(([k]) => k === picked) ? picked : 'summary';
   const perLabel = (i) => (i < (L.periods || 4) || L.sport === 'baseball' ? `${PERIOD_WORD[L.sport] ?? ''}${i + 1}` : periods - (L.periods || 4) > 1 ? `OT${i - (L.periods || 4) + 1}` : 'OT');
   return (
     <>
@@ -550,52 +561,58 @@ function GamePage({ lg, id }) {
               {g.note || d.venue ? <p style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{[g.note, d.venue].filter(Boolean).join(' · ')}</p> : null}
             </div>
 
-            {started && periods > 0 ? (
-              <section className="card pad linesbox" style={{ marginTop: 16 }}>
-                <table className="lines">
-                  <thead><tr><th scope="col"><span style={{ position: 'absolute', left: -9999 }}>Team</span></th>{Array.from({ length: periods }, (_, i) => <th scope="col" key={i}>{perLabel(i)}</th>)}<th scope="col">T</th></tr></thead>
-                  <tbody>{[g.away, g.home].map((t) => <tr key={t.id}><td>{t.abbr}</td>{Array.from({ length: periods }, (_, i) => <td key={i}>{t.lines[i] ?? ''}</td>)}<td>{t.score}</td></tr>)}</tbody>
-                </table>
-              </section>
+            {tabs.length > 1 ? (
+              <div className="gtabs" role="tablist" aria-label="Game sections">
+                {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
+              </div>
             ) : null}
 
-            {d.plays.length && !d.drives.length ? (
-              <section className="sec">
-                <H2>Scoring</H2>
-                <div className="card pad">
-                  {d.plays.map((p, i) => { const t = p.teamId === g.home.id ? g.home : p.teamId === g.away.id ? g.away : null; return (
-                    <div className="prow" key={i}>
-                      {t ? <Blob team={t} /> : <span style={{ width: 28 }} />}
-                      <span className="txt">{p.kind ? <span className="kind" style={{ color: 'var(--yellow)' }}>{p.kind}</span> : null}{p.text}</span>
-                      <span className="sc">{Number.isFinite(p.away) && Number.isFinite(p.home) ? `${p.away}-${p.home}` : ''}<small>{p.period ? `${PERIOD_WORD[L.sport] ?? ''}${p.period}` : ''} {p.clock}</small></span>
-                    </div>); })}
-                </div>
-              </section>
+            {tab === 'summary' ? (
+              <div className="gtab">
+                {started && periods > 0 ? (
+                  <section className="card pad linesbox" style={{ marginTop: 12 }}>
+                    <table className="lines">
+                      <thead><tr><th scope="col"><span style={{ position: 'absolute', left: -9999 }}>Team</span></th>{Array.from({ length: periods }, (_, i) => <th scope="col" key={i}>{perLabel(i)}</th>)}<th scope="col">T</th></tr></thead>
+                      <tbody>{[g.away, g.home].map((t) => <tr key={t.id}><td>{t.abbr}</td>{Array.from({ length: periods }, (_, i) => <td key={i}>{t.lines[i] ?? ''}</td>)}<td>{t.score}</td></tr>)}</tbody>
+                    </table>
+                  </section>
+                ) : null}
+                {d.chart ? <ScoreChart chart={d.chart} game={g} L={L} /> : null}
+                {d.plays.length ? (
+                  <section className="sec">
+                    <H2>Scoring</H2>
+                    <div className="card pad">
+                      {d.plays.map((p, i) => { const t = p.teamId === g.home.id ? g.home : p.teamId === g.away.id ? g.away : null; return (
+                        <div className="prow" key={i}>
+                          {t ? <Blob team={t} /> : <span style={{ width: 28 }} />}
+                          <span className="txt">{p.kind ? <span className="kind" style={{ color: 'var(--yellow)' }}>{p.kind}</span> : null}{p.text}</span>
+                          <span className="sc">{Number.isFinite(p.away) && Number.isFinite(p.home) ? `${p.away}-${p.home}` : ''}<small>{p.period ? `${PERIOD_WORD[L.sport] ?? ''}${p.period}` : ''} {p.clock}</small></span>
+                        </div>); })}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
             ) : null}
-
-            {d.chart ? <ScoreChart chart={d.chart} game={g} L={L} /> : null}
-
-            {d.drives.length ? <Drives drives={d.drives} game={g} /> : null}
-            {d.shots.length ? <ShotChart shots={d.shots} game={g} lg={lg} /> : null}
-
-            {d.box.length ? <BoxScore box={d.box} game={g} sport={L.sport} /> : null}
-
-            {d.stats.length ? (
-              <section className="sec">
-                <H2>Team Stats</H2>
-                <div className="card pad">
-                  {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1; return (
-                    <div className="statrow" key={s.label}>
-                      <div className="lab"><span>{s.label}</span></div>
-                      {[[g.away, s.away, s.awayN, 'var(--teal)', s.awayPct], [g.home, s.home, s.homeN, 'var(--yellow)', s.homePct]].map(([t, v, n, c, pc]) => (
-                        <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
-                      ))}
-                    </div>); })}
-                </div>
-              </section>
+            {tab === 'drives' ? <div className="gtab solo"><Drives drives={d.drives} game={g} /></div> : null}
+            {tab === 'shots' ? <div className="gtab solo"><ShotChart shots={d.shots} game={g} lg={lg} /></div> : null}
+            {tab === 'plays' ? <div className="gtab solo"><PlayByPlay pbp={d.pbp} game={g} L={L} /></div> : null}
+            {tab === 'box' ? <div className="gtab solo"><BoxScore box={d.box} game={g} sport={L.sport} /></div> : null}
+            {tab === 'stats' ? (
+              <div className="gtab solo">
+                <section className="sec">
+                  <H2>Team Stats</H2>
+                  <div className="card pad">
+                    {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1; return (
+                      <div className="statrow" key={s.label}>
+                        <div className="lab"><span>{s.label}</span></div>
+                        {[[g.away, s.away, s.awayN, 'var(--teal)', s.awayPct], [g.home, s.home, s.homeN, 'var(--yellow)', s.homePct]].map(([t, v, n, c, pc]) => (
+                          <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
+                        ))}
+                      </div>); })}
+                  </div>
+                </section>
+              </div>
             ) : null}
-
-            {d.pbp.length ? <PlayByPlay pbp={d.pbp} game={g} L={L} /> : null}
 
             {!started && g.state === 'pre' ? <Empty>Scoring and stats show up here once the game starts.</Empty> : null}
             <Stamp at={q.updatedAt} live={g.state === 'live'} />
