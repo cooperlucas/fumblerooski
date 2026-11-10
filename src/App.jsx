@@ -1080,6 +1080,13 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   };
   const court = `M0 0 H${W} V${H} H0 Z M${W / 2} 0 V${H} ${lines(false)} ${lines(true)}`;
   const lt = last ? spot(last) : null;
+  // The latest play lights up its end of the floor: the three-point arc glows in the team's color, and a make lights the rim gold.
+  const arc3 = (flip) => {
+    const r = (v) => v * K, ax = (v) => (flip ? W - v : v);
+    return `M${ax(0)} ${r(25 - corner)} L${ax(r(B + cx3))} ${r(25 - corner)} A${r(r3)} ${r(r3)} 0 0 ${flip ? 0 : 1} ${ax(r(B + cx3))} ${r(25 + corner)} L${ax(0)} ${r(25 + corner)}`;
+  };
+  const right = lt ? lt.x > W / 2 : false;
+  const made = last?.scoring && last?.shot;
   const shown = recent.slice(0, 4);
   return (
     <>
@@ -1090,6 +1097,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
             <span><small>▸ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
           </div>
           <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court full" role="img" aria-label={last ? `Latest: ${last.text}` : 'Court'}>
+            <defs><filter id="lcglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
             <rect x="0" y="0" width={W} height={H} fill="#10162C" />
             <rect x="0" y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.away.main} opacity="0.16" />
             <rect x={W - 19 * K} y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.home.main} opacity="0.16" />
@@ -1103,8 +1111,8 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
               : <path key={p.id || i} d={`M${s.x - 4} ${s.y - 4} L${s.x + 4} ${s.y + 4} M${s.x + 4} ${s.y - 4} L${s.x - 4} ${s.y + 4}`} stroke={col(p.teamId)} strokeWidth="2.2" opacity={0.5 - i * 0.06} />; })}
             {lt ? (
               <g key={last.id}>
-                <circle cx={lt.x} cy={lt.y} r="9" fill="none" stroke={col(last.teamId)} strokeWidth="2.5" className="ping" />
-                <circle cx={lt.x} cy={lt.y} r="7" fill={last.scoring ? '#FFBE2E' : col(last.teamId)} stroke="#0C1124" strokeWidth="2" />
+                <path d={arc3(right)} fill="none" stroke={col(last.teamId)} strokeWidth="5" strokeLinecap="round" filter="url(#lcglow)" className="arcglow" />
+                {made ? <circle cx={right ? W - B * K : B * K} cy={H / 2} r="6" fill="none" stroke="#FFBE2E" strokeWidth="3.5" filter="url(#lcglow)" className="rimglow" /> : null}
               </g>
             ) : null}
           </svg>

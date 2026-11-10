@@ -457,9 +457,11 @@ button.pick.date { cursor: pointer; }
 .lchead small { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
 .court.full { display: block; width: 100%; height: auto; }
 .court .ccode { font-style: italic; font-weight: 900; font-size: 18px; font-stretch: 125%; letter-spacing: 0.02em; }
-.court .ping { transform-box: fill-box; transform-origin: center; animation: ping 1.6s ease-out infinite; }
-@keyframes ping { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .court .ping { animation: none; } }
+.court .arcglow { animation: arcglow 2.4s ease-in-out infinite; }
+.court .rimglow { animation: rimglow 1.2s ease-in-out infinite alternate; }
+@keyframes arcglow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes rimglow { from { opacity: 0.7; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .court .arcglow, .court .rimglow { animation: none; } }
 .lclast { display: flex; align-items: center; gap: 10px; margin: 10px -12px 0; padding: 10px 12px; border-top: 1px solid var(--rule); background: var(--panel2); }
 .lclast .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .lclast .tx b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; }
