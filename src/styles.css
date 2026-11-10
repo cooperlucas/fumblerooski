@@ -448,3 +448,35 @@ button.pick.date { cursor: pointer; }
 .grow .gtv { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .htv { margin-top: 10px; text-align: center; font-size: 12px; font-weight: 800; color: #fff; }
 .htv .tvb { display: inline-block; margin-right: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.18); font-size: 10px; letter-spacing: 0.08em; vertical-align: 1px; }
+
+/* Live courtside view (basketball) */
+.livecourt { padding: 12px 12px 0; }
+.lchead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+.lchead > span { display: inline-flex; align-items: center; gap: 6px; }
+.lchead b { font-stretch: 112%; font-style: italic; font-weight: 900; }
+.lchead small { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+.court.full { display: block; width: 100%; height: auto; }
+.court .ccode { font-style: italic; font-weight: 900; font-size: 18px; font-stretch: 125%; letter-spacing: 0.02em; }
+.court .ping { transform-box: fill-box; transform-origin: center; animation: ping 1.6s ease-out infinite; }
+@keyframes ping { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .court .ping { animation: none; } }
+.lclast { display: flex; align-items: center; gap: 10px; margin: 10px -12px 0; padding: 10px 12px; border-top: 1px solid var(--rule); background: var(--panel2); }
+.lclast .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.lclast .tx b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; }
+.lclast .tx span { color: var(--soft); font-weight: 600; }
+.lclast .when { flex: none; font-size: 11px; font-weight: 800; color: var(--mute); font-variant-numeric: tabular-nums; }
+.feed { padding: 0; }
+.fitem { display: flex; align-items: flex-start; gap: 12px; padding: 10px 14px; box-shadow: inset 0 0 0 transparent; }
+.fitem.score { box-shadow: inset 4px 0 0 var(--tc); }
+.fitem > .blob, .fitem .noteam { margin-top: 1px; }
+.fitem .noteam { flex: none; width: 26px; height: 26px; }
+.fitem + .fitem { border-top: 1px solid var(--rule); }
+.fitem .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fitem .hd { display: flex; align-items: baseline; gap: 8px; }
+.fitem .hd b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 14px; }
+.fitem.score .hd b { color: var(--yellow); }
+.fitem .hd small { font-size: 11px; font-weight: 700; color: var(--mute); font-variant-numeric: tabular-nums; }
+.fitem .tx { font-size: 13px; color: var(--soft); font-weight: 600; }
+.fitem .rs { flex: none; align-self: center; display: flex; gap: 10px; align-items: center; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.fitem .rs .hot { color: var(--ink); }
+.feed .more { display: block; width: 100%; padding: 12px; border: none; border-top: 1px solid var(--rule); background: transparent; color: var(--teal); font-weight: 800; font-size: 13px; }

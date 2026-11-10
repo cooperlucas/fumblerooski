@@ -1199,7 +1199,11 @@ export function normPlays(rawPlays) {
     const a = Number(p.awayScore), h = Number(p.homeScore);
     const scored = p.scoringPlay === true || (Number.isFinite(a) && Number.isFinite(h) && (a !== pa || h !== ph));
     if (Number.isFinite(a) && Number.isFinite(h)) { pa = a; ph = h; }
-    return { text: cleanText(p.text), period: p.period?.number || 0, clock: p.clock?.displayValue || '', teamId: String(p.team?.id ?? ''), scoring: scored, away: a, home: h };
+    const cx = Number(p.coordinate?.x), cy = Number(p.coordinate?.y);
+    return { text: cleanText(p.text), period: p.period?.number || 0, clock: p.clock?.displayValue || '', teamId: String(p.team?.id ?? ''), scoring: scored, away: a, home: h,
+      id: String(p.id ?? ''), type: cleanText(p.type?.text || ''), pts: Number(p.scoreValue) || 0, shot: p.shootingPlay === true,
+      // Basketball: feet on a half court, x across (0 to 50) and y out from the basket. Free throws carry junk spots.
+      xy: Number.isFinite(cx) && Number.isFinite(cy) && cx > -900 && !/free throw/i.test(`${p.type?.text || ''} ${p.text || ''}`) ? { x: cx, y: cy } : null };
   }).filter((p) => p.text);
 }
 

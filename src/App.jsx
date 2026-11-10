@@ -1027,6 +1027,121 @@ function ShotChart({ shots, game, lg }) {
   );
 }
 
+/* ---------- basketball, live: the court with the latest play on it, and a running feed underneath ---------- */
+// A short headline for each play, the way a courtside graphic would put it.
+export function playHead(p, L) {
+  const t = `${p.type} ${p.text}`;
+  if (p.scoring && p.pts) return `+${p.pts} Point${p.pts > 1 ? 's' : ''}`;
+  if (p.shot) return /free throw/i.test(t) ? 'Missed Free Throw' : /three point/i.test(t) ? 'Missed Three' : 'Missed Shot';
+  if (/rebound/i.test(p.type)) return /offensive/i.test(p.type) ? 'Offensive Rebound' : 'Rebound';
+  if (/block/i.test(t)) return 'Block';
+  if (/steal/i.test(t)) return 'Steal';
+  if (/turnover|traveling|bad pass|lost ball/i.test(t)) return 'Turnover';
+  if (/foul/i.test(t)) return 'Foul';
+  if (/timeout/i.test(t)) return 'Timeout';
+  if (/jump ?ball/i.test(t)) return 'Jump Ball';
+  if (/end (of )?(game|period|half|quarter)/i.test(t)) return /game/i.test(t) ? 'Final' : `End of ${perName(L, p.period)}`;
+  return p.type || 'Play';
+}
+const isSub = (p) => /substitution|subbing/i.test(`${p.type} ${p.text}`);
+
+function LiveCourt({ pbp, game, L, lg }) {
+  const [all, setAll] = useState(false);
+  const cc = chartColors(game.away, game.home);
+  const side = (id) => (id === game.away.id ? 'away' : id === game.home.id ? 'home' : null);
+  const teamOf = (id) => (side(id) === 'away' ? game.away : side(id) === 'home' ? game.home : null);
+  const col = (id) => (side(id) === 'away' ? cc.away.main : cc.home.main);
+  // Full court in feet, 94 by 50. Away attacks the left basket, home the right.
+  const K = 4, W = 94 * K, H = 50 * K, B = 5.25, pro = lg === 'nba' || lg === 'wnba';
+  const r3 = pro ? 23.75 : 22.15, corner = pro ? 22 : 21.65, cx3 = Math.sqrt(r3 * r3 - corner * corner), lane = pro ? 8 : 6;
+  // Where on the full court a play happened: shots at the shooter's basket, a rebound at whichever basket the missed shot was at.
+  const spot = (p) => {
+    if (!p.xy || !side(p.teamId)) return null;
+    const reb = /rebound/i.test(p.type), shot = p.shot;
+    if (!shot && !reb) return null;
+    const attacking = shot || /offensive/i.test(p.type) ? side(p.teamId) : side(p.teamId) === 'away' ? 'home' : 'away';
+    const x = Math.max(-1, Math.min(47, p.xy.y)), y = Math.max(0.8, Math.min(49.2, p.xy.x));
+    return attacking === 'away' ? { x: (B + x) * K, y: y * K } : { x: W - (B + x) * K, y: H - y * K };
+  };
+  const plays = pbp.filter((p) => !isSub(p));
+  const recent = [...plays].reverse();
+  const last = recent.find((p) => spot(p));
+  const trail = recent.filter((p) => p.shot && spot(p) && p !== last).slice(0, 6);
+  const now = recent[0];
+  const lines = (flip) => {
+    const bx = B * K, r = (v) => v * K, ax = (v) => (flip ? W - v : v);
+    const e = (x0, y0, x1, y1) => `M${ax(x0)} ${y0} L${ax(x1)} ${y1}`;
+    return [
+      e(0, r(25 - lane), r(19), r(25 - lane)), e(r(19), r(25 - lane), r(19), r(25 + lane)), e(r(19), r(25 + lane), 0, r(25 + lane)),
+      `M${ax(r(19))} ${r(19)} A${r(6)} ${r(6)} 0 0 ${flip ? 0 : 1} ${ax(r(19))} ${r(31)}`,
+      e(0, r(25 - corner), r(B + cx3), r(25 - corner)),
+      `M${ax(r(B + cx3))} ${r(25 - corner)} A${r(r3)} ${r(r3)} 0 0 ${flip ? 0 : 1} ${ax(r(B + cx3))} ${r(25 + corner)}`,
+      e(r(B + cx3), r(25 + corner), 0, r(25 + corner)),
+      e(r(4), r(22), r(4), r(28)),
+    ].join(' ');
+  };
+  const court = `M0 0 H${W} V${H} H0 Z M${W / 2} 0 V${H} ${lines(false)} ${lines(true)}`;
+  const lt = last ? spot(last) : null;
+  const shown = all ? recent : recent.slice(0, 8);
+  return (
+    <>
+      <section className="sec">
+        <div className="card livecourt">
+          <div className="lchead">
+            <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ◂</small></span>
+            <span><small>▸ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
+          </div>
+          <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court full" role="img" aria-label={last ? `Latest: ${last.text}` : 'Court'}>
+            <rect x="0" y="0" width={W} height={H} fill="#10162C" />
+            <rect x="0" y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.away.main} opacity="0.16" />
+            <rect x={W - 19 * K} y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.home.main} opacity="0.16" />
+            <path d={court} fill="none" stroke="#6E3AB5" strokeWidth="2.5" transform="translate(2 2)" />
+            <path d={court} fill="none" stroke="#22D3D6" strokeWidth="2.5" />
+            <circle cx={W / 2} cy={H / 2} r={6 * K} fill="#10162C" stroke="#22D3D6" strokeWidth="2.5" />
+            <text x={W / 2} y={H / 2 + 6} textAnchor="middle" className="ccode" fill={cc.home.main}>{game.home.abbr}</text>
+            {[B * K, W - B * K].map((x) => <circle key={x} cx={x} cy={H / 2} r="5" fill="none" stroke="#FF7A1A" strokeWidth="2.5" />)}
+            {trail.map((p, i) => { const s = spot(p); return p.scoring
+              ? <rect key={p.id || i} x={s.x - 4} y={s.y - 4} width="8" height="8" fill={col(p.teamId)} opacity={0.5 - i * 0.06} />
+              : <path key={p.id || i} d={`M${s.x - 4} ${s.y - 4} L${s.x + 4} ${s.y + 4} M${s.x + 4} ${s.y - 4} L${s.x - 4} ${s.y + 4}`} stroke={col(p.teamId)} strokeWidth="2.2" opacity={0.5 - i * 0.06} />; })}
+            {lt ? (
+              <g key={last.id}>
+                <circle cx={lt.x} cy={lt.y} r="9" fill="none" stroke={col(last.teamId)} strokeWidth="2.5" className="ping" />
+                <circle cx={lt.x} cy={lt.y} r="7" fill={last.scoring ? '#FFBE2E' : col(last.teamId)} stroke="#0C1124" strokeWidth="2" />
+              </g>
+            ) : null}
+          </svg>
+          {now ? (() => { const t = teamOf(now.teamId); return (
+            <div className="lclast">
+              {t ? <Blob team={t} size={30} /> : <span style={{ width: 30 }} />}
+              <span className="tx"><b style={now.scoring ? { color: 'var(--yellow)' } : undefined}>{playHead(now, L)}</b><span>{now.text}</span></span>
+              <span className="when">{now.period ? perName(L, now.period) : ''} {now.clock}</span>
+            </div>); })() : null}
+        </div>
+      </section>
+      <section className="sec">
+        <H2>Play by Play</H2>
+        <div className="card feed">
+          {shown.map((p, i) => { const t = teamOf(p.teamId); return (
+            <div className={'fitem' + (p.scoring ? ' score' : '')} key={p.id || i} style={{ '--tc': t ? col(p.teamId) : 'var(--rule)' }}>
+              {t ? <Blob team={t} size={26} /> : <span className="noteam" aria-hidden="true" />}
+              <span className="body">
+                <span className="hd"><b>{playHead(p, L)}</b><small>{p.period ? perName(L, p.period) : ''} · {p.clock}</small></span>
+                <span className="tx">{p.text}</span>
+              </span>
+              {Number.isFinite(p.away) && Number.isFinite(p.home) ? (
+                <span className="rs" aria-label={`${game.away.abbr} ${p.away}, ${game.home.abbr} ${p.home}`}>
+                  <span className={p.scoring && side(p.teamId) === 'away' ? 'hot' : undefined}>{p.away}</span>
+                  <span className={p.scoring && side(p.teamId) === 'home' ? 'hot' : undefined}>{p.home}</span>
+                </span>
+              ) : null}
+            </div>); })}
+          {recent.length > 8 ? <button className="more" onClick={() => setAll(!all)}>{all ? 'Show less' : `Show all ${recent.length} plays`}</button> : null}
+        </div>
+      </section>
+    </>
+  );
+}
+
 /* ---------- hockey: every shot on the rink. Away team shoots right, home team shoots left. ---------- */
 export function IceChart({ ice, game }) {
   const [per, setPer] = useState(0);
@@ -1278,6 +1393,7 @@ function GamePage({ lg, id }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
+                {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} /> : null}
                 {started && periods > 0 ? (
                   <section className="card pad linesbox" style={{ marginTop: 12 }}>
                     <table className="lines">
