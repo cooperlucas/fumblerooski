@@ -530,7 +530,7 @@ export async function getTeamStats(lg) {
   })).filter((c) => c.key && c.labels.length);
   const teams = (d.teams || []).map((t) => {
     const stats = {};
-    (t.categories || []).forEach((c) => { const v = c.totals || c.displayValues || c.values; if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); // raw numbers come with long tails });
+    (t.categories || []).forEach((c) => { const v = c.totals || c.displayValues || c.values; if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); }); // raw numbers come with long tails, so trim them
     return { team: normTeam(t.team || {}, lg), stats };
   }).filter((t) => t.team.id);
   return { lg, cats: cats.filter((c) => teams.some((t) => t.stats[c.key]?.length)), teams };
