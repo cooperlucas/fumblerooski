@@ -276,3 +276,8 @@ h1, h2, h3, p { margin: 0; }
 .titem .at:empty { display: none; }
 .titem .tst { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; }
 @media (prefers-reduced-motion: reduce) { .ttrack { animation: none; } .ticker { overflow-x: auto; scrollbar-width: none; } }
+
+/* league dropdown */
+.pick { position: relative; display: inline-flex; align-items: center; color: var(--yellow); }
+.pick select { appearance: none; -webkit-appearance: none; min-height: 36px; padding: 0 30px 0 14px; border-radius: 999px; border: 1px solid var(--line3); background: var(--chip); color: var(--yellow); font: inherit; font-weight: 800; font-size: 13px; }
+.pick svg { position: absolute; right: 12px; pointer-events: none; }

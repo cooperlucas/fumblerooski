@@ -82,6 +82,7 @@ function Ticker() {
 function Home() {
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
+  const [lg, setLg] = useState('all');
   const today = useDay(0);
   const games = useMemo(() => sortGames(today.data?.games || [], favSet), [today.data, favSet]);
   const live = games.some((g) => g.state === 'live');
@@ -89,39 +90,39 @@ function Home() {
   if (today.loading && !today.data) return <Loading rows={5} />;
   if (today.error && !today.data) return <Problem error={today.error} retry={today.reload} />;
 
-  const lineFor = (t) => {
-    const g = games.find((x) => (x.home.id === t.id || x.away.id === t.id) && x.lg === t.lg);
-    if (!g) return { text: 'No game today', bg: '#232C50', fg: '#CBD2EA', open: () => go(`team/${t.lg}/${t.id}`) };
-    const me = g.home.id === t.id ? g.home : g.away, them = g.home.id === t.id ? g.away : g.home;
-    const open = () => go(`game/${g.lg}/${g.id}`);
-    if (g.state === 'live') return { text: `LIVE ${me.score}-${them.score}`, bg: 'rgba(255,61,127,.18)', fg: '#FF7AA6', open };
-    if (g.state === 'final') { const w = +me.score > +them.score, tie = +me.score === +them.score; return { text: `${tie ? 'T' : w ? 'W' : 'L'} ${me.score}-${them.score}`, bg: w ? 'rgba(155,227,58,.16)' : '#232C50', fg: w ? '#9BE33A' : '#CBD2EA', open }; }
-    return { text: `${statusLabel(g)} ${g.home.id === t.id ? 'vs' : 'at'} ${them.abbr}`, bg: 'rgba(34,211,214,.14)', fg: '#22D3D6', open };
-  };
+  const mine = games.filter((g) => isFavGame(g, favSet));
+  const rest = games.filter((g) => !isFavGame(g, favSet));
+  const leagues = LEAGUES.filter((l) => rest.some((g) => g.lg === l.id));
+  const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
+  const list = pick === 'all' ? rest.slice(0, 12) : rest.filter((g) => g.lg === pick);
 
   return (
     <>
-      <section className="sec">
-        <H2>Your Teams</H2>
-        {favs.length ? (
-          <div className="card">
-            {favs.map((t) => { const l = lineFor(t); return (
-              <button key={favKey(t)} className="lrow fav" onClick={l.open} aria-label={`${t.name}, ${LEAGUE[t.lg]?.short || ''}: ${l.text}`}>
-                <Blob team={t} size={36} radius={10} />
-                <span className="nm">{t.name}<span className="sub">{LEAGUE[t.lg]?.short}</span></span>
-                <span className="ln" style={{ background: l.bg, color: l.fg }}>{l.text}</span>
-              </button>); })}
-          </div>
-        ) : (
-          <Empty>Pin your teams and their games jump to the top.<br /><button className="btn on" onClick={() => go('search')}>Find a team</button></Empty>
-        )}
-      </section>
+      {mine.length ? (
+        <section className="sec">
+          <H2>Your Teams</H2>
+          <div className="card">{mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}</div>
+        </section>
+      ) : null}
 
       <section className="sec">
-        <div className="sechead"><H2>Today</H2><button className="link" onClick={() => go('scores')}>All scores</button></div>
-        {games.length ? (
-          <div className="card">{games.slice(0, 10).map((g) => <GameRow key={g.lg + g.id} g={g} />)}</div>
-        ) : <Empty>No games on the board today.</Empty>}
+        <div className="sechead">
+          <H2>Today</H2>
+          {leagues.length > 1 ? (
+            <label className="pick">
+              <span style={{ position: 'absolute', left: -9999 }}>League</span>
+              <select value={pick} onChange={(e) => setLg(e.target.value)}>
+                <option value="all">All leagues</option>
+                {leagues.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}
+              </select>
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </label>
+          ) : null}
+        </div>
+        {list.length ? (
+          <div className="card">{list.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={pick === 'all'} />)}</div>
+        ) : <Empty>{mine.length ? 'No other games on the board today.' : 'No games on the board today.'}</Empty>}
+        {pick === 'all' && rest.length > list.length ? <div style={{ textAlign: 'center', marginTop: 12 }}><button className="link" onClick={() => go('scores')}>All {rest.length + mine.length} games</button></div> : null}
       </section>
 
       <Stamp at={today.updatedAt} live={live} />
