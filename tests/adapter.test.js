@@ -121,7 +121,7 @@ test('player box score: basketball leads with PTS, REB, AST and +/-, and skips p
 
 test('player box score: football shows passing, rushing, receiving in that order', async () => {
   const { box } = await getGame('nfl', 'g2');
-  assert.deepEqual(box[1].groups.map((g) => g.title), ['Passing', 'Rushing', 'Receiving']);
+  assert.deepEqual(box[1].groups.map((g) => g.title), ['Passing', 'Rushing', 'Receiving', 'Defensive', 'Fumbles']);
   assert.ok(box[1].groups.every((g) => !/demo|team/i.test(g.title)), 'no team name in front of the group title');
   assert.equal(box[1].groups[0].rows[0].stats[0], '22/31');
   const pre = await getGame('nfl', 'g3');
@@ -311,4 +311,18 @@ test('league stats: leaders by category and team tables, with betting categories
   assert.deepEqual(t.cats.map((c) => c.key), ['passing', 'rushing']);
   assert.equal(t.teams.length, 6);
   assert.equal(t.teams[0].stats.passing.length, 4);
+});
+
+test('football box score: defense gets FF (from the play-by-play) and FR (from the fumbles table)', async () => {
+  const { forcedFumbles, nameKey } = await import('../src/data/espn.js');
+  assert.equal(nameKey('T.J. Watt'), nameKey('T.Watt'));
+  assert.equal(nameKey('Tre Watt'), 'twatt');
+  const ff = forcedFumbles({ previous: [{ id: 'a', team: { id: '1' }, plays: [{ text: 'J.Allen sacked (T.Watt). FUMBLES (T.Watt), RECOVERED by PIT.' }, { text: 'Smith fumbled, forced by Tre Watt, recovered by Pitt' }, { text: 'FUMBLES (Aborted)' }] }] });
+  assert.deepEqual(ff, { 1: { twatt: 2 } });
+  const g = await getGame('nfl', 'g2'); // away team 5 had the ball when D.Tackler forced it, so the home defense gets the FF
+  const def = g.box[1].groups.find((x) => x.key === 'defensive');
+  assert.deepEqual(def.labels.slice(-2), ['FF', 'FR']);
+  assert.deepEqual(def.rows[0].stats.slice(-2), ['1', '1']);
+  assert.deepEqual(def.rows[1].stats.slice(-2), ['0', '0']);
+  assert.ok(g.box[1].groups.some((x) => x.key === 'fumbles'));
 });

@@ -145,7 +145,8 @@ function summary(lg, id) {
     const side = (q, r, w) => [
       g3('receiving', ['REC', 'YDS', 'AVG', 'TD', 'LONG', 'TGTS'], [ath(w + 'w', 'D. Receiver', 'WR', ['7', '104', '14.9', '1', '32', '10'])]),
       g3('passing', ['C/ATT', 'YDS', 'AVG', 'TD', 'INT', 'SACKS', 'QBR', 'RTG'], [ath(q + 'q', 'D. Quarterback', 'QB', ['22/31', '265', '8.5', '2', '0', '1-7', '71.2', '118.4'])]),
-      g3('fumbles', ['FUM', 'LOST', 'REC'], [ath(q + 'f', 'D. Quarterback', 'QB', ['1', '0', '0'])]),
+      g3('fumbles', ['FUM', 'LOST', 'REC'], [ath(q + 'f', 'D. Quarterback', 'QB', ['1', '0', '0']), ath(w + 'd', 'D. Tackler', 'LB', ['0', '0', '1'])]),
+      g3('defensive', ['TOT', 'SOLO', 'SACKS', 'TFL', 'PD', 'QB HTS', 'TD'], [ath(w + 'd', 'D. Tackler', 'LB', ['9', '6', '1', '2', '1', '2', '0']), ath(w + 's', 'S. Safety', 'S', ['5', '4', '0', '0', '2', '0', '0'])]),
       g3('rushing', ['CAR', 'YDS', 'AVG', 'TD', 'LONG'], [ath(r + 'r', 'D. Back', 'RB', ['19', '96', '5.1', '1', '22'])]),
     ];
     box.players = [{ team: { id: a }, statistics: side('a', 'a', 'a') }, { team: { id: h }, statistics: side('h', 'h', 'h') }];
@@ -170,7 +171,7 @@ function summary(lg, id) {
     const prev = [
       dr('d1', h, 'Touchdown', true, '8 plays, 75 yards, 4:10', 1, '13:24', 'OWN 25', [pl(1, '13:24', 'Demo back up the middle for 6 yards', '1st & 10 at OWN 25', 75, 69), pl(1, '12:50', 'Demo QB pass deep right to Demo receiver for 41 yards', '2nd & 4 at OWN 31', 69, 28), pl(1, '9:14', 'Demo back 4 Yd Run (Kick good)', '1st & Goal at 4', 4, 0, { scoringPlay: true, homeScore: 7 })]),
       dr('d2', a, 'Punt', false, '3 plays, 4 yards, 1:38', 1, '9:14', 'OWN 22', [pl(1, '9:14', 'Demo back left tackle for 3 yards', '1st & 10 at OWN 22', 78, 75), pl(1, '7:40', 'Demo punter punts 44 yards. Lions favored by 3 at DraftKings Sportsbook', '4th & 6 at OWN 26', 74, 74)]),
-      dr('d3', a, 'Interception', false, '5 plays, 31 yards, 2:02', 2, '11:00', 'OWN 30', [pl(2, '11:00', 'Demo QB pass short left to Demo receiver for 12 yards', '1st & 10 at OWN 30', 70, 58), pl(2, '9:10', 'Demo QB pass intercepted', '2nd & 8 at OPP 41', 41, 39)]),
+      dr('d3', a, 'Interception', false, '5 plays, 31 yards, 2:02', 2, '11:00', 'OWN 30', [pl(2, '11:00', 'Demo QB pass short left to Demo receiver for 12 yards', '1st & 10 at OWN 30', 70, 58), pl(2, '10:05', 'D.Quarterback sacked at DEM 38 for -4 yards (D.Tackler). FUMBLES (D.Tackler), recovered by DEM-D.Quarterback at DEM 36.', '1st & 10 at OPP 42', 42, 44), pl(2, '9:10', 'Demo QB pass intercepted', '2nd & 8 at OPP 41', 41, 39)]),
     ];
     prev.push(dr('d5', h, 'Field Goal', true, '6 plays, 40 yards, 2:30', 2, '2:34', 'OWN 30', [pl(2, '2:34', 'Demo back right guard for 5 yards', '1st & 10 at OWN 30', 70, 65), pl(2, '0:04', 'Demo kicker 47 yard field goal is GOOD', '4th & 3 at OPP 30', 30, 0, { scoringPlay: true, homeScore: 10 })]));
     const cur = dr('d4', a, '', false, '2 plays, 9 yards, 0:48', 3, '5:00', 'OWN 40', [pl(3, '5:00', 'Demo back right end for 9 yards', '1st & 10 at OWN 40', 60, 51)]);

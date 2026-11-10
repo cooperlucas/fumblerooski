@@ -585,7 +585,31 @@ function statRows(box, awayId, homeId, sport) {
 const BOX_FIRST = {
   basketball: ['MIN', 'PTS', 'REB', 'AST', '+/-', 'FG', '3PT', 'FT', 'STL', 'BLK', 'TO'],
 };
-const FOOTBALL_GROUPS = ['passing', 'rushing', 'receiving', 'defensive', 'interceptions', 'kicking', 'punting'];
+const FOOTBALL_GROUPS = ['passing', 'rushing', 'receiving', 'defensive', 'interceptions', 'fumbles', 'kicking', 'punting', 'kickreturns', 'puntreturns'];
+
+// Forced fumbles are not in the feed's box score, so count them from the play-by-play:
+// pro plays read "FUMBLES (T.Watt)", college plays read "fumbled, forced by Tre Watt".
+// Names are matched by first initial + last name, which is how both spellings line up with the box score.
+export const nameKey = (n) => { const p = String(n || '').toLowerCase().replace(/[^a-z.\s'-]/g, '').split(/[.\s]+/).filter(Boolean); return p.length ? p[0][0] + p[p.length - 1] : ''; };
+export function forcedFumbles(drives) {
+  const out = {}; // offense team id -> { nameKey: count } credited to the OTHER team's defenders
+  const all = [...(drives?.previous || []), ...(drives?.current ? [drives.current] : [])];
+  const seen = new Set();
+  for (const d of all) {
+    if (seen.has(d.id)) continue; seen.add(d.id);
+    const off = String(d.team?.id ?? '');
+    for (const p of d.plays || []) {
+      const text = String(p.text || '');
+      const names = [...text.matchAll(/FUMBLES?\s*\(([^)]+)\)/g)].map((m) => m[1]).concat([...text.matchAll(/forced by ([A-Z][A-Za-z.'-]*(?: [A-Z][A-Za-z.'-]*){0,2})/g)].map((m) => m[1]));
+      for (const n of names) {
+        if (/aborted/i.test(n)) continue;
+        const k = nameKey(n); if (!k) continue;
+        (out[off] = out[off] || {})[k] = ((out[off] || {})[k] || 0) + 1;
+      }
+    }
+  }
+  return out;
+}
 // The feed's display text puts the team in front ("Buffalo Passing"). The plain stat name is cleaner.
 const titleOf = (g, sport) => {
   const t = String(g.name || g.text || g.displayName || '').trim();
@@ -593,7 +617,7 @@ const titleOf = (g, sport) => {
   return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/([a-z])([A-Z])/g, '$1 $2');
 };
 // plusMinus: optional { athleteId: number } worked out from the play-by-play, used when the feed has no +/- column.
-export function playerBox(box, awayId, homeId, sport, plusMinus) {
+export function playerBox(box, awayId, homeId, sport, plusMinus, ff) {
   const out = [];
   for (const id of [awayId, homeId]) {
     const side = (box?.players || []).find((p) => String(p.team?.id) === String(id));
@@ -617,6 +641,18 @@ export function playerBox(box, awayId, homeId, sport, plusMinus) {
       })).filter((r) => r.name);
       return { key: String(g.name || '').toLowerCase(), title: titleOf(g, sport), labels: order.map((i) => labels[i]), rows, totals: Array.isArray(g.totals) && g.totals.length ? order.map((i) => String(g.totals[i] ?? '')) : null };
     }).filter((g) => g.rows.length && g.labels.length);
+    if (sport === 'football') {
+      // Give the defense table the two columns fans look for: forced fumbles and fumble recoveries.
+      const def = groups.find((g) => g.key === 'defensive'), fum = groups.find((g) => g.key === 'fumbles');
+      if (def) {
+        const other = String(id) === String(awayId) ? String(homeId) : String(awayId);
+        const forced = ff ? (ff[other] || {}) : null; // fumbles forced while the other team had the ball
+        const recIdx = fum ? fum.labels.indexOf('REC') : -1;
+        const recOf = (r) => (recIdx < 0 ? 0 : Number(fum.rows.find((x) => x.id && x.id === r.id)?.stats[recIdx]) || 0);
+        if (forced) { def.labels.push('FF'); def.rows.forEach((r) => r.stats.push(String(forced[nameKey(r.name)] || 0))); if (def.totals) def.totals.push(String(def.rows.reduce((n, r) => n + Number(r.stats[r.stats.length - 1]), 0))); }
+        if (recIdx >= 0) { def.labels.push('FR'); def.rows.forEach((r) => r.stats.push(String(recOf(r)))); if (def.totals) def.totals.push(String(def.rows.reduce((n, r) => n + Number(r.stats[r.stats.length - 1]), 0))); }
+      }
+    }
     if (sport === 'football') groups = groups.filter((g) => FOOTBALL_GROUPS.includes(g.key)).sort((x, y) => FOOTBALL_GROUPS.indexOf(x.key) - FOOTBALL_GROUPS.indexOf(y.key));
     out.push({ teamId: String(id), groups });
   }
@@ -830,7 +866,7 @@ export async function getGame(lg, id) {
   return {
     game,
     stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport),
-    box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus),
+    box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus, L.sport === 'football' && data.drives ? forcedFumbles(data.drives) : null),
     plays,
     chart: started ? scoreSeries(game, timeline, L) : null,
     drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
