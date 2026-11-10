@@ -79,6 +79,7 @@ function standings(lg, level) {
     stats: [
       { name: 'wins', displayValue: r[6].split('-')[0] }, { name: 'losses', displayValue: r[6].split('-')[1] },
       { name: 'overall', displayValue: r[6], summary: r[6] }, { name: 'streak', displayValue: i % 2 ? 'L1' : 'W3' },
+      { name: 'gamesBehind', displayName: 'Conference Games Back', displayValue: String(i) },
       { name: 'vsConf', displayName: 'Conference Record', displayValue: `${Math.max(0, +r[6].split('-')[0] - 3)}-${r[6].split('-')[1]}` },
     ],
   });

@@ -257,3 +257,9 @@ test('players: roster, profile with game log and career, search, and no betting 
   assert.ok(hits.every((h) => h.lg && h.name !== 'Somebody Cricket'));
   assert.equal(hits[0].team.length > 0, true);
 });
+
+test('college standings: CONF column is the conference record, not games behind', async () => {
+  const { getStandings } = await import('../src/data/espn.js');
+  const c = await getStandings('cfb');
+  assert.match(c.groups[0].rows[1].col2, /^\d+-\d+$/);
+});

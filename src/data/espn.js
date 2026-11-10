@@ -170,8 +170,13 @@ function overallOf(entry) {
 function col2Of(entry, L) {
   if (L.sport === 'hockey' || L.sport === 'soccer') return ['PTS', stat(entry, 'points')];
   if (L.college) {
-    const conf = (entry.stats || []).find((x) => /conf/i.test(x.name || '') || /conf/i.test(x.displayName || '') || /conf/i.test(x.type || ''));
-    return ['CONF', conf ? String(conf.displayValue ?? conf.summary ?? '') : ''];
+    // Conference record ("5-1"). Other stats mention "conference" too (games behind), so insist on a W-L value.
+    const val = (x) => String(x.displayValue ?? x.summary ?? '');
+    const isRec = (x) => /^\d+-\d+(-\d+)?$/.test(val(x));
+    const all = entry.stats || [];
+    const conf = all.find((x) => /^vs\.?\s*conf/i.test(x.name || x.type || '') && isRec(x))
+      || all.find((x) => [x.name, x.displayName, x.type, x.shortDisplayName, x.abbreviation].some((n) => /conf/i.test(n || '')) && isRec(x));
+    return ['CONF', conf ? val(conf) : ''];
   }
   return ['STREAK', stat(entry, 'streak')];
 }
