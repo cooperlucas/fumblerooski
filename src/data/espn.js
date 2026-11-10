@@ -297,7 +297,9 @@ export async function getStandings(lg) {
 /* ---------- teams ---------- */
 // The feed's team list is flaky from browsers (the big-limit request can be refused), so try smaller asks,
 // then fall back to the teams inside standings, which is a read we know works.
-let teamsParams = [{ limit: '1000' }, { limit: '400' }, {}];
+// The same data is served from a second address; some phones get the first one refused for this read.
+const SITE_ALT = 'https://site.web.api.espn.com/apis/site/v2/sports';
+let teamsParams = [[SITE, { limit: '1000' }], [SITE_ALT, { limit: '1000' }], [SITE_ALT, { limit: '400' }], [SITE, { limit: '400' }], [SITE_ALT, {}], [SITE, {}]];
 const listMemo = new Map();
 export function listTeams(lg) {
   if (!listMemo.has(lg)) {
@@ -305,7 +307,8 @@ export function listTeams(lg) {
       let lastErr = null;
       for (const params of teamsParams) {
         try {
-          const data = await get(url(SITE, lg, '/teams', params));
+          const [base, q] = params;
+          const data = await get(url(base, lg, '/teams', q));
           const list = data.sports?.[0]?.leagues?.[0]?.teams || data.teams || [];
           const teams = list.map((x) => normTeam(x.team || x, lg)).filter((t) => t.id);
           if (teams.length) {
