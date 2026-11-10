@@ -497,7 +497,11 @@ export async function getPlayer(lg, id) {
     },
     summary: {
       title: cleanText(sum.displayName || ''),
-      items: (sum.statistics || []).map((x) => ({ label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? '') })).filter((x) => x.label && x.value).slice(0, 4),
+      // The feed ranks each headline stat against the league ("12th"). Show it when they are in the top 150.
+      items: (sum.statistics || []).map((x) => {
+        const rank = Number(x.rank) || Number(/^(\d+)/.exec(String(x.rankDisplayValue || ''))?.[1]) || 0;
+        return { label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? ''), rank: rank > 0 && rank <= 150 ? rank : 0, tied: /^T/i.test(String(x.rankDisplayValue || '')) };
+      }).filter((x) => x.label && x.value).slice(0, 4),
     },
     gamelog: log.status === 'fulfilled' ? normGamelog(log.value) : { labels: [], spans: [], seasons: [] },
     career,

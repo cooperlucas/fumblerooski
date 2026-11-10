@@ -244,6 +244,7 @@ test('players: roster, profile with game log and career, search, and no betting 
   assert.equal(p.player.name, 'Dexter Quarterback');
   assert.equal(p.player.team.abbr, 'CIN');
   assert.equal(p.summary.items.length, 4);
+  assert.deepEqual(p.summary.items.slice(0, 3).map((x) => [x.rank, x.tied]), [[12, false], [4, true], [0, false]]);
   assert.ok(!JSON.stringify(p).includes('+450'));
   assert.equal(p.gamelog.labels.length, 8);
   assert.deepEqual(p.gamelog.spans.map((s) => s.count), [5, 3]);

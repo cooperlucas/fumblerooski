@@ -323,3 +323,4 @@ h1, h2, h3, p { margin: 0; }
 .released { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .released b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 14px; color: var(--ink); }
 .released span { font-size: 12px; font-weight: 700; color: var(--mute); }
+.trank { display: block; margin-top: 5px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; color: var(--teal); }

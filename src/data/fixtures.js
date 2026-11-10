@@ -221,7 +221,7 @@ function playerInfo(lg, id) {
   const nba = lg === 'nba';
   return { athlete: { ...athlete(lg, r), team: team(lg, T[lg][0][0]), statsSummary: { displayName: 'This Season', statistics: nba
     ? [{ abbreviation: 'PTS', displayValue: '24.1' }, { abbreviation: 'REB', displayValue: '5.2' }, { abbreviation: 'AST', displayValue: '7.8' }, { abbreviation: 'FG%', displayValue: '48.3' }]
-    : [{ abbreviation: 'YDS', displayValue: '2,104' }, { abbreviation: 'TD', displayValue: '17' }, { abbreviation: 'INT', displayValue: '4' }, { abbreviation: 'RTG', displayValue: '104.2' }] },
+    : [{ abbreviation: 'YDS', displayValue: '2,104', rank: 12, rankDisplayValue: '12th' }, { abbreviation: 'TD', displayValue: '17', rank: 4, rankDisplayValue: 'Tied-4th' }, { abbreviation: 'INT', displayValue: '4' }, { abbreviation: 'RTG', displayValue: '104.2' }] },
     // betting noise the guard must drop
     odds: { details: 'MVP +450' } } };
 }

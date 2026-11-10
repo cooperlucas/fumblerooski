@@ -492,6 +492,7 @@ function TeamPage({ lg, id }) {
 }
 
 /* ---------- Player ---------- */
+const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };
 const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
 function PlayerPage({ lg, id }) {
   const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
@@ -523,7 +524,7 @@ function PlayerPage({ lg, id }) {
 
             {tab === 'season' ? (
               <>
-                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{x.value}</b><span>{x.label}</span></div>)}</div> : null}
+                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{x.value}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
                     <div className="ptitle">{c.row.season} {c.title}</div>
