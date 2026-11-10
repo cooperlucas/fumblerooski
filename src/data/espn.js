@@ -384,7 +384,8 @@ export async function getTeam(lg, id) {
   return {
     team: normTeam(t.id ? t : { ...t, id }, lg),
     record: String(record || ''),
-    standing: cleanText(t.standingSummary || ''),
+    // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
+    standing: (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule: events.map((e) => normEvent(e, lg)).filter((g) => g.id),
     scheduleMissing: sched.status === 'rejected',
   };
@@ -958,8 +959,14 @@ export function normDrives(drives, awayId, homeId, live) {
       x0: pos(from), x1: pos(to),
       plays,
       live: !!live && !!cur && String(d.id) === String(cur.id),
+      // Score once the drive was over (extra point included), from its last play that carries one.
+      score: (() => { const p = [...plays].reverse().find((x) => Number.isFinite(x.away) && Number.isFinite(x.home)); return p ? { away: p.away, home: p.home } : null; })(),
     };
-  }).filter((d) => d.side && (d.plays.length || d.summary));
+  }).filter((d) => d.side && (d.plays.length || d.summary)).map((d, i, all) => {
+    // Show the score on drives that changed it (touchdowns, field goals, and safeties or return scores by the other side).
+    const prev = all.slice(0, i).reverse().find((x) => x.score)?.score || { away: 0, home: 0 };
+    return { ...d, scoreChanged: !!d.score && (d.score.away !== prev.away || d.score.home !== prev.home) };
+  });
 }
 
 /* ---------- basketball shots ---------- */

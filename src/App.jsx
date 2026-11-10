@@ -735,7 +735,8 @@ function Drives({ drives, game }) {
             <button className="dhead" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.id)}>
               <Blob team={t} />
               <span className="dmain">
-                <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.result || 'Drive')}</span>
+                <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.result || 'Drive')}
+                  {d.scoreChanged && !d.live ? <span className="dscore">{game.away.abbr} <b>{d.score.away}</b> · {game.home.abbr} <b>{d.score.home}</b></span> : null}</span>
                 <span className="dsum">{[d.summary, d.startText ? `from ${d.startText}` : ''].filter(Boolean).join(' · ')}</span>
               </span>
               <span className="dwhen">{d.period ? `Q${d.period}` : ''} {d.clock}<i aria-hidden="true">{isOpen ? '▴' : '▾'}</i></span>
