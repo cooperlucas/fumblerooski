@@ -303,7 +303,8 @@ test('second color: black-primary teams keep black as the secondary', async () =
 test('league stats: leaders by category and team tables, with betting categories dropped', async () => {
   const { getLeaders, getTeamStats } = await import('../src/data/espn.js');
   const l = await getLeaders('nfl');
-  assert.deepEqual(l.cats.map((c) => c.title), ['Passing Yards', 'Rushing Yards', 'Receiving Yards']);
+  assert.deepEqual(l.cats.map((c) => c.title), ['Passing Yards', 'Rushing Yards', 'Receiving Yards', 'Sacks']);
+  assert.deepEqual(l.cats[3].rows.map((r) => r.value), ['8.5', '8']);
   assert.equal(l.cats[0].rows[0].value, '2,804');
   assert.equal(l.cats[0].rows[0].player.name, 'Dexter Quarterback');
   assert.equal(l.cats[0].rows[0].team.abbr, 'CIN');

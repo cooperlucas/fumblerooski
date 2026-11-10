@@ -270,7 +270,7 @@ function leadersFx(lg) {
   const cat = (name, displayName, abbreviation, vals) => ({ name, displayName, abbreviation, leaders: vals.map((v, i) => row(i, v)) });
   return { leaders: { categories: nba
     ? [cat('pointsPerGame', 'Points Per Game', 'PTS', ['31.2', '28.4', '27.9']), cat('reboundsPerGame', 'Rebounds Per Game', 'REB', ['13.1', '11.8', '10.2']), cat('assistsPerGame', 'Assists Per Game', 'AST', ['10.4', '9.1', '8.8'])]
-    : [cat('passingYards', 'Passing Yards', 'YDS', ['2,804', '2,611', '2,540']), cat('rushingYards', 'Rushing Yards', 'YDS', ['1,012', '944', '871']), cat('receivingYards', 'Receiving Yards', 'YDS', ['988', '902', '860']), { name: 'odds', displayName: 'MVP Odds', leaders: [row(0, '+450')] }] } };
+    : [cat('passingYards', 'Passing Yards', 'YDS', ['2,804', '2,611', '2,540']), cat('rushingYards', 'Rushing Yards', 'YDS', ['1,012', '944', '871']), cat('receivingYards', 'Receiving Yards', 'YDS', ['988', '902', '860']), { name: 'sacks', displayName: 'Sacks', abbreviation: 'SACK', leaders: [{ ...row(0, '9'), value: 8.5 }, { ...row(1, '8'), value: 8 }] }, { name: 'odds', displayName: 'MVP Odds', leaders: [row(0, '+450')] }] } };
 }
 function teamStatsFx(lg) {
   const nba = lg === 'nba';

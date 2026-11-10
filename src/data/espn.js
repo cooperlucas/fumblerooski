@@ -499,6 +499,16 @@ export async function searchPlayers(text) {
 /* ---------- league stats: leaders and team tables ---------- */
 const SITE3 = 'https://site.api.espn.com/apis/site/v3/sports';
 // Who leads the league in each stat. The feed has moved this around, so try each place it has lived.
+// The feed's display text rounds half sacks away ("8" for 8.5), so trust the number when it has a fraction.
+function leaderValue(l) {
+  const shown = String(l.displayValue ?? l.value ?? '');
+  const n = Number(l.value);
+  if (/^\d+$/.test(shown) && Number.isFinite(n)) {
+    if (!Number.isInteger(n)) return String(Math.round(n * 10) / 10);
+    if (n >= 1000) return n.toLocaleString('en-US');
+  }
+  return shown;
+}
 export async function getLeaders(lg) {
   const tries = [[SITE3, '/leaders'], [SITE, '/leaders'], [SITE, '/statistics']];
   let lastErr = null;
@@ -513,7 +523,7 @@ export async function getLeaders(lg) {
         rows: (c.leaders || []).map((l) => {
           const a = l.athlete || null, t = l.team || a?.team || null;
           return {
-            value: String(l.displayValue ?? l.value ?? ''),
+            value: leaderValue(l),
             player: a ? { id: String(a.id ?? ''), name: cleanText(a.displayName || a.fullName || a.shortName || ''), pos: a.position?.abbreviation || '' } : null,
             team: t?.id ? normTeam(t, lg) : null,
           };
