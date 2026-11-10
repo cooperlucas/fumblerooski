@@ -637,7 +637,10 @@ export async function getLeaders(lg) {
           };
         }).filter((r) => r.value && (r.player?.name || r.team)),
       })).filter((c) => c.title && c.rows.length);
-      if (cats.length) return { lg, cats };
+      // Kickoff yards is noise: drop it. Other special-teams lists go to the bottom.
+      const niche = (c) => /punt|return|kick|field goal/i.test(c.title + ' ' + c.key);
+      const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key));
+      if (kept.length) return { lg, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche)] };
     } catch (e) { lastErr = e; }
   }
   if (lastErr) throw lastErr;
