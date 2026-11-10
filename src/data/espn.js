@@ -1102,13 +1102,32 @@ function normPreview(data, game, lg) {
       result: String(e.gameResult || ''), score: String(e.score || ''),
     })).sort((a, b) => String(b.date).localeCompare(String(a.date))); // most recent first
   });
+  // The feed sends a different pile of columns per sport (NBA: GB, L, STRK, PCT, W). Boil it down to the few that matter.
+  const sport = LEAGUE[lg]?.sport;
+  const cols = sport === 'soccer' ? [['GP', ['gamesPlayed']], ['GD', ['pointDifferential']], ['PTS', ['points']]]
+    : sport === 'hockey' ? [['REC', ['@rec']], ['PTS', ['points']]]
+      : LEAGUE[lg]?.college ? [['REC', ['@rec']], ['CONF', ['vsConf', 'vs. Conf.', 'CONF', 'VS CONF']]]
+        : sport === 'football' ? [['REC', ['@rec']], ['PCT', ['winPercent']]]
+        : [['REC', ['@rec']], ['PCT', ['winPercent']], ['GB', ['gamesBehind']]];
   const standings = (data.standings?.groups || []).map((g) => {
     const entries = g.standings?.entries || [];
-    const cols = (entries[0]?.stats || []).map((x) => cleanText(x.abbreviation || x.shortDisplayName || x.name || '')).map((c) => (/^(season|overall)$/i.test(c) ? 'OVR' : c === 'VS CONF' ? 'CONF' : c));
+    const val = (e, names) => {
+      const st = e.stats || [];
+      const by = (n) => st.find((x) => x.name === n || x.abbreviation === n || x.type === n || x.shortDisplayName === n);
+      if (names[0] === '@rec') {
+        const o = by('overall') || by('total');
+        if (o && /^\d+-\d+/.test(String(o.displayValue ?? o.summary ?? ''))) return String(o.displayValue ?? o.summary);
+        const w = by('wins')?.displayValue, l = by('losses')?.displayValue, t = (by('otLosses') || by('ties'))?.displayValue;
+        return w != null && l != null ? [w, l, ...(t != null && (sport === 'hockey' || t !== '0') ? [t] : [])].join('-') : '';
+      }
+      for (const n of names) { const x = by(n); if (x) return String(x.displayValue ?? x.summary ?? ''); }
+      return '';
+    };
+    const use = cols.filter(([, names]) => entries.some((e) => val(e, names)));
     return {
       title: shortGroup(cleanText(g.header || '').replace(/^\d{4}(-\d{2})?\s+/, '').replace(/\s+Standings$/i, '')),
-      cols,
-      rows: entries.map((e) => ({ id: String(e.id ?? ''), name: cleanText(typeof e.team === 'string' ? e.team : e.team?.displayName || ''), stats: (e.stats || []).map((x) => String(x.displayValue ?? x.summary ?? '')) })),
+      cols: use.map(([label]) => label),
+      rows: entries.map((e) => ({ id: String(e.id ?? ''), name: cleanText(typeof e.team === 'string' ? e.team : e.team?.displayName || ''), stats: use.map(([, names]) => val(e, names)) })),
     };
   }).filter((g) => g.rows.length);
   const leaders = {};
