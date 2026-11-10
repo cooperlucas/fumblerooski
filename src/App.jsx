@@ -743,8 +743,15 @@ function TeamSeason({ lg, id, season, team }) {
               <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}`)}>
                 <span className="jersey" style={{ width: 30, height: 30, fontSize: 12, background: team.color, color: inkOn(team.color) }}>{r.jersey || '·'}</span>
                 <span className="nm">{i === 0 ? <small className="lcat">{c.title}</small> : null}{r.name}{r.pos ? <small> {r.pos}</small> : null}{i === 0 && r.detail && r.detail !== r.value ? <small className="ldet">{r.detail}</small> : null}</span>
-                <span className="v">{pct1(c.title, r.value)}</span>
-                {i === 0 && c.rows.length > 1 ? <span className="lmore" role="button" aria-label={open[c.key] ? 'Show fewer' : 'Show the next two'} onClick={(e) => { e.stopPropagation(); setOpen({ ...open, [c.key]: !open[c.key] }); }}>{open[c.key] ? '▴' : '▾'}</span> : <span className="lmore" aria-hidden="true" />}
+                {i === 0 && c.rows.length > 1 ? (
+                  // Everything right of the name opens the next two; the name side goes to the player.
+                  <span className="ltog" role="button" aria-label={open[c.key] ? 'Show fewer' : 'Show the next two'} onClick={(e) => { e.stopPropagation(); setOpen({ ...open, [c.key]: !open[c.key] }); }}>
+                    <span className="v">{pct1(c.title, r.value)}</span>
+                    <span className="lmore">{open[c.key] ? '▴' : '▾'}</span>
+                  </span>
+                ) : (
+                  <span className="ltog plain"><span className="v">{pct1(c.title, r.value)}</span><span className="lmore" aria-hidden="true" /></span>
+                )}
               </button>
             )))}
           </div>

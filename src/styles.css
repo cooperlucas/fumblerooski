@@ -428,7 +428,11 @@ button.pick.date { cursor: pointer; }
 .lead.tl.top .v { font-size: 18px; }
 .lead .lmore { flex: none; width: 14px; margin-left: -4px; text-align: right; color: var(--dim); font-size: 12px; }
 .lead.tl { padding-right: 12px; }
-.lead.tl .v { margin-left: auto; text-align: right; }
+.lead.tl .nm { flex: 0 1 auto; }
+.lead.tl .ltog { flex: 1 0 96px; align-self: stretch; display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin: -9px -12px -9px 0; padding: 9px 12px 9px 12px; cursor: pointer; }
+.lead.tl .ltog.plain { cursor: inherit; }
+.lead.tl .ltog:not(.plain):active { background: var(--panel2); }
+.lead.tl .v { text-align: right; }
 /* pin star */
 .star { flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--line3); background: var(--panel); color: var(--dim); padding: 0; }
 .star.on { color: var(--yellow); border-color: var(--yellow); animation: frWobble 380ms ease 1; }
