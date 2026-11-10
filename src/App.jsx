@@ -87,6 +87,7 @@ function Ticker() {
             <span className="at">{pre ? 'at' : ''}</span>
             <span className={fin && h < a ? 'dim' : undefined}>{g.home.abbr}{pre ? '' : <b> {g.home.score}</b>}</span>
             <span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
+            {!fin && g.tv?.national?.length ? <span className="ttv">{g.tv.national[0]}</span> : null}
           </button>
         );
       })}
