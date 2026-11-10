@@ -375,7 +375,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
   const divPicker = (
     <div className="filters">
       {divs.length > 1 ? <Picker label="Division" value={div} onChange={(v) => { setHunting(false); setAll(true); setConf('all'); setDiv(v); }}>{divs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</Picker> : null}
-      {confNames.length ? <Picker label="Conference" value={confNames.includes(conf) ? conf : 'all'} onChange={(v) => { setAll(true); setConf(v); }}><option value="all">All {L.college || curView?.id === 'conference' && curView?.label === 'Conference' ? 'conferences' : curView?.id === 'division' ? 'divisions' : 'teams'}</option>{confNames.map((n) => <option key={n} value={n}>{n}</option>)}</Picker> : null}
+      {confNames.length ? <Picker label="Conference" value={confNames.includes(conf) ? conf : 'all'} onChange={(v) => { setAll(true); setConf(v); }}><option value="all">All {L.college || curView?.id === 'conference' && curView?.label === 'Conference' ? 'confs' : curView?.id === 'division' ? 'divisions' : 'teams'}</option>{confNames.map((n) => <option key={n} value={n}>{n}</option>)}</Picker> : null}
       {seasons.length > 1 ? <Picker label="Season" value={String(yr || seasons[0].year)} onChange={(v) => { setHunting(false); setAll(true); setYr(Number(v) === seasons[0].year ? null : Number(v)); }}>{seasons.map((x) => <option key={x.year} value={x.year}>{x.label}</option>)}</Picker> : null}
     </div>
   );
@@ -632,10 +632,16 @@ function TeamPage({ lg, id }) {
   const recs = useQuery(`records:${lg}`, () => getRecords(lg), () => 600000).data || {};
   // Ranked colleges: show where they sit in each poll (CFP, AP, Coaches).
   const polls = useQuery(LEAGUE[lg].college ? `rankings:${lg}` : null, () => getRankings(lg), () => 1800000).data?.polls || [];
-  const pollRanks = polls.map((p) => ({ name: /cfp|playoff/i.test(p.name + p.type) ? 'CFP' : /\bap\b/i.test(p.name) ? 'AP' : /coach|usa/i.test(p.name + p.type) ? 'Coaches' : p.name, r: p.ranks.find((x) => x.team.id === String(id))?.rank }))
-    .filter((x) => x.r && ['CFP', 'AP', 'Coaches'].includes(x.name));
-  // The gold number is the main poll only (CFP when it is out, else AP). Ranked elsewhere: just the small poll line.
-  const mainPoll = polls[0];
+  // Each poll gets a short name and a level: top division (CFP, AP, Coaches) or a lower one (FCS, D2, D3).
+  const pollName = (p) => { const t = p.name + ' ' + p.full + ' ' + p.type;
+    return /cfp|playoff/i.test(t) ? ['CFP', 'top'] : /\bfcs\b/i.test(t) ? ['FCS', 'fcs'] : /div(ision)?\.?\s*iii\b|\bd3\b/i.test(t) ? ['D3', 'd3'] : /div(ision)?\.?\s*ii\b|\bd2\b/i.test(t) ? ['D2', 'd2']
+      : /\bap\b/i.test(t) ? ['AP', 'top'] : /coach|usa/i.test(t) ? ['Coaches', 'top'] : [p.name, 'other']; };
+  const pollRanks = polls.map((p) => { const [name, level] = pollName(p); return { name, level, poll: p, r: p.ranks.find((x) => x.team.id === String(id))?.rank }; })
+    .filter((x) => x.r && x.level !== 'other');
+  // The gold number comes from the team's main poll: CFP (or AP before it is out) for the top division,
+  // or the one poll a lower-division team appears in (FCS Coaches, AFCA Div II, AFCA Div III).
+  const lower = pollRanks.find((x) => x.level !== 'top');
+  const mainPoll = lower ? lower.poll : polls[0];
   const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || null);
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
@@ -662,7 +668,7 @@ function TeamPage({ lg, id }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
                 <p>{[q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {topRank || pollRanks.length ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                {topRank || pollRanks.length ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

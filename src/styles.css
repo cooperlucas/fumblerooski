@@ -403,8 +403,11 @@ button.pick.date { cursor: pointer; }
 .cday.on .gdot { background: var(--bg); }
 .lghead .link { font-size: 12px; }
 .lghead .link { margin-left: auto; }
-.filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-.filters .pick select { max-width: 46vw; text-overflow: ellipsis; }
+/* Filter dropdowns always share one line: each takes a fair share of the width and long names trim with an ellipsis. */
+.filters { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.filters .pick { flex: 1 1 0; min-width: 0; max-width: 60%; }
+.filters .pick:only-child { flex: 0 1 auto; }
+.filters .pick select { width: 100%; min-width: 0; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 .board .brk { color: #FFBE2E; font-weight: 900; }
 .board .tm .nm { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .grow .meta .gdate { font-size: 11px; font-weight: 700; color: var(--mute); }
