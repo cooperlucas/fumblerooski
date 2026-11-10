@@ -137,7 +137,7 @@ export function Stamp({ at, live }) {
 }
 
 /* ---------- chrome ---------- */
-const SearchIcon = () => (<svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="#F5F5F7" strokeWidth="2.6" /><path d="M15.5 15.5 L21 21" stroke="#F5F5F7" strokeWidth="2.6" strokeLinecap="round" /></svg>);
+const SearchIcon = () => (<svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.6" /><path d="M15.5 15.5 L21 21" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>);
 
 export function Mascot() {
   return (
@@ -185,7 +185,7 @@ export function SubHeader({ title, children }) {
   return (
     <header className="head">
       <button className="round" aria-label="Back" onClick={back}>
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="#F5F5F7" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
       {children || (<>
         <h1 className="subtitle">{title}</h1>

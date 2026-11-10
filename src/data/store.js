@@ -158,3 +158,18 @@ export async function loadLowerTeams() {
   if (!isDemo() && teams.length) ls.set('fr.lower.v1', { at: Date.now(), teams });
   return teams;
 }
+
+/* ---------- appearance: dark (default), light, or follow the phone ---------- */
+export const getTheme = () => { const t = ls.get('fr.theme', 'dark'); return t === 'light' || t === 'system' ? t : 'dark'; };
+export function applyTheme(t = getTheme()) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  if (t === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+  const light = t === 'light' || (t === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#F3EFE4' : '#0C1124');
+}
+export function setTheme(t) { ls.set('fr.theme', t); applyTheme(t); }
+if (typeof window !== 'undefined') {
+  applyTheme();
+  try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (getTheme() === 'system') applyTheme('system'); }); } catch { /* old browsers */ }
+}

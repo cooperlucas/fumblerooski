@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
-import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked } from './data/store.js';
+import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll } from './ui.jsx';
 
@@ -610,7 +610,7 @@ function TeamPage({ lg, id }) {
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
         <Blob team={them} />
         <span className="nm">{home ? 'vs' : 'at'} {them.name}{recs[them.id] || them.record ? <small className="orec"> {recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}</span></span>
-        <span className="res">{fin ? (<><b style={{ background: w ? 'rgba(155,227,58,.16)' : '#232C50', color: w ? '#9BE33A' : '#CBD2EA' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
+        <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span style={{ color: 'var(--pink)' }}>LIVE {me.score}-{them.score}</span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
               : <span style={{ color: 'var(--teal)' }}>{g.tbd ? 'TBD' : fmtTime(g.date)}</span>}</span>
@@ -780,8 +780,8 @@ function ScoreChart({ chart, game, L }) {
         </div>
         <div role="img" aria-label={`Score over time. ${game.away.name} ${end.a}, ${game.home.name} ${end.h}.`}>
           <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-            {ticks.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} stroke={v === 0 ? '#3A4672' : '#232C50'} strokeWidth={v === 0 ? 2 : 1} /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">{v}</text></g>)}
-            {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} stroke="#2C3762" strokeDasharray="2 4" />)}
+            {ticks.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: v === 0 ? 'var(--line3)' : 'var(--rule)' }} strokeWidth={v === 0 ? 2 : 1} /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">{v}</text></g>)}
+            {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={i} x={x((a + b) / 2)} y={H - 18} textAnchor="middle" className="per">{label(i)}</text>; })}
             {sides.map(([, k, , c2]) => <path key={'s' + k} d={path(k)} transform="translate(3 3)" fill="none" stroke={c2} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
             {sides.map(([, k, c]) => <path key={k} d={path(k)} fill="none" stroke={c} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
@@ -1221,7 +1221,7 @@ function Preview({ p, game, lg }) {
               <button key={e.id} className="lrow" onClick={() => e.id && go(`game/${lg}/${e.id}`)}>
                 {e.opp ? <Blob team={e.opp} /> : null}
                 <span className="nm">{e.at === '@' ? 'at' : 'vs'} {e.opp?.name || ''}<span className="sub">{e.date ? new Date(e.date).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' }) : ''}</span></span>
-                <span className="res">{e.result ? <b style={{ background: e.result === 'W' ? 'rgba(155,227,58,.16)' : '#232C50', color: e.result === 'W' ? '#9BE33A' : '#CBD2EA' }}>{e.result}</b> : null}{e.score}</span>
+                <span className="res">{e.result ? <b style={{ background: e.result === 'W' ? 'var(--win-bg)' : 'var(--rule)', color: e.result === 'W' ? 'var(--lime)' : 'var(--soft)' }}>{e.result}</b> : null}{e.score}</span>
               </button>
             ))}
           </div>
@@ -1249,6 +1249,20 @@ function Preview({ p, game, lg }) {
         </section>
       ) : null}
     </>
+  );
+}
+
+/* ---------- Appearance ---------- */
+function Appearance() {
+  const [t, setT] = useState(getTheme);
+  const pick = (v) => { setTheme(v); setT(v); };
+  return (
+    <section className="sec">
+      <H2>Appearance</H2>
+      <div className="seg" role="group" aria-label="Appearance" style={{ marginTop: 10 }}>
+        {[['dark', 'Dark'], ['light', 'Light'], ['system', 'Match phone']].map(([k, label]) => <button key={k} aria-pressed={t === k} onClick={() => pick(k)}>{label}</button>)}
+      </div>
+    </section>
   );
 }
 
@@ -1366,6 +1380,7 @@ function About() {
           ))}</div> : null}
         </div>
       </section>
+      <Appearance />
       <section className="sec">
         <H2>Demo Mode</H2>
         <div className="card pad">
