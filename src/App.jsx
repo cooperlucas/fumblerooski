@@ -15,13 +15,12 @@ export default function App() {
   const [name = '', a, b] = parts;
   const root = ROOTS.has(name);
   let title = '', body, tab = name;
-  if (name === '') body = <Home />;
-  else if (name === 'scores') body = <Scores />;
+  if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
-  else if (name === 'game' && LEAGUE[a] && b) { tab = 'scores'; body = <GamePage key={a + b} lg={a} id={b} />; }
+  else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
   else if (name === 'about') { title = 'About'; tab = 'leagues'; body = <About />; }
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
@@ -78,58 +77,6 @@ function Ticker() {
   );
 }
 
-/* ---------- Home ---------- */
-function Home() {
-  const favs = useFavs();
-  const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const [lg, setLg] = useState('all');
-  const today = useDay(0);
-  const games = useMemo(() => sortGames(today.data?.games || [], favSet), [today.data, favSet]);
-  const live = games.some((g) => g.state === 'live');
-
-  if (today.loading && !today.data) return <Loading rows={5} />;
-  if (today.error && !today.data) return <Problem error={today.error} retry={today.reload} />;
-
-  const mine = games.filter((g) => isFavGame(g, favSet));
-  const rest = games.filter((g) => !isFavGame(g, favSet));
-  const leagues = LEAGUES.filter((l) => rest.some((g) => g.lg === l.id));
-  const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
-  const list = pick === 'all' ? rest.slice(0, 12) : rest.filter((g) => g.lg === pick);
-
-  return (
-    <>
-      {mine.length ? (
-        <section className="sec">
-          <H2>Your Teams</H2>
-          <div className="card">{mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}</div>
-        </section>
-      ) : null}
-
-      <section className="sec">
-        <div className="sechead">
-          <H2>Today</H2>
-          {leagues.length > 1 ? (
-            <label className="pick">
-              <span style={{ position: 'absolute', left: -9999 }}>League</span>
-              <select value={pick} onChange={(e) => setLg(e.target.value)}>
-                <option value="all">All leagues</option>
-                {leagues.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}
-              </select>
-              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </label>
-          ) : null}
-        </div>
-        {list.length ? (
-          <div className="card">{list.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={pick === 'all'} />)}</div>
-        ) : <Empty>{mine.length ? 'No other games on the board today.' : 'No games on the board today.'}</Empty>}
-        {pick === 'all' && rest.length > list.length ? <div style={{ textAlign: 'center', marginTop: 12 }}><button className="link" onClick={() => go('scores')}>All {rest.length + mine.length} games</button></div> : null}
-      </section>
-
-      <Stamp at={today.updatedAt} live={live} />
-    </>
-  );
-}
-
 /* ---------- Scores ---------- */
 const DAYS = [-3, -2, -1, 0, 1, 2, 3];
 function Scores() {
@@ -141,6 +88,7 @@ function Scores() {
   const all = q.data?.games || [];
   const leagues = LEAGUES.filter((l) => all.some((g) => g.lg === l.id));
   const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
+  const mine = sortGames(all.filter((g) => isFavGame(g, favSet) && (pick === 'all' || g.lg === pick)), favSet);
   return (
     <>
       <div className="chips" role="group" aria-label="Day">
@@ -150,22 +98,39 @@ function Scores() {
             <span>{d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
           </button>); })}
       </div>
-      {leagues.length > 1 ? (
-        <div className="chips" role="group" aria-label="League" style={{ marginTop: 8 }}>
-          <button className="chipb" aria-pressed={pick === 'all'} onClick={() => setLg('all')}>All</button>
-          {leagues.map((l) => <button key={l.id} className="chipb" aria-pressed={pick === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
-        </div>
-      ) : null}
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !all.length ? <Empty>No games on this day.</Empty> : (
-        leagues.filter((l) => pick === 'all' || pick === l.id).map((l) => {
-          const games = sortGames(all.filter((g) => g.lg === l.id), favSet);
-          return (
-            <div className="card" key={l.id}>
-              <button className="lghead" onClick={() => go(`league/${l.id}`)}><b style={{ color: l.color }}>{l.name}</b><span>{games.length} {games.length === 1 ? 'game' : 'games'} ›</span></button>
-              {games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
+        <>
+          <div className="sechead" style={{ marginTop: 14 }}>
+            <H2>{off === 0 ? 'Today' : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
+            {leagues.length > 1 ? (
+              <label className="pick">
+                <span style={{ position: 'absolute', left: -9999 }}>League</span>
+                <select value={pick} onChange={(e) => setLg(e.target.value)}>
+                  <option value="all">All leagues</option>
+                  {leagues.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}
+                </select>
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </label>
+            ) : null}
+          </div>
+          {mine.length ? (
+            <div className="card">
+              <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
+              {mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}
             </div>
-          );
-        })
+          ) : null}
+          {leagues.filter((l) => pick === 'all' || pick === l.id).map((l) => {
+            const games = sortGames(all.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
+            if (!games.length) return null;
+            return (
+              <div className="card" key={l.id}>
+                <button className="lghead" onClick={() => go(`league/${l.id}`)}><b style={{ color: l.color }}>{l.name}</b><span>{games.length} {games.length === 1 ? 'game' : 'games'} ›</span></button>
+                {games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
+              </div>
+            );
+          })}
+          {!favs.length ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
+        </>
       )}
       <Stamp at={q.updatedAt} live={all.some((g) => g.state === 'live')} />
     </>
@@ -286,7 +251,7 @@ function TeamPage({ lg, id }) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned to Home' : 'Pin to Home'}</button>
+              <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned' : 'Pin Team'}</button>
               <button className="btn" onClick={() => go(`league/${lg}/${id}`)}><LgTag lg={lg} /> Standings</button>
             </div>
             <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
@@ -834,7 +799,7 @@ function Search() {
         {!term ? (
           <>
             {favs.length ? <section className="sec"><H2>Your Teams</H2><div className="card">{favs.map((t) => <TeamRow key={favKey(t)} t={{ ...t, full: t.name }} />)}</div></section> : null}
-            <Empty>Type a team, player or league. Open a team and tap Pin to put it on your Home screen.</Empty>
+            <Empty>Type a team, player or league. Open a team and tap Pin to put its games on top.</Empty>
           </>
         ) : q.loading && !q.data ? <Loading /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !leagues.length && !players.length && !playersBusy ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
           <>
