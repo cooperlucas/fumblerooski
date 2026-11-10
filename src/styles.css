@@ -427,3 +427,11 @@ button.pick.date { cursor: pointer; }
 .lead.tl.more + .lead.tl.top, .lead.tl.top + .lead.tl.top { border-top: 1px solid var(--rule); }
 .lead.tl.top .v { font-size: 18px; }
 .lead .lmore { flex: none; width: 22px; text-align: center; color: var(--dim); font-size: 13px; }
+/* pin star */
+.star { flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--line3); background: var(--panel); color: var(--dim); padding: 0; }
+.star.on { color: var(--yellow); border-color: var(--yellow); animation: frWobble 380ms ease 1; }
+.star.on svg { filter: drop-shadow(2px 2px 0 var(--deep)); }
+.teambar { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.teambar .btn { min-width: 0; }
+.teambar .pick { flex: none; }
+.teambar .pick select { min-height: 46px; }

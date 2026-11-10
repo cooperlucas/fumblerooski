@@ -680,9 +680,16 @@ function TeamPage({ lg, id }) {
                 {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned' : 'Pin Team'}</button>
-              <button className="btn" onClick={() => go(`league/${lg}/${id}`)}><LgTag lg={lg} /> Standings</button>
+            <div className="teambar">
+              <button className={'star' + (pinned ? ' on' : '')} aria-pressed={pinned} aria-label={pinned ? 'Unpin team' : 'Pin team'} onClick={() => toggleFav(t)}>
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 L14.7 8.6 L21 9.3 L16.3 13.6 L17.6 19.9 L12 16.7 L6.4 19.9 L7.7 13.6 L3 9.3 L9.3 8.6 Z" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
+              </button>
+              <button className="btn" style={{ flex: 1 }} onClick={() => go(`league/${lg}/${id}`)}><LgTag lg={lg} /> Standings</button>
+              {(view === 'schedule' || view === 'stats') && cur ? (
+                <Picker label="Season" value={String(yr || cur)} onChange={(v) => setYr(Number(v) === cur ? null : Number(v))}>
+                  {Array.from({ length: Math.max(1, cur - 2002) }, (_, i) => cur - i).map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
+                </Picker>
+              ) : null}
             </div>
             {full ? (
               <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
@@ -691,13 +698,6 @@ function TeamPage({ lg, id }) {
                 <button aria-pressed={view === 'stats'} onClick={() => setView('stats')}>Stats</button>
               </div>
             ) : <div style={{ marginTop: 14 }}><H2>Schedule</H2></div>}
-            {(view === 'schedule' || view === 'stats') && cur ? (
-              <div className="filters">
-                <Picker label="Season" value={String(yr || cur)} onChange={(v) => setYr(Number(v) === cur ? null : Number(v))}>
-                  {Array.from({ length: Math.max(1, cur - 2002) }, (_, i) => cur - i).map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
-                </Picker>
-              </div>
-            ) : null}
             {view === 'stats' ? <TeamSeason lg={lg} id={id} season={yr || cur} team={t} /> : view === 'schedule' ? (
               <section className="sec" style={{ marginTop: 12 }}>
                 {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
