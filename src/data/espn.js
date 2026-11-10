@@ -245,6 +245,43 @@ function statRows(box, awayId, homeId, sport) {
   if (!rows.length) rows = a.slice(0, 6).map((s) => row(s.name, s.label || s.displayName)).filter(Boolean);
   return rows;
 }
+/* ---------- player box score ---------- */
+// Column order we want up front per sport. Anything else the feed sends follows after, so nothing is hidden.
+const BOX_FIRST = {
+  basketball: ['MIN', 'PTS', 'REB', 'AST', '+/-', 'FG', '3PT', 'FT', 'STL', 'BLK', 'TO'],
+};
+const FOOTBALL_GROUPS = ['passing', 'rushing', 'receiving', 'defensive', 'interceptions', 'kicking', 'punting'];
+const titleOf = (g, sport) => {
+  const t = String(g.text || g.displayName || g.name || '').trim();
+  if (!t) return sport === 'basketball' ? 'Players' : 'Stats';
+  return t.charAt(0).toUpperCase() + t.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+};
+export function playerBox(box, awayId, homeId, sport) {
+  const out = [];
+  for (const id of [awayId, homeId]) {
+    const side = (box?.players || []).find((p) => String(p.team?.id) === String(id));
+    let groups = (side?.statistics || []).map((g) => {
+      const labels = (g.labels || g.names || g.keys || []).map((l) => cleanText(l));
+      const keys = g.keys || g.names || [];
+      // Make sure plus/minus is labeled the way fans know it even if the feed only names the key.
+      labels.forEach((l, i) => { if (!l && /plusMinus/i.test(keys[i] || '')) labels[i] = '+/-'; });
+      const first = BOX_FIRST[sport] || [];
+      const order = [...first.map((l) => labels.indexOf(l)).filter((i) => i >= 0), ...labels.map((_, i) => i).filter((i) => !first.includes(labels[i]))];
+      const rows = (g.athletes || []).filter((a) => !a.didNotPlay && (a.stats || []).length).map((a) => ({
+        id: String(a.athlete?.id ?? ''),
+        name: cleanText(a.athlete?.shortName || a.athlete?.displayName || ''),
+        pos: a.athlete?.position?.abbreviation || '',
+        starter: a.starter === true,
+        stats: order.map((i) => String(a.stats[i] ?? '')),
+      })).filter((r) => r.name);
+      return { key: String(g.name || '').toLowerCase(), title: titleOf(g, sport), labels: order.map((i) => labels[i]), rows, totals: Array.isArray(g.totals) && g.totals.length ? order.map((i) => String(g.totals[i] ?? '')) : null };
+    }).filter((g) => g.rows.length && g.labels.length);
+    if (sport === 'football') groups = groups.filter((g) => FOOTBALL_GROUPS.includes(g.key)).sort((x, y) => FOOTBALL_GROUPS.indexOf(x.key) - FOOTBALL_GROUPS.indexOf(y.key));
+    out.push({ teamId: String(id), groups });
+  }
+  return out.some((t) => t.groups.length) ? out : [];
+}
+
 const clockFrac = (clock, len) => {
   const m = String(clock || '').match(/^(\d+):(\d{2})/);
   if (!m || !len) return null;
@@ -291,6 +328,7 @@ export async function getGame(lg, id) {
   return {
     game,
     stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport),
+    box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport),
     plays,
     flow: game.state === 'final' ? momentum(game, plays, L) : null,
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),

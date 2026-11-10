@@ -125,6 +125,25 @@ function summary(lg, id) {
       { team: { id: h }, statistics: lg === 'nba' ? bb('46-90', '15-38', 47, 29, 9) : fb(412, 265, 147, '8-14', 0, '33:12') },
     ],
   };
+  const ath = (id, name, pos, stats, starter) => ({ athlete: { id, displayName: name, shortName: name, position: { abbreviation: pos } }, starter, stats });
+  if (started && lg === 'nba') {
+    // Label order here is the feed's, not ours: the adapter has to move PTS, REB, AST and +/- up front.
+    const labels = ['MIN', 'FG', '3PT', 'FT', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', '+/-', 'PTS'];
+    const grp = (rows) => [{ names: labels, keys: labels, labels, athletes: rows, totals: ['', '41-88', '12-34', '10-12', '9', '31', '40', '22', '6', '4', '13', '18', '', '104'] }];
+    box.players = [
+      { team: { id: a }, statistics: grp([ath('p1', 'D. Guard', 'G', ['36', '10-19', '4-9', '5-5', '0', '4', '4', '8', '2', '0', '3', '2', '+14', '29'], true), ath('p2', 'D. Center', 'C', ['31', '7-10', '0-0', '2-4', '4', '9', '13', '2', '0', '3', '1', '4', '+9', '16'], true), ath('p3', 'D. Sixth', 'F', ['22', '4-9', '2-5', '0-0', '1', '3', '4', '1', '1', '0', '2', '1', '-3', '10'], false), { ...ath('p4', 'D. Bench', 'G', []), didNotPlay: true }]) },
+      { team: { id: h }, statistics: grp([ath('p5', 'D. Wing', 'F', ['38', '9-21', '3-8', '4-4', '1', '6', '7', '5', '1', '1', '4', '3', '-12', '25'], true)]) },
+    ];
+  } else if (started) {
+    const g3 = (name, labels, rows) => ({ name, text: name, labels, keys: labels, athletes: rows, totals: [] });
+    const side = (q, r, w) => [
+      g3('receiving', ['REC', 'YDS', 'AVG', 'TD', 'LONG', 'TGTS'], [ath(w + 'w', 'D. Receiver', 'WR', ['7', '104', '14.9', '1', '32', '10'])]),
+      g3('passing', ['C/ATT', 'YDS', 'AVG', 'TD', 'INT', 'SACKS', 'QBR', 'RTG'], [ath(q + 'q', 'D. Quarterback', 'QB', ['22/31', '265', '8.5', '2', '0', '1-7', '71.2', '118.4'])]),
+      g3('fumbles', ['FUM', 'LOST', 'REC'], [ath(q + 'f', 'D. Quarterback', 'QB', ['1', '0', '0'])]),
+      g3('rushing', ['CAR', 'YDS', 'AVG', 'TD', 'LONG'], [ath(r + 'r', 'D. Back', 'RB', ['19', '96', '5.1', '1', '22'])]),
+    ];
+    box.players = [{ team: { id: a }, statistics: side('a', 'a', 'a') }, { team: { id: h }, statistics: side('h', 'h', 'h') }];
+  }
   let plays = [];
   if (started && lg !== 'nba') {
     const [as, hs] = [+g[6], +g[7]];

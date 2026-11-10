@@ -10,7 +10,7 @@ This is milestone 1 of the launch checklist: the prototype's screens running on 
 - **Scores**: any day from three back to three ahead, filtered by league
 - **Leagues**: 10 leagues (CFB, NFL, NBA, NHL, MLB, men's and women's college hoops, Premier League, MLS, WNBA) with standings and the current slate
 - **Team pages**: record, schedule and results, Pin to Home
-- **Game pages**: scoreboard, score by period, scoring plays, team stats with plain-English explanations, and a Momentum chart for finished games
+- **Game pages**: scoreboard, score by period, scoring plays, player box scores (with +/- for basketball), and team stats with plain-English explanations
 - **Search** across every team
 - **Live refresh**: every 30 seconds while a game is live, every 5 minutes otherwise, paused when the tab is hidden
 - **Installable**: add it to a phone home screen and it opens full screen

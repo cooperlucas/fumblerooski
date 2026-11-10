@@ -102,3 +102,23 @@ test('team list falls back to standings when the feed refuses the team list', as
   setFetcher(demoFetch);
   assert.equal((await getTeams('nfl')).source, 'team list');
 });
+
+test('player box score: basketball leads with PTS, REB, AST and +/-, and skips players who did not play', async () => {
+  const { box, game } = await getGame('nba', 'g10');
+  assert.equal(box.length, 2); assert.equal(box[0].teamId, game.away.id);
+  const g = box[0].groups[0];
+  assert.deepEqual(g.labels.slice(0, 5), ['MIN', 'PTS', 'REB', 'AST', '+/-']);
+  assert.equal(g.labels.length, 14, 'no column is dropped');
+  assert.equal(g.rows.length, 3);
+  assert.deepEqual(g.rows[0].stats.slice(0, 5), ['36', '29', '4', '8', '+14']);
+  assert.equal(g.rows[0].starter, true); assert.equal(g.rows[2].starter, false);
+  assert.equal(g.totals[1], '104');
+});
+
+test('player box score: football shows passing, rushing, receiving in that order', async () => {
+  const { box } = await getGame('nfl', 'g2');
+  assert.deepEqual(box[1].groups.map((g) => g.title), ['Passing', 'Rushing', 'Receiving']);
+  assert.equal(box[1].groups[0].rows[0].stats[0], '22/31');
+  const pre = await getGame('nfl', 'g3');
+  assert.deepEqual(pre.box, []);
+});

@@ -178,3 +178,20 @@ h1, h2, h3, p { margin: 0; }
 .check + .check { border-top: 1px solid #232C50; }
 .check b { flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--bg); }
 .check small { display: block; font-weight: 600; color: var(--mute); margin-top: 2px; word-break: break-word; }
+
+/* player box score: names stay put while the numbers scroll sideways */
+.pbox { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pbox table { border-collapse: collapse; min-width: 100%; font-variant-numeric: tabular-nums; }
+.pbox th, .pbox td { padding: 9px 9px; text-align: right; white-space: nowrap; font-size: 13px; }
+.pbox thead th { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; color: var(--dim); border-bottom: 1px solid #232C50; }
+.pbox thead th.hot { color: var(--yellow); }
+.pbox thead th.who { color: var(--teal); font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 12px; text-transform: uppercase; }
+.pbox .who { position: sticky; left: 0; z-index: 1; text-align: left; background: var(--panel); padding-left: 14px; min-width: 132px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 #232C50; }
+.pbox tbody th.who { font-weight: 800; color: var(--ink); }
+.pbox tbody th small { font-size: 10px; font-weight: 700; color: var(--mute); }
+.pbox tbody td { font-weight: 700; color: var(--soft); }
+.pbox tbody tr + tr th, .pbox tbody tr + tr td { border-top: 1px solid #1D2545; }
+.pbox td.up { color: var(--lime); }
+.pbox td.down { color: #FF7AA6; }
+.pbox tr.bench th { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding-top: 12px; }
+.pbox tr.tot th, .pbox tr.tot td { color: var(--ink); font-weight: 900; border-top: 1px solid #2C3762; }

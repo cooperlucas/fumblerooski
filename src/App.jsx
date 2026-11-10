@@ -341,6 +341,46 @@ function Momentum({ flow, game, L }) {
   );
 }
 
+const COL_TIPS = {
+  '+/-': 'Plus/minus: how many points the team outscored the other team by while this player was on the floor.',
+  'C/ATT': 'Completions out of pass attempts.', TGTS: 'Targets: passes thrown to this player.', TFL: 'Tackles for loss.',
+};
+function BoxScore({ box, game, sport }) {
+  const [side, setSide] = useState(0);
+  const teams = [game.away, game.home];
+  const cur = box[side];
+  const hasBench = sport === 'basketball';
+  const tips = [...new Set(cur.groups.flatMap((g) => g.labels))].filter((l) => COL_TIPS[l]);
+  return (
+    <section className="sec">
+      <H2>Box Score</H2>
+      <div className="seg" role="group" aria-label="Team" style={{ marginTop: 10 }}>
+        {teams.map((t, i) => <button key={t.id} aria-pressed={side === i} onClick={() => setSide(i)}>{t.name}</button>)}
+      </div>
+      {cur.groups.length ? cur.groups.map((gr) => {
+        const bench = hasBench ? gr.rows.findIndex((r, i) => i > 0 && !r.starter && gr.rows[i - 1].starter) : -1;
+        return (
+          <div className="card pbox" key={gr.key + gr.title}>
+            <table>
+              <thead><tr><th scope="col" className="who">{gr.title}</th>{gr.labels.map((l, i) => <th scope="col" key={i} className={l === '+/-' ? 'hot' : undefined}>{l}</th>)}</tr></thead>
+              <tbody>
+                {gr.rows.map((r, i) => (
+                  <React.Fragment key={r.id || r.name + i}>
+                    {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
+                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}</td>)}</tr>
+                  </React.Fragment>
+                ))}
+                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}</td>)}</tr> : null}
+              </tbody>
+            </table>
+          </div>
+        );
+      }) : <Empty>No player stats for {teams[side].name} yet.</Empty>}
+      {tips.length ? <p className="stamp" style={{ textAlign: 'left' }}>{tips.map((l) => <span key={l} style={{ display: 'block', marginTop: 4 }}><b style={{ color: 'var(--soft)' }}>{l}</b> {COL_TIPS[l]}</span>)}</p> : null}
+    </section>
+  );
+}
+
 function GamePage({ lg, id }) {
   const L = LEAGUE[lg];
   const q = useQuery(`game:${lg}:${id}`, () => getGame(lg, id), (d) => (d?.game?.state === 'live' ? 20000 : d?.game?.state === 'pre' ? 120000 : 0));
@@ -385,8 +425,6 @@ function GamePage({ lg, id }) {
               </section>
             ) : null}
 
-            {d.flow ? <Momentum flow={d.flow} game={g} L={L} /> : null}
-
             {d.plays.length ? (
               <section className="sec">
                 <H2>Scoring</H2>
@@ -400,6 +438,8 @@ function GamePage({ lg, id }) {
                 </div>
               </section>
             ) : null}
+
+            {d.box.length ? <BoxScore box={d.box} game={g} sport={L.sport} /> : null}
 
             {d.stats.length ? (
               <section className="sec">
