@@ -1,0 +1,165 @@
+// Demo data, shaped like the real feed, for demo mode and tests. Never shown without a DEMO banner.
+// It deliberately carries betting fields and a sportsbook sentence so the tests can prove the guard strips them.
+
+const T = {
+  nfl: [
+    ['4', 'Cincinnati Bengals', 'Bengals', 'CIN', 'fb4f14', '000000', '5-4'], ['5', 'Cleveland Browns', 'Browns', 'CLE', '472a08', 'ff3c00', '2-7'],
+    ['12', 'Kansas City Chiefs', 'Chiefs', 'KC', 'e31837', 'ffb612', '7-2'], ['2', 'Buffalo Bills', 'Bills', 'BUF', '00338d', 'd50a0a', '6-3'],
+    ['8', 'Detroit Lions', 'Lions', 'DET', '0076b6', 'bbbbbb', '7-2'], ['21', 'Philadelphia Eagles', 'Eagles', 'PHI', '06424d', '000000', '6-3'],
+  ],
+  cfb: [
+    ['194', 'Ohio State Buckeyes', 'Ohio State', 'OSU', 'ba0c2f', 'ffffff', '9-0'], ['130', 'Michigan Wolverines', 'Michigan', 'MICH', '00274c', 'ffcb05', '7-2'],
+    ['84', 'Indiana Hoosiers', 'Indiana', 'IU', '990000', 'ffffff', '9-0'], ['213', 'Penn State Nittany Lions', 'Penn State', 'PSU', '061440', 'ffffff', '6-3'],
+    ['2483', 'Oregon Ducks', 'Oregon', 'ORE', '007030', 'fee11a', '8-1'], ['251', 'Texas Longhorns', 'Texas', 'TEX', 'c15d26', 'ffffff', '7-2'],
+  ],
+  nba: [
+    ['5', 'Cleveland Cavaliers', 'Cavaliers', 'CLE', '860038', 'bc945c', '7-3'], ['18', 'New York Knicks', 'Knicks', 'NY', '1d428a', 'f58426', '6-3'],
+    ['2', 'Boston Celtics', 'Celtics', 'BOS', '008348', 'ffffff', '5-5'], ['25', 'Oklahoma City Thunder', 'Thunder', 'OKC', '007ac1', 'ef3b24', '9-1'],
+  ],
+};
+const SPORT = { 'college-football': 'cfb', nfl: 'nfl', nba: 'nba' };
+const team = (lg, id) => { const r = T[lg].find((x) => x[0] === id); return { id: r[0], displayName: r[1], shortDisplayName: r[2], abbreviation: r[3], color: r[4], alternateColor: r[5] }; };
+const rec = (lg, id) => T[lg].find((x) => x[0] === id)[6];
+
+const iso = (dayOffset, h, m = 0) => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+
+const STATUS = {
+  pre: () => ({ period: 0, displayClock: '0:00', type: { name: 'STATUS_SCHEDULED', state: 'pre', completed: false, shortDetail: 'Scheduled' } }),
+  live: (period, clock, short) => ({ period, displayClock: clock, type: { name: 'STATUS_IN_PROGRESS', state: 'in', completed: false, shortDetail: short } }),
+  final: (short = 'Final') => ({ period: 4, displayClock: '0:00', type: { name: 'STATUS_FINAL', state: 'post', completed: true, shortDetail: short } }),
+};
+
+// id, league, day offset, hour, away, home, away score, home score, status, linescores, ranks
+const GAMES = [
+  ['g1', 'nfl', 0, 20, '12', '2', '17', '20', STATUS.live(3, '4:12', '4:12 - 3rd'), [[7, 3, 7], [3, 10, 7]]],
+  ['g2', 'nfl', 0, 13, '5', '4', '13', '27', STATUS.final(), [[3, 7, 0, 3], [7, 10, 3, 7]]],
+  ['g3', 'nfl', 1, 20, '21', '8', '', '', STATUS.pre(), null],
+  ['g4', 'nfl', -1, 13, '8', '21', '24', '27', STATUS.final('Final/OT'), [[7, 7, 3, 7, 0], [3, 14, 0, 7, 3]]],
+  ['g5', 'cfb', 0, 12, '130', '194', '13', '31', STATUS.final(), [[3, 7, 0, 3], [7, 10, 7, 7]], [18, 1]],
+  ['g6', 'cfb', 0, 19, '213', '84', '', '', STATUS.pre(), null, [null, 2]],
+  ['g7', 'cfb', -1, 15, '251', '2483', '24', '21', STATUS.final(), [[7, 3, 7, 7], [7, 7, 0, 7]], [null, 6]],
+  ['g8', 'nba', 0, 19, '18', '5', '58', '61', STATUS.live(2, '0:00', 'Halftime'), [[30, 28], [33, 28]]],
+  ['g9', 'nba', 0, 22, '2', '25', '', '', STATUS.pre(), null],
+  ['g10', 'nba', -1, 19, '5', '2', '118', '96', STATUS.final(), [[31, 29, 30, 28], [22, 26, 25, 23]]],
+];
+
+function event(g) {
+  const [id, lg, off, hour, a, h, as, hs, status, lines, ranks] = g;
+  const side = (tid, homeAway, score, i) => ({
+    id: tid, homeAway, team: team(lg, tid), score, winner: status.type.state === 'post' ? +score > +(homeAway === 'home' ? as : hs) : undefined,
+    records: [{ name: 'overall', summary: rec(lg, tid) }],
+    curatedRank: { current: ranks && ranks[i] ? ranks[i] : 99 },
+    linescores: lines ? lines[i].map((v) => ({ value: v, displayValue: String(v) })) : [],
+  });
+  return {
+    id, date: iso(off, hour), name: 'demo', status,
+    competitions: [{
+      id, date: iso(off, hour), status,
+      competitors: [side(h, 'home', hs, 1), side(a, 'away', as, 0)],
+      // Betting data the real feed carries. The guard must drop every bit of it.
+      odds: [{ provider: { name: 'ESPN BET' }, details: 'BUF -2.5', overUnder: 47.5, spread: -2.5 }],
+      notes: id === 'g2' ? [{ headline: 'Battle of Ohio' }] : id === 'g3' ? [{ headline: 'Lions favored by 3 at DraftKings Sportsbook' }] : [],
+    }],
+  };
+}
+
+function scoreboard(lg, dates) {
+  const today = new Date();
+  const games = GAMES.filter((g) => g[1] === lg).filter((g) => {
+    if (!dates) return g[2] === 0;
+    const d = new Date(today); d.setDate(d.getDate() + g[2]); return ymd(d) === dates;
+  });
+  return { leagues: [{ season: { type: { name: 'Regular Season' } } }], events: games.map(event) };
+}
+
+function standings(lg) {
+  const entry = (r, i) => ({
+    team: { id: r[0], displayName: r[1], shortDisplayName: r[2], abbreviation: r[3], color: r[4], alternateColor: r[5] },
+    stats: [
+      { name: 'wins', displayValue: r[6].split('-')[0] }, { name: 'losses', displayValue: r[6].split('-')[1] },
+      { name: 'overall', displayValue: r[6], summary: r[6] }, { name: 'streak', displayValue: i % 2 ? 'L1' : 'W3' },
+      { name: 'vsConf', displayName: 'Conference Record', displayValue: `${Math.max(0, +r[6].split('-')[0] - 3)}-${r[6].split('-')[1]}` },
+    ],
+  });
+  const rows = T[lg], half = Math.ceil(rows.length / 2);
+  const names = { nfl: ['American Football Conference', 'National Football Conference'], cfb: ['Big Ten Conference', 'Southeastern Conference'], nba: ['Eastern Conference', 'Western Conference'] }[lg];
+  return {
+    name: lg, children: [
+      { name: names[0], standings: { entries: rows.slice(0, half).map(entry) } },
+      { name: names[1], standings: { entries: rows.slice(half).map(entry) } },
+    ],
+  };
+}
+
+function teamsList(lg) { return { sports: [{ leagues: [{ teams: T[lg].map((r) => ({ team: team(lg, r[0]) })) }] }] }; }
+function teamInfo(lg, id) { return { team: { ...team(lg, id), record: { items: [{ summary: rec(lg, id) }] }, standingSummary: '2nd in Division' } }; }
+function schedule(lg, id) {
+  const evs = GAMES.filter((g) => g[1] === lg && (g[4] === id || g[5] === id)).map(event).map((e) => {
+    // The schedule endpoint sends scores as objects, not strings.
+    e.competitions[0].competitors.forEach((c) => { if (c.score !== '') c.score = { value: +c.score, displayValue: String(c.score) }; else delete c.score; });
+    return e;
+  });
+  return { team: team(lg, id), events: evs.sort((a, b) => a.date.localeCompare(b.date)) };
+}
+
+function summary(lg, id) {
+  const g = GAMES.find((x) => x[0] === id && x[1] === lg);
+  if (!g) return {};
+  const ev = event(g), comp = ev.competitions[0];
+  comp.competitors.forEach((c) => { c.record = [{ type: 'total', summary: rec(lg, c.id) }]; delete c.records; });
+  const [, , , , a, h] = g;
+  const fb = (y, p, r, t, to, top) => [
+    { name: 'totalYards', label: 'Total Yards', displayValue: String(y) }, { name: 'netPassingYards', label: 'Passing', displayValue: String(p) },
+    { name: 'rushingYards', label: 'Rushing', displayValue: String(r) }, { name: 'thirdDownEff', label: '3rd down efficiency', displayValue: t },
+    { name: 'turnovers', label: 'Turnovers', displayValue: String(to) }, { name: 'possessionTime', label: 'Possession', displayValue: top },
+  ];
+  const bb = (fg, tp, reb, ast, to) => [
+    { name: 'fieldGoalsMade-fieldGoalsAttempted', label: 'FG', displayValue: fg }, { name: 'threePointFieldGoalsMade-threePointFieldGoalsAttempted', label: '3PT', displayValue: tp },
+    { name: 'totalRebounds', label: 'Rebounds', displayValue: String(reb) }, { name: 'assists', label: 'Assists', displayValue: String(ast) }, { name: 'turnovers', label: 'Turnovers', displayValue: String(to) },
+  ];
+  const started = g[8].type.state !== 'pre';
+  const box = !started ? { teams: [] } : {
+    teams: [
+      { team: { id: a }, statistics: lg === 'nba' ? bb('41-88', '12-34', 40, 22, 13) : fb(288, 201, 87, '4-13', 2, '26:48') },
+      { team: { id: h }, statistics: lg === 'nba' ? bb('46-90', '15-38', 47, 29, 9) : fb(412, 265, 147, '8-14', 0, '33:12') },
+    ],
+  };
+  let plays = [];
+  if (started && lg !== 'nba') {
+    const [as, hs] = [+g[6], +g[7]];
+    const mk = (per, clock, tid, text, type, A, H) => ({ text, type: { text: type }, period: { number: per }, clock: { displayValue: clock }, team: { id: tid }, awayScore: A, homeScore: H });
+    plays = [
+      mk(1, '9:14', h, 'Demo back 4 Yd Run (Kick good)', 'Rushing Touchdown', 0, 7),
+      mk(1, '2:31', a, 'Demo kicker 38 Yd Field Goal', 'Field Goal Good', 3, 7),
+      mk(2, '6:02', h, 'Demo receiver 22 Yd pass from Demo QB (Kick good)', 'Passing Touchdown', 3, 14),
+      mk(2, '0:04', h, 'DraftKings Sportsbook play of the half: 44 Yd Field Goal', 'Field Goal Good', 3, 17),
+      mk(3, '8:40', a, 'Demo back 12 Yd Run (Kick good)', 'Rushing Touchdown', Math.min(as, 10), 17),
+      mk(4, '3:05', h, 'Demo receiver 9 Yd pass from Demo QB (Kick good)', 'Passing Touchdown', as, hs),
+    ];
+  }
+  return {
+    header: { id, competitions: [comp] }, boxscore: box, scoringPlays: plays,
+    gameInfo: { venue: { fullName: 'Demo Stadium' } },
+    pickcenter: [{ provider: { name: 'ESPN BET' }, details: 'HOME -3' }],
+    winprobability: [{ homeWinPercentage: 0.61 }],
+    predictor: { homeTeam: { gameProjection: '61.0' } },
+    againstTheSpread: [{ team: { id: h } }],
+  };
+}
+
+export async function demoFetch(u) {
+  const { pathname, searchParams } = new URL(u);
+  const m = pathname.match(/\/sports\/[^/]+\/([^/]+)\/(.*)$/);
+  const lg = m && SPORT[m[1]];
+  const rest = m ? m[2] : '';
+  await new Promise((r) => setTimeout(r, 60));
+  if (!lg) return rest.startsWith('scoreboard') ? { events: [], leagues: [] } : rest === 'standings' ? { children: [] } : { sports: [{ leagues: [{ teams: [] }] }] };
+  if (rest === 'scoreboard') return scoreboard(lg, searchParams.get('dates'));
+  if (rest === 'standings') return standings(lg);
+  if (rest === 'teams') return teamsList(lg);
+  if (rest === 'summary') return summary(lg, searchParams.get('event'));
+  let t = rest.match(/^teams\/([^/]+)\/schedule$/); if (t) return schedule(lg, t[1]);
+  t = rest.match(/^teams\/([^/]+)$/); if (t) return teamInfo(lg, t[1]);
+  throw new Error('demo: no fixture for ' + u);
+}
