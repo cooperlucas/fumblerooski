@@ -1141,8 +1141,8 @@ function GamePage({ lg, id }) {
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
-                    <span className="nm">{t.rank ? <span className="brk">{t.rank}</span> : null}{t.name}</span>
-                    <span className="rc">{t.record}</span>
+                    <span className="nm" style={t.name.length > 9 ? { fontStretch: '100%', fontSize: 13 } : undefined}>{t.name}</span>
+                    <span className="rc">{t.rank ? <b className="brk">No. {t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
