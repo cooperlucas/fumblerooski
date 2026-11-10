@@ -271,8 +271,18 @@ export function shortGroup(name) {
 function standingGroups(data, lg) {
   const L = LEAGUE[lg];
   const groups = [];
-  const walk = (node) => {
+  // College conferences sometimes come split (SEC East / West, MAC East / West): fold those into one conference table.
+  const all = (node) => [...(node.standings?.entries || []), ...(node.children || []).flatMap(all)];
+  const recPct = (r) => { const [w = 0, l = 0, t = 0] = String(r || '').split('-').map(Number); const g = w + l + t; return g ? (w + t / 2) / g : -1; };
+  const walk = (node, depth = 0) => {
     if (!node || typeof node !== 'object') return;
+    if (L.college && depth === 1 && !node.standings?.entries?.length && (node.children || []).some((c) => c.standings?.entries?.length)) {
+      const rows = all(node).map((e) => { const [, v] = col2Of(e, L); return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v }; })
+        .sort((a, b) => recPct(b.col2) - recPct(a.col2) || recPct(b.overall) - recPct(a.overall));
+      const full = node.name || node.abbreviation || L.name;
+      if (rows.length) groups.push({ name: shortGroup(full), full, col2Label: 'CONF', rows });
+      return;
+    }
     const entries = node.standings?.entries;
     if (Array.isArray(entries) && entries.length) {
       let label = 'REC';
@@ -283,7 +293,7 @@ function standingGroups(data, lg) {
       const full = node.name || node.abbreviation || L.name;
       groups.push({ name: shortGroup(full), full, col2Label: label, rows });
     }
-    (node.children || []).forEach(walk);
+    (node.children || []).forEach((c) => walk(c, depth + 1));
   };
   walk(data);
   return groups;
