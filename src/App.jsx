@@ -1018,7 +1018,7 @@ function ShotChart({ shots, game, lg }) {
             <path d={court} fill="none" stroke="#22D3D6" strokeWidth="3" strokeLinejoin="miter" />
             <circle cx={X(25)} cy={Y(0)} r="5" fill="none" stroke="#FF7A1A" strokeWidth="3" />
             {shown.filter((s) => !s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <path key={'m' + i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke="#FF7AA6" strokeWidth="2.6" strokeLinecap="square" />; })}
-            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <rect key={'k' + i} x={x - 5} y={y - 5} width="10" height="10" fill="#FFBE2E" stroke="#0C1124" strokeWidth="1.6" />; })}
+            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <g key={'k' + i}><circle cx={x} cy={y} r="6.5" fill="none" stroke="#FFBE2E" strokeWidth="1.8" /><circle cx={x} cy={y} r="3.2" fill="#FFBE2E" /></g>; })}
           </svg>
         </div>
         <p className="stamp" style={{ marginTop: 10 }}>Field goals {made}-{shown.length}{pctTxt(made, shown.length)} · Threes {made3}-{threes.length}{pctTxt(made3, threes.length)}</p>
@@ -1107,7 +1107,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
             <text x={W / 2} y={H / 2 + 6} textAnchor="middle" className="ccode" fill={cc.home.main}>{game.home.abbr}</text>
             {[B * K, W - B * K].map((x) => <circle key={x} cx={x} cy={H / 2} r="5" fill="none" stroke="#FF7A1A" strokeWidth="2.5" />)}
             {trail.map((p, i) => { const s = spot(p); return p.scoring
-              ? <rect key={p.id || i} x={s.x - 4} y={s.y - 4} width="8" height="8" fill={col(p.teamId)} opacity={0.5 - i * 0.06} />
+              ? <g key={p.id || i} opacity={0.6 - i * 0.07}><circle cx={s.x} cy={s.y} r="5.5" fill="none" stroke={col(p.teamId)} strokeWidth="1.6" /><circle cx={s.x} cy={s.y} r="2.6" fill={col(p.teamId)} /></g>
               : <path key={p.id || i} d={`M${s.x - 4} ${s.y - 4} L${s.x + 4} ${s.y + 4} M${s.x + 4} ${s.y - 4} L${s.x - 4} ${s.y + 4}`} stroke={col(p.teamId)} strokeWidth="2.2" opacity={0.5 - i * 0.06} />; })}
             {lt ? (
               <g key={last.id}>
