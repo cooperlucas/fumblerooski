@@ -266,7 +266,8 @@ h1, h2, h3, p { margin: 0; }
 /* bottom score ticker */
 .ticker { flex: none; overflow: hidden; height: 30px; background: #070B18; border-top: 2px solid var(--yellow); }
 .ttrack { display: inline-flex; align-items: center; height: 100%; white-space: nowrap; animation: crawl 60s linear infinite; will-change: transform; }
-.ticker:hover .ttrack, .ticker:active .ttrack, .ticker:focus-within .ttrack { animation-play-state: paused; }
+@media (hover: hover) { .ticker:hover .ttrack { animation-play-state: paused; } } /* mouse only: a tap on a phone must not stop the crawl */
+.ticker:has(:focus-visible) .ttrack { animation-play-state: paused; }
 @keyframes crawl { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .tlg { flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 9px; margin-right: 4px; color: #0C1124; font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 11px; letter-spacing: 0.04em; }
 .titem { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 100%; padding: 0 12px; border: none; border-right: 1px solid #232C50; background: transparent; color: var(--ink); font-stretch: 112%; font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums; }
