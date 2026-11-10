@@ -326,3 +326,35 @@ h1, h2, h3, p { margin: 0; }
 .trank { display: block; margin-top: 5px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; color: var(--teal); }
 .morebar { display: flex; justify-content: center; gap: 22px; padding: 12px 14px; border-top: 1px solid #232C50; }
 .lrow .nm small.orec { font-size: 12px; font-weight: 700; color: var(--mute); }
+
+/* pre-game preview */
+.vshead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; position: relative; }
+.vshead > span { display: flex; align-items: center; gap: 8px; }
+.vshead b { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 14px; }
+.vshead small { font-size: 11px; font-weight: 800; color: var(--mute); }
+.vshead em { position: absolute; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+.vsrow { padding: 12px 0 4px; }
+.vsrow + .vsrow { border-top: 1px solid #232C50; }
+.vsnums { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.vsnums b { min-width: 56px; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--soft); }
+.vsnums b:last-child { text-align: right; }
+.vsnums b.best { color: var(--ink); }
+.vsnums span { flex: 1; text-align: center; font-size: 13px; font-weight: 800; color: var(--soft); }
+.vsbar { display: flex; gap: 4px; height: 8px; margin-top: 8px; }
+.vsbar i { display: block; height: 100%; border-radius: 4px; }
+.vsbar.two { justify-content: space-between; }
+.vsbar.two i { max-width: calc(50% - 4px); }
+.vsbar.two i:first-child { margin-right: auto; }
+.vsleadrow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; padding: 12px 0; }
+.vsleadrow + .vsleadrow { border-top: 1px solid #232C50; }
+.vsleadrow .mid { padding-top: 6px; font-size: 12px; font-weight: 800; color: var(--soft); text-align: center; }
+.vslead { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; border: none; background: transparent; padding: 0; text-align: left; color: inherit; font: inherit; }
+.vslead.r { align-items: flex-end; text-align: right; }
+.vslead b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 20px; color: var(--yellow); font-variant-numeric: tabular-nums; }
+.vslead b small { font-size: 10px; color: var(--mute); font-style: normal; }
+.vslead .who { font-weight: 800; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vslead .who small { color: var(--mute); }
+.vslead .sub { font-size: 11px; font-weight: 700; color: var(--mute); }
+.shead .col, .srow .col { width: 44px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.srow .col { font-weight: 700; color: var(--soft); }
+.srow .col:last-child { color: var(--ink); font-weight: 800; }

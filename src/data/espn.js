@@ -1016,6 +1016,57 @@ export function normPlays(rawPlays) {
   }).filter((p) => p.text);
 }
 
+// Before a game: season numbers side by side, each team's last five, the standings that matter, and season leaders.
+function normPreview(data, game, lg) {
+  const ids = [game.away.id, game.home.id];
+  const teamsBox = data.boxscore?.teams || [];
+  const statsOf = (id) => teamsBox.find((t) => String(t.team?.id) === id)?.statistics || [];
+  const A = statsOf(game.away.id), H = statsOf(game.home.id);
+  const num = (v) => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : null; };
+  const short = (l) => cleanText(l).replace(/\s+Per Game$/i, '').replace(/^Yards (Passing|Rushing)$/i, '$1 Yards');
+  const seen = new Set();
+  const compare = A.filter((s) => s.name !== 'streak' && !seen.has(s.name) && seen.add(s.name)).map((s) => {
+    const h = H.find((x) => x.name === s.name);
+    if (!h) return null;
+    const pct = /pct|percent/i.test(s.name);
+    return { key: s.name, label: short(s.label || s.displayName || s.name), away: String(s.displayValue ?? '') + (pct ? '%' : ''), home: String(h.displayValue ?? '') + (pct ? '%' : ''),
+      awayN: num(s.displayValue), homeN: num(h.displayValue), pct, lowerBetter: /against|allowed|turnover/i.test(s.name + ' ' + (s.label || '')) };
+  }).filter((r) => r && r.awayN != null && r.homeN != null && (r.awayN || r.homeN) && !/^team turnovers$/i.test(r.label));
+  compare.sort((a, b) => a.lowerBetter - b.lowerBetter); // offense first, then what they give up
+  const streak = Object.fromEntries(ids.map((id) => [id, String(statsOf(id).find((s) => s.name === 'streak')?.displayValue || '')]));
+  const last5 = {};
+  (data.lastFiveGames || []).forEach((t) => {
+    const id = String(t.team?.id ?? '');
+    last5[id] = (t.events || []).map((e) => ({
+      id: String(e.id ?? ''), date: e.gameDate || null, at: e.atVs || '',
+      opp: e.opponent?.id ? normTeam(e.opponent, lg) : null,
+      result: String(e.gameResult || ''), score: String(e.score || ''),
+    })).sort((a, b) => String(b.date).localeCompare(String(a.date))); // most recent first
+  });
+  const standings = (data.standings?.groups || []).map((g) => {
+    const entries = g.standings?.entries || [];
+    const cols = (entries[0]?.stats || []).map((x) => cleanText(x.abbreviation || x.shortDisplayName || x.name || '')).map((c) => (/^(season|overall)$/i.test(c) ? 'OVR' : c === 'VS CONF' ? 'CONF' : c));
+    return {
+      title: shortGroup(cleanText(g.header || '').replace(/^\d{4}(-\d{2})?\s+/, '').replace(/\s+Standings$/i, '')),
+      cols,
+      rows: entries.map((e) => ({ id: String(e.id ?? ''), name: cleanText(typeof e.team === 'string' ? e.team : e.team?.displayName || ''), stats: (e.stats || []).map((x) => String(x.displayValue ?? x.summary ?? '')) })),
+    };
+  }).filter((g) => g.rows.length);
+  const leaders = {};
+  (data.leaders || []).forEach((t) => {
+    const id = String(t.team?.id ?? '');
+    leaders[id] = (t.leaders || []).map((c) => {
+      const x = c.leaders?.[0]; if (!x) return null;
+      const a = x.athlete || {};
+      const main = x.mainStat?.value ?? x.displayValue ?? '';
+      return { key: String(c.name || ''), title: cleanText(c.displayName || c.name || ''), value: String(main),
+        unit: cleanText(x.mainStat?.label || ''), player: { id: String(a.id ?? ''), name: cleanText(a.shortName || a.displayName || ''), jersey: a.jersey ? String(a.jersey) : '' }, sub: cleanText(x.summary || '') };
+    }).filter(Boolean);
+  });
+  const has = compare.length || Object.keys(last5).length || standings.length || Object.keys(leaders).length;
+  return has ? { compare, streak, last5, standings, leaders } : null;
+}
+
 export async function getGame(lg, id) {
   const L = LEAGUE[lg];
   const data = await get(url(SITE, lg, '/summary', { event: id }));
@@ -1049,6 +1100,7 @@ export async function getGame(lg, id) {
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),
+    preview: started ? null : normPreview(data, game, lg),
   };
 }
 

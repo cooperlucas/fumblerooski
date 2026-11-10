@@ -1033,11 +1033,115 @@ function GamePage({ lg, id }) {
               </div>
             ) : null}
 
-            {!started && g.state === 'pre' ? <Empty>Scoring and stats show up here once the game starts.</Empty> : null}
+            {!started && d.preview ? <Preview p={d.preview} game={g} lg={lg} /> : !started && g.state === 'pre' ? <Empty>Scoring and stats show up here once the game starts.</Empty> : null}
             <Stamp at={q.updatedAt} live={g.state === 'live'} />
           </>
         )}
       </Page>
+    </>
+  );
+}
+
+/* ---------- Before the game: how the two teams stack up ---------- */
+function Preview({ p, game, lg }) {
+  const cc = chartColors(game.away, game.home);
+  const both = [game.away, game.home];
+  const [l5, setL5] = useSticky('l5', game.away.id);
+  const inGroup = (gr, id) => gr.rows.some((r) => r.id === id);
+  const shared = p.standings.find((gr) => inGroup(gr, game.away.id) && inGroup(gr, game.home.id));
+  const groups = shared ? [shared] : p.standings;
+  const [gi, setGi] = useSticky('stand', 0);
+  const gr = groups[Math.min(gi, groups.length - 1)];
+  const leaderKeys = [...new Set(both.flatMap((t) => (p.leaders[t.id] || []).map((x) => x.key)))];
+  const lead = (t, k) => (p.leaders[t.id] || []).find((x) => x.key === k);
+  return (
+    <>
+      {p.compare.length ? (
+        <section className="sec">
+          <H2>Team Stats</H2>
+          <div className="card pad">
+            <div className="vshead">{both.map((t, i) => <span key={t.id} style={{ flexDirection: i ? 'row-reverse' : 'row' }}><Blob team={t} size={26} /><b>{t.abbr}</b>{p.streak[t.id] ? <small>{p.streak[t.id]}</small> : null}</span>)}<em>Season averages</em></div>
+            {p.compare.map((r) => {
+              const tot = Math.abs(r.awayN) + Math.abs(r.homeN) || 1;
+              const aBest = r.awayN === r.homeN ? null : (r.awayN > r.homeN) !== r.lowerBetter;
+              return (
+                <div className="vsrow" key={r.key}>
+                  <div className="vsnums"><b className={aBest === true ? 'best' : ''}>{r.away}</b><span>{r.label}</span><b className={aBest === false ? 'best' : ''}>{r.home}</b></div>
+                  {r.pct ? (
+                    <div className="vsbar two"><i style={{ width: `${Math.min(100, r.awayN)}%`, background: cc.away.main }} /><i style={{ width: `${Math.min(100, r.homeN)}%`, background: cc.home.main }} /></div>
+                  ) : (
+                    <div className="vsbar"><i style={{ width: `${(Math.abs(r.awayN) / tot) * 100}%`, background: cc.away.main }} /><i style={{ width: `${(Math.abs(r.homeN) / tot) * 100}%`, background: cc.home.main }} /></div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {leaderKeys.length ? (
+        <section className="sec">
+          <H2>Season Leaders</H2>
+          <div className="card pad">
+            {leaderKeys.map((k) => {
+              const a = lead(game.away, k), h = lead(game.home, k);
+              const side = (x, right) => (x ? (
+                <button className={'vslead' + (right ? ' r' : '')} onClick={() => x.player.id && go(`player/${lg}/${x.player.id}`)}>
+                  <b>{x.value}<small> {x.unit}</small></b>
+                  <span className="who">{x.player.name}{x.player.jersey ? <small> #{x.player.jersey}</small> : null}</span>
+                  {x.sub ? <span className="sub">{x.sub}</span> : null}
+                </button>
+              ) : <span className="vslead" />);
+              return (
+                <div className="vsleadrow" key={k}>
+                  {side(a, false)}
+                  <span className="mid">{(a || h).title}</span>
+                  {side(h, true)}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {Object.keys(p.last5).length ? (
+        <section className="sec">
+          <H2>Last Five Games</H2>
+          <div className="seg" role="group" aria-label="Team" style={{ marginBottom: 10 }}>
+            {both.filter((t) => p.last5[t.id]).map((t) => <button key={t.id} aria-pressed={l5 === t.id} onClick={() => setL5(t.id)}>{t.name}</button>)}
+          </div>
+          <div className="card">
+            {(p.last5[l5] || p.last5[game.away.id] || p.last5[game.home.id] || []).map((e) => (
+              <button key={e.id} className="lrow" onClick={() => e.id && go(`game/${lg}/${e.id}`)}>
+                {e.opp ? <Blob team={e.opp} /> : null}
+                <span className="nm">{e.at === '@' ? 'at' : 'vs'} {e.opp?.name || ''}<span className="sub">{e.date ? new Date(e.date).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' }) : ''}</span></span>
+                <span className="res">{e.result ? <b style={{ background: e.result === 'W' ? 'rgba(155,227,58,.16)' : '#232C50', color: e.result === 'W' ? '#9BE33A' : '#CBD2EA' }}>{e.result}</b> : null}{e.score}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {gr ? (
+        <section className="sec">
+          <H2>Standings</H2>
+          {groups.length > 1 ? (
+            <div className="seg" role="group" aria-label="Conference" style={{ marginBottom: 10 }}>
+              {groups.map((x, i) => <button key={x.title} aria-pressed={gr === x} onClick={() => setGi(i)}>{x.title}</button>)}
+            </div>
+          ) : null}
+          <div className="card">
+            <div className="shead"><span className="nm">{gr.title}</span>{gr.cols.map((c) => <span key={c} className="col">{c}</span>)}</div>
+            {gr.rows.map((r, i) => (
+              <button key={r.id || i} className={'srow' + (r.id === game.away.id || r.id === game.home.id ? ' me' : '')} onClick={() => r.id && go(`team/${lg}/${r.id}`)}>
+                <span className="pos">{i + 1}</span>
+                <span className="nm">{r.name}</span>
+                {r.stats.map((v, j) => <span key={j} className="col">{v}</span>)}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
