@@ -1045,8 +1045,7 @@ export function playHead(p, L) {
 }
 const isSub = (p) => /substitution|subbing/i.test(`${p.type} ${p.text}`);
 
-function LiveCourt({ pbp, game, L, lg }) {
-  const [all, setAll] = useState(false);
+function LiveCourt({ pbp, game, L, lg, onAll }) {
   const cc = chartColors(game.away, game.home);
   const side = (id) => (id === game.away.id ? 'away' : id === game.home.id ? 'home' : null);
   const teamOf = (id) => (side(id) === 'away' ? game.away : side(id) === 'home' ? game.home : null);
@@ -1067,7 +1066,6 @@ function LiveCourt({ pbp, game, L, lg }) {
   const recent = [...plays].reverse();
   const last = recent.find((p) => spot(p));
   const trail = recent.filter((p) => p.shot && spot(p) && p !== last).slice(0, 6);
-  const now = recent[0];
   const lines = (flip) => {
     const bx = B * K, r = (v) => v * K, ax = (v) => (flip ? W - v : v);
     const e = (x0, y0, x1, y1) => `M${ax(x0)} ${y0} L${ax(x1)} ${y1}`;
@@ -1082,11 +1080,11 @@ function LiveCourt({ pbp, game, L, lg }) {
   };
   const court = `M0 0 H${W} V${H} H0 Z M${W / 2} 0 V${H} ${lines(false)} ${lines(true)}`;
   const lt = last ? spot(last) : null;
-  const shown = all ? recent : recent.slice(0, 8);
+  const shown = recent.slice(0, 4);
   return (
     <>
       <section className="sec">
-        <div className="card livecourt">
+        <div className="card livecourt" style={{ paddingBottom: 12 }}>
           <div className="lchead">
             <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ◂</small></span>
             <span><small>▸ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
@@ -1110,12 +1108,6 @@ function LiveCourt({ pbp, game, L, lg }) {
               </g>
             ) : null}
           </svg>
-          {now ? (() => { const t = teamOf(now.teamId); return (
-            <div className="lclast">
-              {t ? <Blob team={t} size={30} /> : <span style={{ width: 30 }} />}
-              <span className="tx"><b style={now.scoring ? { color: 'var(--yellow)' } : undefined}>{playHead(now, L)}</b><span>{now.text}</span></span>
-              <span className="when">{now.period ? perName(L, now.period) : ''} {now.clock}</span>
-            </div>); })() : null}
         </div>
       </section>
       <section className="sec">
@@ -1135,7 +1127,7 @@ function LiveCourt({ pbp, game, L, lg }) {
                 </span>
               ) : null}
             </div>); })}
-          {recent.length > 8 ? <button className="more" onClick={() => setAll(!all)}>{all ? 'Show less' : `Show all ${recent.length} plays`}</button> : null}
+          {onAll ? <button className="more" onClick={onAll}>Full Play by Play ›</button> : null}
         </div>
       </section>
     </>
@@ -1393,7 +1385,7 @@ function GamePage({ lg, id }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
-                {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} /> : null}
+                {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
                   <section className="card pad linesbox" style={{ marginTop: 12 }}>
                     <table className="lines">
