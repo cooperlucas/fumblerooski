@@ -43,12 +43,15 @@ const Page = ({ children }) => <main className="page"><div className="enter">{ch
 /* ---------- Bottom ticker: today's scores crawling by, league by league, like an old sports channel ---------- */
 function Ticker() {
   const today = useDay(0);
+  const morning = isMorning();
+  const yest = useDay(morning ? -1 : 0);
   const track = useRef(null);
   const [secs, setSecs] = useState(60);
   const groups = useMemo(() => {
     const rank = { live: 0, final: 1, pre: 2, off: 3 };
-    return LEAGUES.map((l) => ({ l, games: (today.data?.games || []).filter((g) => g.lg === l.id).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
-  }, [today.data]);
+    const pool = [...(morning ? (yest.data?.games || []) : []), ...(today.data?.games || [])];
+    return LEAGUES.map((l) => ({ l, games: pool.filter((g) => g.lg === l.id).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
+  }, [today.data, yest.data, morning]);
   const count = groups.reduce((n, x) => n + x.games.length, 0);
   // Constant crawl speed no matter how many games are on.
   useLayoutEffect(() => { if (track.current) setSecs(Math.max(20, Math.round(track.current.scrollWidth / 2 / 55))); }, [count]);
@@ -80,16 +83,53 @@ function Ticker() {
 
 /* ---------- Scores ---------- */
 const DAYS = [-3, -2, -1, 0, 1, 2, 3];
+// Until noon, today's games have not started, so lead with last night's results and put today's slate under them.
+const MORNING_UNTIL = 12;
+const isMorning = () => new Date().getHours() < MORNING_UNTIL;
+
+// One day's games: your teams first, then each league in its own card.
+function Board({ games, pick, favSet, title }) {
+  const shown = games.filter((g) => pick === 'all' || g.lg === pick);
+  const mine = sortGames(shown.filter((g) => isFavGame(g, favSet)), favSet);
+  const leagues = LEAGUES.filter((l) => shown.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+  return (
+    <>
+      {title ? <div className="sechead" style={{ marginTop: 22 }}><H2>{title}</H2></div> : null}
+      {!shown.length ? <Empty>No games.</Empty> : null}
+      {mine.length ? (
+        <div className="card">
+          <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
+          {mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}
+        </div>
+      ) : null}
+      {leagues.map((l) => {
+        const list = sortGames(shown.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
+        return (
+          <div className="card" key={l.id}>
+            <button className="lghead" onClick={() => go(`league/${l.id}`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
+            {list.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function Scores() {
   const [off, setOff] = useState(0);
   const [lg, setLg] = useState('all');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const q = useDay(off);
-  const all = q.data?.games || [];
-  const leagues = LEAGUES.filter((l) => all.some((g) => g.lg === l.id));
+  const morning = off === 0 && isMorning();
+  const y = useDay(morning ? -1 : off); // same read as q when not needed, so nothing extra is fetched
+  const today = q.data?.games || [];
+  const last = morning ? (y.data?.games || []) : [];
+  const both = [...last, ...today];
+  const leagues = LEAGUES.filter((l) => both.some((g) => g.lg === l.id));
   const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
-  const mine = sortGames(all.filter((g) => isFavGame(g, favSet) && (pick === 'all' || g.lg === pick)), favSet);
+  const busy = (q.loading && !q.data) || (morning && y.loading && !y.data);
+  const err = q.error && !q.data ? q : null;
   return (
     <>
       <div className="chips" role="group" aria-label="Day">
@@ -99,10 +139,10 @@ function Scores() {
             <span>{d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
           </button>); })}
       </div>
-      {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !all.length ? <Empty>No games on this day.</Empty> : (
+      {busy ? <Loading rows={5} /> : err ? <Problem error={err.error} retry={err.reload} /> : !both.length ? <Empty>No games on this day.</Empty> : (
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
-            <H2>{off === 0 ? 'Today' : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
+            <H2>{morning && last.length ? 'Last Night' : off === 0 ? 'Today' : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
             {leagues.length > 1 ? (
               <label className="pick">
                 <span style={{ position: 'absolute', left: -9999 }}>League</span>
@@ -114,26 +154,16 @@ function Scores() {
               </label>
             ) : null}
           </div>
-          {mine.length ? (
-            <div className="card">
-              <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
-              {mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}
-            </div>
-          ) : null}
-          {leagues.filter((l) => pick === 'all' || pick === l.id).map((l) => {
-            const games = sortGames(all.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
-            if (!games.length) return null;
-            return (
-              <div className="card" key={l.id}>
-                <button className="lghead" onClick={() => go(`league/${l.id}`)}><b style={{ color: l.color }}>{l.name}</b><span>{games.length} {games.length === 1 ? 'game' : 'games'} ›</span></button>
-                {games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
-              </div>
-            );
-          })}
+          {morning && last.length ? (
+            <>
+              <Board games={last} pick={pick} favSet={favSet} />
+              <Board games={today} pick={pick} favSet={favSet} title="Today" />
+            </>
+          ) : <Board games={today} pick={pick} favSet={favSet} />}
           {!favs.length ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
         </>
       )}
-      <Stamp at={q.updatedAt} live={all.some((g) => g.state === 'live')} />
+      <Stamp at={q.updatedAt} live={both.some((g) => g.state === 'live')} />
     </>
   );
 }
