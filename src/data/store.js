@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LEAGUES } from './leagues.js';
-import { getScoreboard, getTeams, setFetcher } from './espn.js';
+import { getScoreboard, getTeams, getDivisionTeams, setFetcher } from './espn.js';
 import { demoFetch } from './fixtures.js';
 
 const ls = {
@@ -132,16 +132,29 @@ export function sortGames(games, favSet) {
 // One league at a time with a short breath between: asking for every league at once gets some of the reads refused.
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function loadAllTeams() {
-  const saved = ls.get('fr.teams.v3', null);
+  const saved = ls.get('fr.teams.v4', null);
   // A full index (every league's real team list, with colors) is good for a week; a patched one gets rebuilt within the hour.
   if (!isDemo() && saved?.teams?.length && Date.now() - saved.at < (saved.full ? 7 * 864e5 : 36e5)) return saved.teams;
   const teams = []; let full = true, firstErr = null;
   for (const l of LEAGUES) {
     try { const t = await getTeams(l.id); teams.push(...t); if (t.source !== 'team list') full = false; }
     catch (e) { full = false; firstErr = firstErr || e; }
+
     if (!isDemo()) await pause(120);
   }
   if (!teams.length) throw firstErr || new Error('No teams came back.');
-  if (!isDemo()) ls.set('fr.teams.v3', { at: Date.now(), teams, full });
+  if (!isDemo()) ls.set('fr.teams.v4', { at: Date.now(), teams, full });
+  return teams;
+}
+
+// Smaller schools (FCS, D2, D3), loaded after the main index so search is usable right away. Cached for a week.
+export async function loadLowerTeams() {
+  const saved = ls.get('fr.lower.v1', null);
+  if (!isDemo() && saved?.teams?.length && Date.now() - saved.at < 7 * 864e5) return saved.teams;
+  const teams = [];
+  for (const l of LEAGUES.filter((x) => x.college)) {
+    try { teams.push(...(await getDivisionTeams(l.id)).map((t) => ({ ...t, lg: l.id }))); } catch { /* skip that league */ }
+  }
+  if (!isDemo() && teams.length) ls.set('fr.lower.v1', { at: Date.now(), teams });
   return teams;
 }

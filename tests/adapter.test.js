@@ -355,3 +355,13 @@ test('rankings: playoff committee first, movement, votes, others and dropped', a
   assert.equal(ap.dropped.length, 1);
   assert.deepEqual((await getRankings('ncaam')).polls, []); // no polls in the feed: empty, not an error
 });
+
+test('college divisions: FBS by default, other divisions by group, missing ones come back empty', async () => {
+  const { getStandings, getDivisionTeams } = await import('../src/data/espn.js');
+  assert.equal((await getStandings('cfb')).groups[0].name, 'Big Ten');
+  assert.equal((await getStandings('cfb', 'fcs')).groups[0].rows[0].team.name, 'Montana');
+  assert.equal((await getStandings('cfb', 'd3')).groups[0].name, 'CCIW');
+  const lower = await getDivisionTeams('cfb');
+  assert.deepEqual(lower.map((t) => t.div), ['FCS', 'FCS', 'Division II', 'Division III', 'Division III']);
+  assert.deepEqual((await getStandings('ncaam', 'd2')).groups, []);
+});

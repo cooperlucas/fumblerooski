@@ -311,6 +311,13 @@ export async function demoFetch(u) {
   await new Promise((r) => setTimeout(r, 60));
   if (!lg) return rest.startsWith('scoreboard') ? { events: [], leagues: [] } : rest === 'standings' ? { children: [] } : { sports: [{ leagues: [{ teams: [] }] }] };
   if (rest === 'scoreboard') return scoreboard(lg, searchParams.get('dates'));
+  if (rest === 'standings' && lg === 'cfb' && searchParams.get('group')) {
+    const g = searchParams.get('group');
+    const lower = { 81: [['f1', 'Montana Grizzlies', 'Montana', 'MONT', '', '', '8-1'], ['f2', 'North Dakota State Bison', 'N Dakota St', 'NDSU', '', '', '9-0']],
+      57: [['d21', 'Ferris State Bulldogs', 'Ferris St', 'FSU', '', '', '9-0']], 58: [['d31', 'North Central Cardinals', 'North Central', 'NCC', '', '', '9-0'], ['d32', 'Mount Union Purple Raiders', 'Mount Union', 'MTU', '', '', '8-1']] }[g];
+    if (!lower) return { children: [] };
+    return { children: [{ name: g === '81' ? 'Big Sky Conference' : g === '57' ? 'GLIAC' : 'CCIW', standings: { entries: lower.map((r) => ({ team: { id: r[0], displayName: r[1], shortDisplayName: r[2], abbreviation: r[3] }, stats: [{ name: 'overall', displayValue: r[6], summary: r[6] }, { name: 'vsConf', displayName: 'Conference Record', displayValue: '5-0' }] })) } }] };
+  }
   if (rest === 'standings') return standings(lg, searchParams.get('level'));
   if (rest === 'teams') return teamsList(lg);
   if (rest === 'summary') return summary(lg, searchParams.get('event'));

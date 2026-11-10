@@ -282,17 +282,38 @@ const entryTeams = (node, out = []) => {
   return out;
 };
 // Pro leagues come grouped by conference; asking one level deeper gives divisions. Offer both when both exist.
-export async function getStandings(lg) {
+// College divisions. The first is the default view. Group ids are the feed's; where unsure, several are tried in turn.
+export const DIVISIONS = {
+  cfb: [{ id: 'fbs', label: 'FBS', groups: [] }, { id: 'fcs', label: 'FCS', groups: ['81'] }, { id: 'd2', label: 'Division II', groups: ['57', '35'] }, { id: 'd3', label: 'Division III', groups: ['58', '36'] }],
+  ncaam: [{ id: 'd1', label: 'Division I', groups: [] }, { id: 'd2', label: 'Division II', groups: ['51'] }, { id: 'd3', label: 'Division III', groups: ['52'] }],
+  ncaaw: [{ id: 'd1', label: 'Division I', groups: [] }, { id: 'd2', label: 'Division II', groups: ['51'] }, { id: 'd3', label: 'Division III', groups: ['52'] }],
+};
+// Divisions whose teams the feed covers in full (rosters, player pages).
+export const FULL_DIVISIONS = { cfb: ['fbs', 'fcs'], ncaam: ['d1'], ncaaw: ['d1'] };
+const groupWorks = new Map(); // 'lg:div' -> the group id that answered
+async function divisionRead(lg, div) {
+  const d = (DIVISIONS[lg] || []).find((x) => x.id === div);
+  if (!d || !d.groups.length) return get(url(V2, lg, '/standings'));
+  const tries = groupWorks.has(`${lg}:${div}`) ? [groupWorks.get(`${lg}:${div}`)] : d.groups;
+  for (const g of tries) {
+    try {
+      const data = await get(url(V2, lg, '/standings', { group: g }));
+      if (entryTeams(data).length) { groupWorks.set(`${lg}:${div}`, g); return data; }
+    } catch { /* try the next id */ }
+  }
+  return { children: [] }; // the feed has no standings for this division
+}
+export async function getStandings(lg, div) {
   const L = LEAGUE[lg];
-  const [conf, div] = await Promise.allSettled([
-    get(url(V2, lg, '/standings')),
+  const [conf, div3] = await Promise.allSettled([
+    L.college ? divisionRead(lg, div) : get(url(V2, lg, '/standings')),
     L.college ? Promise.reject(new Error('skip')) : get(url(V2, lg, '/standings', { level: '3' })),
   ]);
   if (conf.status !== 'fulfilled') throw conf.reason;
   // Standings rows usually carry no team colors: pull the team list once so the chips are the real colors.
   if (entryTeams(conf.value).some((t) => !knowsColor(t, lg))) { try { await listTeams(lg); } catch { /* chips fall back */ } }
   const groups = standingGroups(conf.value, lg);
-  const divisions = div.status === 'fulfilled' ? standingGroups(div.value, lg) : [];
+  const divisions = div3.status === 'fulfilled' ? standingGroups(div3.value, lg) : [];
   const views = divisions.length > groups.length
     ? [{ id: 'division', label: 'Division', groups: divisions }, { id: 'conference', label: groups.length > 1 ? 'Conference' : 'League', groups }]
     : [{ id: 'conference', label: 'Conference', groups }];
@@ -329,6 +350,16 @@ export function listTeams(lg) {
     p.catch(() => listMemo.delete(lg)); // a failed read can be retried later
   }
   return listMemo.get(lg);
+}
+// Every team in a college league's lower divisions, from their standings (the only list of them we can reach).
+export async function getDivisionTeams(lg) {
+  const out = [], seen = new Set();
+  for (const d of (DIVISIONS[lg] || []).slice(1)) {
+    try {
+      (await getStandings(lg, d.id)).groups.forEach((g) => g.rows.forEach((r) => { if (r.team.id && !seen.has(r.team.id)) { seen.add(r.team.id); out.push({ ...r.team, div: d.label }); } }));
+    } catch { /* that division stays unsearchable */ }
+  }
+  return out;
 }
 export async function getTeams(lg) {
   let lastErr = null;

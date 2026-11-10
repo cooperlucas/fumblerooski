@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
-import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
 
@@ -89,8 +89,10 @@ const ymdDash = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2
 // A college team counts as covered when it is in its league's standings; pro leagues are always covered.
 function useCovered(lg) {
   const college = !!LEAGUE[lg]?.college;
-  const st = useQuery(college ? `standings:${lg}` : null, () => getStandings(lg), () => 600000);
-  return useMemo(() => (college ? new Set((st.data?.groups || []).flatMap((g) => g.rows.map((r) => r.team.id))) : null), [college, st.data]);
+  const [top, second] = FULL_DIVISIONS[lg] || [];
+  const a = useQuery(college ? `standings:${lg}:${top}` : null, () => getStandings(lg, top), () => 600000);
+  const b = useQuery(college && second ? `standings:${lg}:${second}` : null, () => getStandings(lg, second), () => 600000);
+  return useMemo(() => (college ? new Set([a.data, b.data].flatMap((d) => (d?.groups || []).flatMap((g) => g.rows.map((r) => r.team.id)))) : null), [college, a.data, b.data]);
 }
 const isCovered = (set, id) => !set || set.has(String(id));
 // Until noon the ticker leads with last night's finals (the Scores board shows only the day you pick).
@@ -207,7 +209,23 @@ function LeaguePage({ lg, focus }) {
   const [tab, setTab] = useState('standings');
   const [by, setBy] = useState(null);
   const [all, setAll] = useState(false);
-  const st = useQuery(`standings:${lg}`, () => getStandings(lg), () => 600000);
+  const divs = DIVISIONS[lg] || [];
+  const [div, setDiv] = useState(divs[0]?.id);
+  const [hunting, setHunting] = useState(!!focus && divs.length > 1);
+  const st = useQuery(`standings:${lg}${divs.length ? ':' + div : ''}`, () => getStandings(lg, div), () => 600000);
+  // From a team page: if the team is not in this division, step down the divisions until we find it.
+  useEffect(() => {
+    if (!hunting || !st.data) return;
+    if (st.data.groups.some((g) => g.rows.some((r) => r.team.id === String(focus)))) { setHunting(false); return; }
+    const i = divs.findIndex((d) => d.id === div);
+    if (i >= 0 && i < divs.length - 1) setDiv(divs[i + 1].id); else { setDiv(divs[0].id); setHunting(false); }
+  }, [hunting, st.data, div]);
+  const divPicker = divs.length > 1 ? (
+    <div className="sechead" style={{ marginTop: 14 }}>
+      <span />
+      <Picker label="Division" value={div} onChange={(v) => { setHunting(false); setAll(true); setDiv(v); }}>{divs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</Picker>
+    </div>
+  ) : null;
   useEffect(() => {
     if (!st.data) return;
     const groups = [...st.data.groups].sort((x, y) => y.rows.some((r) => r.team.id === String(focus)) - x.rows.some((r) => r.team.id === String(focus)));
@@ -225,8 +243,8 @@ function LeaguePage({ lg, focus }) {
         sb.loading && !sb.data ? <Loading /> : sb.error && !sb.data ? <Problem error={sb.error} retry={sb.reload} /> :
           sb.data.games.length ? <div className="card">{sb.data.games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}</div> : <Empty>No {L.short} games on the current slate.</Empty>
       ) : (
-        st.loading && !st.data ? <Loading rows={6} /> : st.error && !st.data ? <Problem error={st.error} retry={st.reload} /> :
-          !st.data.groups.length ? <Empty>No standings for {L.name} right now.</Empty> : (() => {
+        (st.loading && !st.data) || hunting ? <>{divPicker}<Loading rows={6} /></> : st.error && !st.data ? <>{divPicker}<Problem error={st.error} retry={st.reload} /></> :
+          !st.data.groups.length ? <>{divPicker}<Empty>{divs.length > 1 ? `The scores feed has no ${divs.find((d) => d.id === div)?.label} standings.` : `No standings for ${L.name} right now.`}</Empty></> : (() => {
             const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];
             const view = views.find((v) => v.id === by) || views[0];
             // Coming from a team page: show just that team's group, with the team lit up.
@@ -234,6 +252,7 @@ function LeaguePage({ lg, focus }) {
             const mine = focus && !all ? view.groups.filter(has) : [];
             const shown = mine.length ? mine : view.groups;
             return (<>
+            {divPicker}
             {views.length > 1 ? (
               <div className="seg sub" role="group" aria-label="Group standings by">
                 {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => setBy(v.id)}>{v.label}</button>)}
@@ -954,7 +973,13 @@ function GamePage({ lg, id }) {
 /* ---------- Search ---------- */
 function Search() {
   const [text, setText] = useState('');
-  const q = useQuery('teams:all', loadAllTeams, () => 0);
+  const q0 = useQuery('teams:all', loadAllTeams, () => 0);
+  const lower = useQuery(q0.data ? 'teams:lower' : null, loadLowerTeams, () => 0); // small schools join once the main list is in
+  const q = useMemo(() => {
+    if (!q0.data) return q0;
+    const have = new Set(q0.data.map((t) => `${t.lg}:${t.id}`));
+    return { ...q0, data: [...q0.data, ...(lower.data || []).filter((t) => !have.has(`${t.lg}:${t.id}`))] };
+  }, [q0, lower.data]);
   const favs = useFavs();
   const term = text.trim().toLowerCase();
   const hits = useMemo(() => {
@@ -979,7 +1004,7 @@ function Search() {
   const leagues = term ? LEAGUES.filter((l) => l.name.toLowerCase().includes(term) || l.short.toLowerCase().includes(term)) : [];
   const TeamRow = ({ t }) => (
     <button className="lrow" onClick={() => go(`team/${t.lg}/${t.id}`)}>
-      <Blob team={t} size={36} radius={10} /><span className="nm">{t.full || t.name}</span><LgTag lg={t.lg} />
+      <Blob team={t} size={36} radius={10} /><span className="nm">{t.full || t.name}{t.div ? <span className="sub">{t.div}</span> : null}</span><LgTag lg={t.lg} />
     </button>
   );
   return (
@@ -1030,6 +1055,7 @@ function About() {
     if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
     else push('Team page', false, 'No team to test with');
     try { const r = await listTeams('cfb'); push('Team colors', r.length > 0, `${r.length} college football teams with colors`); } catch (e) { push('Team colors', true, 'Using the colors built into the app (the feed\'s team list did not load, which is fine)'); }
+    try { const got = []; for (const d of DIVISIONS.cfb.slice(1)) { const r = await getStandings('cfb', d.id); if (r.groups.length) got.push(`${d.label} ${r.groups.reduce((n, g) => n + g.rows.length, 0)}`); } push('College divisions', got.length > 0, got.join(', ') || 'Only FBS came back'); } catch (e) { push('College divisions', false, e.message); }
     try { const r = await getRankings('cfb'); push('Rankings', r.polls.some((p) => p.type === 'cfp'), r.polls.map((p) => `${p.name} (wk ${p.week || '?'})`).join(', ') || 'No polls'); } catch (e) { push('Rankings', false, e.message); }
     try { const r = await getLeaders('nfl'); push('League leaders', r.cats.length > 0, `${r.cats.length} stat categories`); } catch (e) { push('League leaders', false, e.message); }
     try { const r = await getTeamStats('nfl'); push('Team stats', r.cats.length > 0 && r.teams.length > 0, `${r.teams.length} teams, ${r.cats.length} stat groups`); } catch (e) { push('Team stats', false, e.message); }
