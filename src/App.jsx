@@ -868,10 +868,11 @@ function Drives({ drives, game }) {
               <Blob team={t} />
               <span className="dmain">
                 <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.result || 'Drive')}
-                  {d.scoreChanged && !d.live ? <span className="dscore">{game.away.abbr} <b>{d.score.away}</b> · {game.home.abbr} <b>{d.score.home}</b></span> : null}</span>
+</span>
                 <span className="dsum">{[d.summary, d.startText ? `from ${d.startText}` : ''].filter(Boolean).join(' · ')}</span>
               </span>
-              <span className="dwhen">{d.period ? `Q${d.period}` : ''} {d.clock}<i aria-hidden="true">{isOpen ? '▴' : '▾'}</i></span>
+              <span className="dwhen"><span>{d.period ? `Q${d.period}` : ''} {d.clock}<i aria-hidden="true">{isOpen ? '▴' : '▾'}</i></span>
+                {d.scoreChanged && !d.live ? <span className="dscore" aria-label={`Score: ${game.away.abbr} ${d.score.away}, ${game.home.abbr} ${d.score.home}`}><b className={d.side === 'away' ? 'hit' : ''}>{d.score.away}</b>-<b className={d.side === 'home' ? 'hit' : ''}>{d.score.home}</b></span> : null}</span>
             </button>
             <DriveField d={d} game={game} />
             {isOpen ? (
@@ -1168,7 +1169,7 @@ function GamePage({ lg, id }) {
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
-                    <span className="nm" style={t.name.length > 9 ? { fontStretch: '100%', fontSize: 13 } : undefined}>{t.name}</span>
+                    <span className="nm" style={t.name.length > 12 ? { fontStretch: '87.5%', fontSize: 12 } : t.name.length > 9 ? { fontStretch: '100%', fontSize: 13 } : undefined}>{t.name}</span>
                     <span className="rc">{t.rank ? <b className="brk">No. {t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>

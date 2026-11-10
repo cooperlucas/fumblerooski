@@ -379,8 +379,10 @@ h1, h2, h3, p { margin: 0; }
 .shead .col, .srow .col { width: 44px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
 .srow .col { font-weight: 700; color: var(--soft); }
 .srow .col:last-child { color: var(--ink); font-weight: 800; }
-.dscore { display: inline-flex; gap: 4px; margin-left: 10px; padding: 2px 8px; border-radius: 6px; background: var(--rule); color: var(--soft); font-stretch: 100%; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; vertical-align: 2px; }
-.dscore b { color: var(--ink); }
+.dwhen { display: flex; flex-direction: column; align-items: flex-end; }
+.dscore { display: block; margin-top: 6px; padding: 3px 8px; border-radius: 7px; background: var(--rule); color: var(--soft); font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.dscore b { font-weight: 900; color: var(--mute); }
+.dscore b.hit { color: var(--ink); }
 
 /* league calendar */
 .daychip { position: relative; }
