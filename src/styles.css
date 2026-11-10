@@ -418,3 +418,4 @@ button.pick.date { cursor: pointer; }
 .stamp.tiny .dot { width: 6px; height: 6px; }
 .subhead { padding: 7px 14px; background: var(--panel2); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); font-size: 10px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }
 .subhead + .srow { border-top: none; }
+.grow .gnote { display: block; margin-bottom: 2px; font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: var(--yellow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

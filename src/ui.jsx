@@ -104,7 +104,7 @@ export function GameRow({ g, showLg = true }) {
   return (
     <button className="grow" onClick={() => go(`game/${g.lg}/${g.id}`)}
       aria-label={`${g.away.name} ${pre ? 'at' : g.away.score + ','} ${g.home.name}${pre ? '' : ' ' + g.home.score}, ${label}`}>
-      <span className="sides">{side(g.away, a, h)}{side(g.home, h, a)}</span>
+      <span className="sides">{g.note ? <span className="gnote">{g.note.replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '')}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
         {g.state === 'final' && !sameDay(new Date(g.date), new Date()) && !isNaN(new Date(g.date)) ? <span className="gdate">{fmtDate(g.date)}</span> : null}
