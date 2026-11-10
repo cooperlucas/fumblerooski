@@ -1,12 +1,12 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
 
 /* ---------- router ---------- */
-const ROOTS = new Set(['', 'scores', 'leagues']);
+const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
 
 export default function App() {
   const parts = useRoute();
@@ -17,6 +17,7 @@ export default function App() {
   let title = '', body, tab = name;
   if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
   else if (name === 'leagues') body = <Leagues />;
+  else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
@@ -210,6 +211,99 @@ function LeaguePage({ lg, focus }) {
             </>);
           })()
       )}
+    </>
+  );
+}
+
+/* ---------- Stats: league leaders and every team's numbers ---------- */
+const Picker = ({ label, value, onChange, children }) => (
+  <label className="pick">
+    <span style={{ position: 'absolute', left: -9999 }}>{label}</span>
+    <select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select>
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  </label>
+);
+const remember = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* fine */ } } };
+function Stats({ start }) {
+  const [lg, setLgRaw] = useState(() => start || (LEAGUE[remember.get('fr.stats.lg', '')] ? remember.get('fr.stats.lg', '') : 'nfl'));
+  const setLg = (v) => { setLgRaw(v); remember.set('fr.stats.lg', v); };
+  const [view, setView] = useState('leaders');
+  return (
+    <>
+      <div className="sechead" style={{ marginTop: 4 }}>
+        <H2>Stats</H2>
+        <Picker label="League" value={lg} onChange={setLg}>{LEAGUES.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}</Picker>
+      </div>
+      <div className="seg" role="group" aria-label="Stats view" style={{ marginTop: 12 }}>
+        <button aria-pressed={view === 'leaders'} onClick={() => setView('leaders')}>Leaders</button>
+        <button aria-pressed={view === 'teams'} onClick={() => setView('teams')}>Team Stats</button>
+      </div>
+      {view === 'leaders' ? <Leaders key={lg} lg={lg} /> : <TeamStats key={lg} lg={lg} />}
+    </>
+  );
+}
+function Leaders({ lg }) {
+  const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
+  const [open, setOpen] = useState({});
+  if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
+  if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
+  if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
+  return (
+    <>
+      {q.data.cats.map((c) => {
+        const rows = open[c.key] ? c.rows : c.rows.slice(0, 5);
+        return (
+          <div className="card" key={c.key} style={{ marginTop: 12 }}>
+            <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
+            {rows.map((r, i) => (
+              <button key={i} className={'lead' + (i === 0 ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
+                <span className="pos">{i + 1}</span>
+                {r.team ? <Blob team={r.team} /> : null}
+                <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
+                <span className="v">{r.value}</span>
+              </button>
+            ))}
+            {c.rows.length > 5 ? <button className="lead" style={{ justifyContent: 'center' }} onClick={() => setOpen({ ...open, [c.key]: !open[c.key] })}><span className="link">{open[c.key] ? 'Show fewer' : `Show all ${c.rows.length}`}</span></button> : null}
+          </div>
+        );
+      })}
+      <Stamp at={q.updatedAt} />
+    </>
+  );
+}
+const numOf = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : -Infinity; };
+function TeamStats({ lg }) {
+  const q = useQuery(`teamstats:${lg}`, () => getTeamStats(lg), () => 600000);
+  const [catKey, setCat] = useState(null);
+  const [sort, setSort] = useState({ col: 0, dir: -1 });
+  useEffect(() => { if (q.data) ensureColors(q.data.teams.map((t) => t.team), 40); }, [q.data]);
+  if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
+  if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
+  const cats = q.data.cats;
+  if (!cats.length) return <Empty>No team stats listed for {LEAGUE[lg].name} right now.</Empty>;
+  const cat = cats.find((c) => c.key === catKey) || cats[0];
+  const rows = q.data.teams.filter((t) => t.stats[cat.key]).sort((a, b) => (numOf(b.stats[cat.key][sort.col]) - numOf(a.stats[cat.key][sort.col])) * -sort.dir || a.team.name.localeCompare(b.team.name));
+  const pickCol = (i) => setSort(sort.col === i ? { col: i, dir: -sort.dir } : { col: i, dir: -1 });
+  return (
+    <>
+      <div className="statbar" style={{ marginTop: 12 }}>
+        {cats.length > 1 ? <Picker label="Stat group" value={cat.key} onChange={(v) => { setCat(v); setSort({ col: 0, dir: -1 }); }}>{cats.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}</Picker> : null}
+        <span className="stamp" style={{ margin: 0 }}>Sorted by {cat.names[sort.col] || cat.labels[sort.col]}, {sort.dir < 0 ? 'most first' : 'fewest first'}. Tap a column to sort.</span>
+      </div>
+      <div className="card pbox" style={{ marginTop: 10 }}>
+        <table>
+          <thead><tr><th scope="col" className="who">{cat.title}</th>{cat.labels.map((l, i) => <th scope="col" key={i} className={'sort' + (sort.col === i ? ' on' : '')} aria-sort={sort.col === i ? (sort.dir < 0 ? 'descending' : 'ascending') : undefined} onClick={() => pickCol(i)}>{l}{sort.col === i ? (sort.dir < 0 ? ' ▾' : ' ▴') : ''}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((t, i) => (
+              <tr key={t.team.id} className="tap" onClick={() => go(`team/${lg}/${t.team.id}`)}>
+                <th scope="row" className="who"><span className="rk">{i + 1}</span>{t.team.name}</th>
+                {cat.labels.map((_, j) => <td key={j} className={sort.col === j ? 'on' : undefined}>{t.stats[cat.key][j] ?? ''}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Stamp at={q.updatedAt} />
     </>
   );
 }
@@ -842,6 +936,8 @@ function About() {
     if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
     else push('Team page', false, 'No team to test with');
     try { const r = await listTeams('cfb'); push('Team colors', r.length > 0, `${r.length} college football teams with colors`); } catch (e) { push('Team colors', false, `Team list: ${e?.message || e}${e?.status ? ' (' + e.status + ')' : ''}`); }
+    try { const r = await getLeaders('nfl'); push('League leaders', r.cats.length > 0, `${r.cats.length} stat categories`); } catch (e) { push('League leaders', false, e.message); }
+    try { const r = await getTeamStats('nfl'); push('Team stats', r.cats.length > 0 && r.teams.length > 0, `${r.teams.length} teams, ${r.cats.length} stat groups`); } catch (e) { push('Team stats', false, e.message); }
     let playerId = null;
     if (teamId) { try { const r = await getRoster('nfl', teamId); const n = r.groups.reduce((k, g) => k + g.players.length, 0); playerId = r.groups[0]?.players[0]?.id; push('Roster', n > 0, `${n} players`); } catch (e) { push('Roster', false, e.message); } }
     if (playerId) { try { const r = await getPlayer('nfl', playerId); const miss = Object.entries(r.missing).filter(([, v]) => v).map(([k]) => k); push('Player page', !miss.length, `${r.player.name}: ${r.gamelog.seasons.reduce((k, x) => k + x.rows.length, 0)} games logged, ${r.career.length} career tables${miss.length ? ', did not load: ' + miss.join(', ') : ''}`); } catch (e) { push('Player page', false, e.message); } }

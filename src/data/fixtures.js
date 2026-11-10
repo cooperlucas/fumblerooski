@@ -261,6 +261,27 @@ function playerSearch(text) {
   return { items: [...items, { id: 'x1', type: 'player', displayName: 'Somebody Cricket', league: 'cricket' }] };
 }
 
+/* ---------- league stats ---------- */
+function leadersFx(lg) {
+  const nba = lg === 'nba';
+  const P = PLAYERS[lg];
+  const row = (i, v) => ({ displayValue: v, athlete: { id: P[i % P.length][0], displayName: P[i % P.length][1], position: { abbreviation: P[i % P.length][3] } }, team: team(lg, T[lg][i % T[lg].length][0]) });
+  const cat = (name, displayName, abbreviation, vals) => ({ name, displayName, abbreviation, leaders: vals.map((v, i) => row(i, v)) });
+  return { leaders: { categories: nba
+    ? [cat('pointsPerGame', 'Points Per Game', 'PTS', ['31.2', '28.4', '27.9']), cat('reboundsPerGame', 'Rebounds Per Game', 'REB', ['13.1', '11.8', '10.2']), cat('assistsPerGame', 'Assists Per Game', 'AST', ['10.4', '9.1', '8.8'])]
+    : [cat('passingYards', 'Passing Yards', 'YDS', ['2,804', '2,611', '2,540']), cat('rushingYards', 'Rushing Yards', 'YDS', ['1,012', '944', '871']), cat('receivingYards', 'Receiving Yards', 'YDS', ['988', '902', '860']), { name: 'odds', displayName: 'MVP Odds', leaders: [row(0, '+450')] }] } };
+}
+function teamStatsFx(lg) {
+  const nba = lg === 'nba';
+  const cats = nba
+    ? [{ name: 'offensive', displayName: 'Offense', labels: ['PTS', 'FG%', '3P%', 'AST'], displayNames: ['Points Per Game', 'Field Goal %', '3-Point %', 'Assists Per Game'] }]
+    : [{ name: 'passing', displayName: 'Passing', labels: ['YDS', 'YDS/G', 'TD', 'INT'], displayNames: ['Passing Yards', 'Passing Yards Per Game', 'Passing Touchdowns', 'Interceptions'] },
+      { name: 'rushing', displayName: 'Rushing', labels: ['YDS', 'YDS/G', 'TD'], displayNames: ['Rushing Yards', 'Rushing Yards Per Game', 'Rushing Touchdowns'] }];
+  return { categories: cats, teams: T[lg].map((r, i) => ({ team: team(lg, r[0]), categories: nba
+    ? [{ name: 'offensive', totals: [String(118 - i * 2.5), String(48.1 - i), String(37.2 - i * 0.6), String(27 + i)] }]
+    : [{ name: 'passing', totals: [`${2 + (i % 3)},${String(104 + i * 97).slice(-3)}`, String(265.4 - i * 11.2), String(19 - i), String(4 + i)] }, { name: 'rushing', totals: [`1,${String(80 + i * 53).padStart(3, '0')}`, String(131.5 - i * 7), String(12 - i)] }] })) };
+}
+
 export async function demoFetch(u) {
   const { pathname, searchParams } = new URL(u);
   if (pathname.endsWith('/common/v3/search')) return playerSearch(searchParams.get('query'));
@@ -273,6 +294,8 @@ export async function demoFetch(u) {
   if (rest === 'standings') return standings(lg, searchParams.get('level'));
   if (rest === 'teams') return teamsList(lg);
   if (rest === 'summary') return summary(lg, searchParams.get('event'));
+  if (rest === 'leaders') return leadersFx(lg);
+  if (rest === 'statistics/byteam') return teamStatsFx(lg);
   let t = rest.match(/^teams\/([^/]+)\/schedule$/); if (t) return schedule(lg, t[1]);
   if (/^teams\/[^/]+\/roster$/.test(rest)) return roster(lg);
   if (/^athletes\/[^/]+\/gamelog$/.test(rest)) return playerLog(lg);

@@ -490,6 +490,52 @@ export async function searchPlayers(text) {
   return out.filter((p) => p.name);
 }
 
+/* ---------- league stats: leaders and team tables ---------- */
+const SITE3 = 'https://site.api.espn.com/apis/site/v3/sports';
+// Who leads the league in each stat. The feed has moved this around, so try each place it has lived.
+export async function getLeaders(lg) {
+  const tries = [[SITE3, '/leaders'], [SITE, '/leaders'], [SITE, '/statistics']];
+  let lastErr = null;
+  for (const [base, path] of tries) {
+    try {
+      const d = await get(url(base, lg, path));
+      const raw = d.leaders?.categories || d.categories || d.stats || d.leaders || [];
+      const cats = (Array.isArray(raw) ? raw : []).map((c) => ({
+        key: String(c.name || c.abbreviation || c.displayName || ''),
+        title: cleanText(c.displayName || c.shortDisplayName || c.name || ''),
+        abbr: cleanText(c.abbreviation || c.shortDisplayName || ''),
+        rows: (c.leaders || []).map((l) => {
+          const a = l.athlete || null, t = l.team || a?.team || null;
+          return {
+            value: String(l.displayValue ?? l.value ?? ''),
+            player: a ? { id: String(a.id ?? ''), name: cleanText(a.displayName || a.fullName || a.shortName || ''), pos: a.position?.abbreviation || '' } : null,
+            team: t?.id ? normTeam(t, lg) : null,
+          };
+        }).filter((r) => r.value && (r.player?.name || r.team)),
+      })).filter((c) => c.title && c.rows.length);
+      if (cats.length) return { lg, cats };
+    } catch (e) { lastErr = e; }
+  }
+  if (lastErr) throw lastErr;
+  return { lg, cats: [] };
+}
+
+// Every team's season numbers, one table per stat group (passing, rushing, defense...).
+export async function getTeamStats(lg) {
+  const d = await get(url(COMMON, lg, '/statistics/byteam', { region: 'us', lang: 'en', contentorigin: 'espn', limit: '400' }));
+  const cats = (d.categories || []).map((c) => ({
+    key: String(c.name || ''), title: cleanText(c.displayName || c.name || ''),
+    labels: (c.labels || c.names || []).map((l) => cleanText(l)),
+    names: (c.displayNames || c.names || []).map((l) => cleanText(l)),
+  })).filter((c) => c.key && c.labels.length);
+  const teams = (d.teams || []).map((t) => {
+    const stats = {};
+    (t.categories || []).forEach((c) => { const v = c.totals || c.displayValues || c.values; if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); // raw numbers come with long tails });
+    return { team: normTeam(t.team || {}, lg), stats };
+  }).filter((t) => t.team.id);
+  return { lg, cats: cats.filter((c) => teams.some((t) => t.stats[c.key]?.length)), teams };
+}
+
 /* ---------- one game ---------- */
 // Which box-score rows we show, in order, and what we call them. Labels match the plain-English tips.
 const STAT_PICKS = {

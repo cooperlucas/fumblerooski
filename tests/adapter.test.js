@@ -299,3 +299,16 @@ test('second color: black-primary teams keep black as the secondary', async () =
   assert.equal(t.color2, '#000000');
   assert.equal(normTeam({ id: '24', displayName: 'San Antonio Spurs', color: '000000', alternateColor: '5b6fd0' }, 'nba').color2, '#000000');
 });
+
+test('league stats: leaders by category and team tables, with betting categories dropped', async () => {
+  const { getLeaders, getTeamStats } = await import('../src/data/espn.js');
+  const l = await getLeaders('nfl');
+  assert.deepEqual(l.cats.map((c) => c.title), ['Passing Yards', 'Rushing Yards', 'Receiving Yards']);
+  assert.equal(l.cats[0].rows[0].value, '2,804');
+  assert.equal(l.cats[0].rows[0].player.name, 'Dexter Quarterback');
+  assert.equal(l.cats[0].rows[0].team.abbr, 'CIN');
+  const t = await getTeamStats('nfl');
+  assert.deepEqual(t.cats.map((c) => c.key), ['passing', 'rushing']);
+  assert.equal(t.teams.length, 6);
+  assert.equal(t.teams[0].stats.passing.length, 4);
+});
