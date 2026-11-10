@@ -93,7 +93,7 @@ function useCovered(lg) {
   return useMemo(() => (college ? new Set((st.data?.groups || []).flatMap((g) => g.rows.map((r) => r.team.id))) : null), [college, st.data]);
 }
 const isCovered = (set, id) => !set || set.has(String(id));
-// Until noon, today's games have not started, so lead with last night's results and put today's slate under them.
+// Until noon the ticker leads with last night's finals (the Scores board shows only the day you pick).
 const MORNING_UNTIL = 12;
 const isMorning = () => new Date().getHours() < MORNING_UNTIL;
 
@@ -131,18 +131,13 @@ function Scores() {
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const q = useDay(off);
-  const morning = off === 0 && isMorning();
-  const y = useDay(morning ? -1 : off); // same read as q when not needed, so nothing extra is fetched
   const today = q.data?.games || [];
-  const last = morning ? (y.data?.games || []) : [];
-  const both = [...last, ...today];
+  const both = today; // last night's finals ride the ticker until noon; the board itself is just the chosen day
   const leagues = LEAGUES.filter((l) => both.some((g) => g.lg === l.id));
   const pick = leagues.some((l) => l.id === lg) ? lg : 'all';
-  const inPick = (g) => pick === 'all' || g.lg === pick;
-  const showLast = morning && last.some(inPick); // nothing last night in this league: go straight to today
   const far = !DAYS.includes(off);
   const pickDate = (v) => { const [yy, mm, dd] = v.split('-').map(Number); if (!yy) return; const t = new Date(yy, mm - 1, dd, 12); setOff(Math.round((t - dayOffset(0)) / 864e5)); };
-  const busy = (q.loading && !q.data) || (morning && y.loading && !y.data);
+  const busy = q.loading && !q.data;
   const err = q.error && !q.data ? q : null;
   return (
     <>
@@ -164,7 +159,7 @@ function Scores() {
       {busy ? <Loading rows={5} /> : err ? <Problem error={err.error} retry={err.reload} /> : !both.length ? <Empty>No games on {off === 0 ? 'the board today' : dayOffset(off).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.</Empty> : (
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
-            <H2>{showLast ? 'Last Night' : off === 0 ? 'Today' : far ? dayOffset(off).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
+            <H2>{off === 0 ? 'Today' : far ? dayOffset(off).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : dayOffset(off).toLocaleDateString([], { weekday: 'long' })}</H2>
             {leagues.length > 1 ? (
               <label className="pick">
                 <span style={{ position: 'absolute', left: -9999 }}>League</span>
@@ -176,12 +171,7 @@ function Scores() {
               </label>
             ) : null}
           </div>
-          {showLast ? (
-            <>
-              <Board games={last} pick={pick} favSet={favSet} />
-              <Board games={today} pick={pick} favSet={favSet} title="Today" />
-            </>
-          ) : <Board games={today} pick={pick} favSet={favSet} />}
+          <Board games={today} pick={pick} favSet={favSet} />
           {!favs.length ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
         </>
       )}
