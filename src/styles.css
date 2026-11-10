@@ -405,3 +405,4 @@ button.pick.date { cursor: pointer; }
 .filters .pick select { max-width: 46vw; text-overflow: ellipsis; }
 .board .brk { color: #FFBE2E; font-weight: 900; }
 .board .tm .nm { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.grow .meta .gdate { font-size: 11px; font-weight: 700; color: var(--mute); }

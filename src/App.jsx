@@ -36,7 +36,7 @@ export default function App() {
   if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
-  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b} />; }
+  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
@@ -136,7 +136,7 @@ function Board({ games, pick, favSet, title }) {
         const list = sortGames(shown.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
         return (
           <div className="card" key={l.id}>
-            <button className="lghead" onClick={() => go(`league/${l.id}`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
+            <button className="lghead" onClick={() => go(`league/${l.id}/scores`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
             {list.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
           </div>
         );
@@ -159,7 +159,13 @@ function Scores() {
   const day = useDay(0);
   const pickL = LEAGUE[lg] ? lg : null;
   // A league's own slate: today, or this week for football.
-  const sb = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const sb0 = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  // The feed's own default is the latest match day, finished or not. For day-by-day leagues show today, else the next game day.
+  const todayKey = ymdOf(new Date());
+  const target = sb0.data?.dates ? gameDayFor(sb0.data.dates.map((x) => x.replace(/-/g, '')), todayKey) : null;
+  const baseDay = sb0.data?.current?.day ? sb0.data.current.day.replace(/-/g, '') : null;
+  const sbDay = useQuery(pickL && target && target !== baseDay ? `board:${pickL}:d${target}` : null, () => getScoreboard(pickL, target), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const sb = target && target !== baseDay ? sbDay : sb0;
   const today = day.data?.games || [];
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
   const leagues = LEAGUES.filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
@@ -195,8 +201,9 @@ function Scores() {
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
             <H2>{LEAGUE[pickL].name}</H2>
-            <button className="link" onClick={() => go(`league/${pickL}`)}>Standings ›</button>
+            <button className="link" onClick={() => go(`league/${pickL}/scores`)}>{sb0.data?.weeks ? 'All weeks' : 'Calendar'} ›</button>
           </div>
+          {target && !sb.data.weeks ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{target === todayKey ? 'Today' : `${target > todayKey ? 'Next games' : 'Last played'}: ${dateOf(target).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}</p> : null}
           {sb.data.weeks && sb.data.current.week ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</p> : null}
           {sb.data.games.length ? <Board games={sb.data.games} pick="all" favSet={favSet} /> : <Empty>No {LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
         </>
@@ -208,6 +215,12 @@ function Scores() {
 }
 
 /* ---------- A league's scores, by week (football) or by day with a calendar ---------- */
+// Today if it has games; otherwise the next day that does; otherwise the last one played. ('YYYYMMDD')
+function gameDayFor(dates, today) {
+  const list = [...dates].sort();
+  if (!list.length || list.includes(today)) return today;
+  return list.find((x) => x > today) || list[list.length - 1];
+}
 const ymdOf = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 const dateOf = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), 12);
 const dashOf = (s) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
@@ -225,7 +238,7 @@ function LeagueScores({ lg }) {
   const curWk = b?.current?.week ? `${b.current.type}:${b.current.week}` : null;
   const wkKey = wk || curWk;
   const today = ymdOf(new Date());
-  const dayKey = day || today;
+  const dayKey = day || (b?.dates ? gameDayFor(b.dates.map((x) => x.replace(/-/g, '')), today) : today);
   const [wt, wn] = (wkKey || '').split(':').map(Number);
   const isBase = weekMode ? wkKey === curWk : dayKey === (b?.current?.day ? b.current.day.replace(/-/g, '') : today);
   const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${wkKey}` : `board:${lg}:d${dayKey}`) : null,
@@ -322,9 +335,9 @@ function Leagues() {
   );
 }
 
-function LeaguePage({ lg, focus }) {
+function LeaguePage({ lg, focus, start }) {
   const L = LEAGUE[lg];
-  const [tab, setTab] = useSticky('tab', 'standings');
+  const [tab, setTab] = useSticky('tab', start || 'standings');
   const [by, setBy] = useSticky('by', null);
   const [all, setAll] = useSticky('all', false);
   const divs = DIVISIONS[lg] || [];
