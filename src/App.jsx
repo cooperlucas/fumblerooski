@@ -1,9 +1,9 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
-import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll } from './ui.jsx';
+import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
@@ -625,7 +625,11 @@ function TeamStats({ lg }) {
 
 /* ---------- Team ---------- */
 function TeamPage({ lg, id }) {
-  const q = useQuery(`team:${lg}:${id}`, () => getTeam(lg, id), () => 300000);
+  const [yr, setYr] = useSticky('yr', null); // null = this season
+  const q = useQuery(`team:${lg}:${id}${yr ? ':' + yr : ''}`, () => getTeam(lg, id, yr), () => 300000);
+  const cur = q.data?.currentSeason || null;
+  const isPast = !!yr && yr !== cur;
+  const yearLabel = (y) => (LEAGUE[lg].sport === 'football' || LEAGUE[lg].sport === 'baseball' || lg === 'mls' || lg === 'wnba' ? String(y) : `${y - 1}-${String(y).slice(2)}`);
   const favs = useFavs();
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
@@ -654,7 +658,7 @@ function TeamPage({ lg, id }) {
     return (
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
         <Blob team={them} />
-        <span className="nm">{home ? 'vs' : 'at'} {them.name}{recs[them.id] || them.record ? <small className="orec"> {recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}</span></span>
+        <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.name}{(isPast ? them.record : recs[them.id] || them.record) ? <small className="orec"> {isPast ? them.record : recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span style={{ color: 'var(--pink)' }}>LIVE {me.score}-{them.score}</span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
@@ -672,8 +676,8 @@ function TeamPage({ lg, id }) {
               <Blob team={t} size={58} radius={16} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
-                <p>{[q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {topRank || pollRanks.length ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
+                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -684,9 +688,17 @@ function TeamPage({ lg, id }) {
               <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
                 <button aria-pressed={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>
                 <button aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button>
+                <button aria-pressed={view === 'stats'} onClick={() => setView('stats')}>Stats</button>
               </div>
             ) : <div style={{ marginTop: 14 }}><H2>Schedule</H2></div>}
-            {view === 'schedule' ? (
+            {(view === 'schedule' || view === 'stats') && cur ? (
+              <div className="filters">
+                <Picker label="Season" value={String(yr || cur)} onChange={(v) => setYr(Number(v) === cur ? null : Number(v))}>
+                  {Array.from({ length: Math.max(1, cur - 2002) }, (_, i) => cur - i).map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
+                </Picker>
+              </div>
+            ) : null}
+            {view === 'stats' ? <TeamSeason lg={lg} id={id} season={yr || cur} team={t} /> : view === 'schedule' ? (
               <section className="sec" style={{ marginTop: 12 }}>
                 {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
               </section>
@@ -709,6 +721,41 @@ function TeamPage({ lg, id }) {
           </>
         )}
       </Page>
+    </>
+  );
+}
+
+/* ---------- one team's season: leaders and key stats ---------- */
+function TeamSeason({ lg, id, season, team }) {
+  const [open, setOpen] = useState({});
+  const q = useQuery(season ? `teamseason:${lg}:${id}:${season}` : null, () => getTeamStatsFor(lg, id, season), () => 600000);
+  if (!season || (q.loading && !q.data)) return <div style={{ marginTop: 12 }}><Loading rows={5} /></div>;
+  if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
+  const { groups, leaders } = q.data;
+  if (!groups.length && !leaders.length) return <Empty>No stats for this season yet.</Empty>;
+  return (
+    <>
+      {leaders.length ? (
+        <section className="sec" style={{ marginTop: 12 }}>
+          <H2>Team Leaders</H2>
+          <div className="card">
+            {leaders.map((c) => (open[c.key] ? c.rows : c.rows.slice(0, 1)).map((r, i) => (
+              <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}`)}>
+                <span className="jersey" style={{ width: 30, height: 30, fontSize: 12, background: team.color, color: inkOn(team.color) }}>{r.jersey || '·'}</span>
+                <span className="nm">{i === 0 ? <small className="lcat">{c.title}</small> : null}{r.name}{r.pos ? <small> {r.pos}</small> : null}{i === 0 && r.detail && r.detail !== r.value ? <small className="ldet">{r.detail}</small> : null}</span>
+                <span className="v">{r.value}</span>
+                {i === 0 && c.rows.length > 1 ? <span className="lmore" role="button" aria-label={open[c.key] ? 'Show fewer' : 'Show the next two'} onClick={(e) => { e.stopPropagation(); setOpen({ ...open, [c.key]: !open[c.key] }); }}>{open[c.key] ? '▴' : '▾'}</span> : <span className="lmore" />}
+              </button>
+            )))}
+          </div>
+        </section>
+      ) : null}
+      {groups.map((g) => (
+        <div className="card pad" key={g.title} style={{ marginTop: 12 }}>
+          <div className="ptitle">{g.title}</div>
+          <div className="kv">{g.items.map((x) => <div key={x.label}><span>{x.label}</span><b>{x.value}</b>{x.rank ? <em className="krank">{ordinal(x.rank)}</em> : null}</div>)}</div>
+        </div>
+      ))}
     </>
   );
 }

@@ -411,10 +411,14 @@ export async function getTeams(lg) {
   return [];
 }
 
-export async function getTeam(lg, id) {
-  const [info, sched] = await Promise.allSettled([
-    get(url(SITE, lg, `/teams/${encodeURIComponent(id)}`)),
-    get(url(SITE, lg, `/teams/${encodeURIComponent(id)}/schedule`)),
+// season: the feed's season year (empty = current). Postseason games (bowls, playoffs, tournaments) are a separate read.
+export async function getTeam(lg, id, season) {
+  const yr = season ? { season: String(season) } : {};
+  const tid = encodeURIComponent(id);
+  const [info, sched, post] = await Promise.allSettled([
+    get(url(SITE, lg, `/teams/${tid}`)),
+    get(url(SITE, lg, `/teams/${tid}/schedule`, yr)),
+    get(url(SITE, lg, `/teams/${tid}/schedule`, { ...yr, seasontype: '3' })),
   ]);
   if (info.status === 'rejected' && sched.status === 'rejected') throw info.reason;
   const t = info.status === 'fulfilled' ? (info.value.team || {}) : (sched.value.team || {});
@@ -422,16 +426,85 @@ export async function getTeam(lg, id) {
   // The team read has no poll rank, but its next game carries the ranking the feed shows on scoreboards.
   const me = (t.nextEvent?.[0]?.competitions?.[0]?.competitors || []).find((c) => String(c.team?.id ?? c.id) === String(t.id ?? id));
   const rankNow = Number(me?.curatedRank?.current ?? me?.rank) || null;
-  const events = sched.status === 'fulfilled' ? (sched.value.events || []) : [];
+  const seen = new Set();
+  const events = [...(sched.status === 'fulfilled' ? (sched.value.events || []) : []), ...(post.status === 'fulfilled' ? (post.value.events || []) : [])]
+    .filter((e) => e?.id && !seen.has(e.id) && seen.add(e.id));
+  const schedule = events.map((e) => normEvent(e, lg)).filter((g) => g.id).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const current = Number(sched.status === 'fulfilled' && (sched.value.season?.year || sched.value.requestedSeason?.year)) || null;
+  const shown = Number(sched.status === 'fulfilled' && sched.value.requestedSeason?.year) || current;
+  // A past season: the team read only knows today's record, so count that season's from its finished games.
+  let pastRecord = '';
+  if (season && shown && season !== current) {
+    let w = 0, l = 0, tie = 0;
+    schedule.filter((g) => g.state === 'final').forEach((g) => {
+      const mine = g.home.id === String(id) ? g.home : g.away, them = mine === g.home ? g.away : g.home;
+      const a = Number(mine.score), b = Number(them.score);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+      if (a > b) w++; else if (a < b) l++; else tie++;
+    });
+    pastRecord = w + l + tie ? [w, l, ...(tie ? [tie] : [])].join('-') : '';
+  }
   return {
     team: normTeam(t.id ? t : { ...t, id }, lg),
-    record: String(record || ''),
-    rank: rankNow && rankNow <= 25 ? rankNow : null,
+    record: String((season && season !== current ? pastRecord : record) || ''),
+    rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : null) : null,
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
-    standing: (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
-    schedule: events.map((e) => normEvent(e, lg)).filter((g) => g.id),
+    standing: season && season !== current ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
+    schedule,
     scheduleMissing: sched.status === 'rejected',
+    season: shown, currentSeason: current,
   };
+}
+
+/* ---------- one team's season stats and leaders ---------- */
+// The feed sends dozens of team stats per group; these are the ones worth a glance, per sport.
+const TEAM_STATS = {
+  football: [['Offense', [['passing', 'totalPointsPerGame', 'Points / game'], ['passing', 'yardsPerGame', 'Yards / game'], ['passing', 'passingYardsPerGame', 'Pass yds / game'], ['rushing', 'rushingYardsPerGame', 'Rush yds / game'], ['passing', 'completionPct', 'Comp %'], ['rushing', 'yardsPerRushAttempt', 'Yds / rush'], ['passing', 'passingTouchdowns', 'Pass TD'], ['rushing', 'rushingTouchdowns', 'Rush TD']]],
+    ['Defense', [['defensive', 'sacks', 'Sacks'], ['defensive', 'tacklesForLoss', 'TFL'], ['defensiveInterceptions', 'interceptions', 'INT'], ['general', 'fumblesRecovered', 'Fumbles rec'], ['defensive', 'passesDefended', 'Passes def']]],
+    ['Situational', [['miscellaneous', 'thirdDownConvPct', '3rd down %'], ['miscellaneous', 'fourthDownConvPct', '4th down %'], ['miscellaneous', 'redzoneScoringPct', 'Red zone %'], ['miscellaneous', 'turnOverDifferential', 'TO margin'], ['miscellaneous', 'totalPenaltyYards', 'Penalty yds'], ['kicking', 'fieldGoalPct', 'FG %']]]],
+  basketball: [['Offense', [['offensive', 'avgPoints', 'Points'], ['offensive', 'fieldGoalPct', 'FG %'], ['offensive', 'threePointFieldGoalPct', '3PT %'], ['offensive', 'freeThrowPct', 'FT %'], ['offensive', 'avgAssists', 'Assists'], ['offensive', 'avgTurnovers', 'Turnovers']]],
+    ['Defense & boards', [['general', 'avgRebounds', 'Rebounds'], ['offensive', 'avgOffensiveRebounds', 'Off reb'], ['defensive', 'avgSteals', 'Steals'], ['defensive', 'avgBlocks', 'Blocks']]]],
+  hockey: [['Offense', [['offensive', 'goals', 'Goals'], ['offensive', 'assists', 'Assists'], ['offensive', 'shootingPct', 'Shooting %'], ['offensive', 'powerPlayGoals', 'PP goals'], ['offensive', 'faceoffPercent', 'Faceoff %']]],
+    ['Goaltending', [['defensive', 'avgGoalsAgainst', 'GAA'], ['defensive', 'savePct', 'Save %'], ['defensive', 'saves', 'Saves'], ['penalties', 'penaltyMinutes', 'PIM']]]],
+  baseball: [['Batting', [['batting', 'avg', 'AVG'], ['batting', 'OPS', 'OPS'], ['batting', 'homeRuns', 'HR'], ['batting', 'runs', 'Runs'], ['batting', 'stolenBases', 'SB']]],
+    ['Pitching', [['pitching', 'ERA', 'ERA'], ['pitching', 'WHIP', 'WHIP'], ['pitching', 'strikeouts', 'Strikeouts'], ['pitching', 'saves', 'Saves'], ['fielding', 'errors', 'Errors']]]],
+};
+export async function getTeamStatsFor(lg, id, season) {
+  const L = LEAGUE[lg];
+  const yr = season ? { season: String(season) } : {};
+  const [st, ro] = await Promise.allSettled([
+    get(url(SITE, lg, `/teams/${encodeURIComponent(id)}/statistics`, yr)),
+    getRoster(lg, id),
+  ]);
+  const cats = st.status === 'fulfilled' ? (st.value.results?.stats?.categories || []) : [];
+  const find = (c, n) => cats.find((x) => x.name === c)?.stats?.find((x) => x.name === n);
+  const groups = (TEAM_STATS[L.sport] || []).map(([title, list]) => ({
+    title,
+    items: list.map(([c, n, label]) => { const x = find(c, n); if (!x) return null; const r = Number(x.rank) || Number(/^\d+/.exec(String(x.rankDisplayValue || ''))?.[0]) || 0;
+      return { label, value: String(x.displayValue ?? ''), rank: r > 0 && r <= 150 ? r : 0 }; }).filter((x) => x && x.value),
+  })).filter((g) => g.items.length);
+  // Team leaders live in the feed's core service; its athletes are links, so names come from the roster.
+  const year = Number(season || st.value?.requestedSeason?.year || st.value?.season?.year) || null;
+  const who = new Map();
+  if (ro.status === 'fulfilled') ro.value.groups.forEach((g) => g.players.forEach((p) => who.set(p.id, p)));
+  let leaders = [];
+  if (year) {
+    try {
+      const d = await get(`https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}/seasons/${year}/types/2/teams/${encodeURIComponent(id)}/leaders?lang=en&region=us`);
+      const skip = /leader$|rating|^PER$|minutes|fouls|offensiveRebounds|defensiveRebounds/i;
+      leaders = (d.categories || []).filter((c) => !skip.test(c.name)).map((c) => {
+        const top = (c.leaders || []).slice(0, 3).map((l) => {
+          const pid = /athletes\/(\d+)/.exec(String(l.athlete?.$ref || ''))?.[1] || '';
+          const p = who.get(pid);
+          const n = Number(l.value); const dv = String(l.displayValue || ''); const v = /^-?[\d.,]+$/.test(dv) ? dv : Number.isFinite(n) ? (Number.isInteger(n) ? n.toLocaleString('en-US') : (Math.round(n * 10) / 10).toString()) : dv;
+          return { id: pid, name: p?.name || '', pos: p?.pos || '', jersey: p?.jersey || '', value: v, detail: cleanText(l.displayValue || '') };
+        }).filter((x) => x.name);
+        const title = cleanText(c.displayName || c.name).replace(/^Average\s+/i, '').replace(/3-Point Field Goals Made/i, '3-pointers').replace(/Field Goal Percentage/i, 'FG %').replace(/Free Throw Percentage/i, 'FT %').replace(/^Double Double$/i, 'Double-doubles');
+        return { key: c.name, title, rows: top };
+      }).filter((c) => c.rows.length);
+    } catch { /* stats only */ }
+  }
+  return { groups, leaders };
 }
 
 // Every team's current overall record in a league, from the standings (all college divisions). id -> '8-1'
