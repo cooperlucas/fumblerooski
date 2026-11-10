@@ -46,6 +46,18 @@ export const isFavGame = (g, set) => set.has(`${g.lg}:${g.home.id}`) || set.has(
 
 /* ---------- cached reads ---------- */
 const cache = new Map(); // key -> { data, at }
+const inflight = new Map(); // key -> promise, so two screens asking for the same thing share one read
+const watchers = new Map(); // key -> Set of repaint callbacks
+const FRESH = 4000;
+function fetchShared(key, fn) {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < FRESH) return Promise.resolve(hit.data);
+  if (!inflight.has(key)) {
+    const p = fn().then((data) => { cache.set(key, { data, at: Date.now() }); (watchers.get(key) || []).forEach((f) => f()); return data; }).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+  }
+  return inflight.get(key);
+}
 
 // Shows cached data right away, refetches, and keeps polling while the tab is visible.
 // refresh(data) returns how many ms to wait before the next fetch (0 = do not poll).
@@ -62,9 +74,8 @@ export function useQuery(key, fn, refresh) {
     const run = async () => {
       clearTimeout(timer);
       try {
-        const data = await fnRef.current();
+        await fetchShared(key, () => fnRef.current());
         if (!alive) return;
-        cache.set(key, { data, at: Date.now() });
         st.current = { key, error: null, loading: false };
       } catch (e) {
         if (!alive) return;
@@ -77,7 +88,10 @@ export function useQuery(key, fn, refresh) {
     const onVis = () => { if (document.visibilityState === 'visible' && !timer) run(); };
     run();
     document.addEventListener('visibilitychange', onVis);
-    return () => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); };
+    const repaint = () => { if (alive) bump((n) => n + 1); };
+    if (!watchers.has(key)) watchers.set(key, new Set());
+    watchers.get(key).add(repaint);
+    return () => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); watchers.get(key)?.delete(repaint); };
   }, [key]);
 
   const hit = key ? cache.get(key) : null;

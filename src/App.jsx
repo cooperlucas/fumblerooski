@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, ensureColors, onColors, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
@@ -33,11 +33,50 @@ export default function App() {
       <DemoBar />
       {root ? <RootHeader /> : ownHeader ? null : <SubHeader title={title} />}
       {ownHeader ? body : <main className="page" key={parts.join('/')}><div className="enter">{body}</div></main>}
+      <Ticker />
       <TabBar active={tab} />
     </div>
   );
 }
 const Page = ({ children }) => <main className="page"><div className="enter">{children}</div></main>;
+
+/* ---------- Bottom ticker: today's scores crawling by, league by league, like an old sports channel ---------- */
+function Ticker() {
+  const today = useDay(0);
+  const track = useRef(null);
+  const [secs, setSecs] = useState(60);
+  const groups = useMemo(() => {
+    const rank = { live: 0, final: 1, pre: 2, off: 3 };
+    return LEAGUES.map((l) => ({ l, games: (today.data?.games || []).filter((g) => g.lg === l.id).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
+  }, [today.data]);
+  const count = groups.reduce((n, x) => n + x.games.length, 0);
+  // Constant crawl speed no matter how many games are on.
+  useLayoutEffect(() => { if (track.current) setSecs(Math.max(20, Math.round(track.current.scrollWidth / 2 / 55))); }, [count]);
+  if (!count) return null;
+  const run = (copy) => groups.map(({ l, games }) => (
+    <React.Fragment key={l.id + copy}>
+      <span className="tlg" style={{ background: l.color }}>{l.short}</span>
+      {games.map((g) => {
+        const pre = g.state === 'pre' || g.state === 'off', fin = g.state === 'final';
+        const a = parseInt(g.away.score, 10), h = parseInt(g.home.score, 10);
+        return (
+          <button key={g.id + copy} className="titem" tabIndex={copy ? -1 : 0} aria-hidden={copy ? 'true' : undefined} onClick={() => go(`game/${g.lg}/${g.id}`)}
+            aria-label={`${l.short}: ${g.away.abbr} ${pre ? 'at' : g.away.score} ${g.home.abbr}${pre ? '' : ' ' + g.home.score}, ${statusLabel(g)}`}>
+            <span className={fin && a < h ? 'dim' : undefined}>{g.away.abbr}{pre ? '' : <b> {g.away.score}</b>}</span>
+            <span className="at">{pre ? 'at' : ''}</span>
+            <span className={fin && h < a ? 'dim' : undefined}>{g.home.abbr}{pre ? '' : <b> {g.home.score}</b>}</span>
+            <span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
+          </button>
+        );
+      })}
+    </React.Fragment>
+  ));
+  return (
+    <div className="ticker" role="region" aria-label="Today's scores">
+      <div className="ttrack" ref={track} style={{ animationDuration: `${secs}s` }}>{run('')}{run('b')}</div>
+    </div>
+  );
+}
 
 /* ---------- Home ---------- */
 function Home() {
@@ -62,17 +101,6 @@ function Home() {
 
   return (
     <>
-      {games.length ? (
-        <div className="strip" aria-label="Today's scores">
-          {games.slice(0, 14).map((g) => (
-            <button key={g.lg + g.id} className="tick" onClick={() => go(`game/${g.lg}/${g.id}`)} aria-label={`${g.away.abbr} ${g.away.score} ${g.home.abbr} ${g.home.score} ${statusLabel(g)}`}>
-              <span className="st" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
-              {[g.away, g.home].map((t) => <span key={t.id} className="r"><span>{t.abbr}</span><span>{g.state === 'pre' ? '' : t.score}</span></span>)}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       <section className="sec">
         <H2>Your Teams</H2>
         {favs.length ? (
