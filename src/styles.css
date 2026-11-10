@@ -260,3 +260,5 @@ h1, h2, h3, p { margin: 0; }
 .icekey b { display: block; font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 14px; }
 .icekey small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--mute); }
 .teamcard .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; width: 100%; }
+.lrow.fav .ln { flex: none; padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lrow.fav .sub { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--dim); }

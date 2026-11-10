@@ -76,11 +76,11 @@ function Home() {
       <section className="sec">
         <H2>Your Teams</H2>
         {favs.length ? (
-          <div className="teamrow">
+          <div className="card">
             {favs.map((t) => { const l = lineFor(t); return (
-              <button key={favKey(t)} className="teamcard" onClick={l.open} aria-label={`${t.name}, ${LEAGUE[t.lg]?.short || ''}: ${l.text}`}>
-                <span className="top"><Blob team={t} size={44} radius={12} /><LgTag lg={t.lg} /></span>
-                <span className="nm">{t.name}</span>
+              <button key={favKey(t)} className="lrow fav" onClick={l.open} aria-label={`${t.name}, ${LEAGUE[t.lg]?.short || ''}: ${l.text}`}>
+                <Blob team={t} size={36} radius={10} />
+                <span className="nm">{t.name}<span className="sub">{LEAGUE[t.lg]?.short}</span></span>
                 <span className="ln" style={{ background: l.bg, color: l.fg }}>{l.text}</span>
               </button>); })}
           </div>
