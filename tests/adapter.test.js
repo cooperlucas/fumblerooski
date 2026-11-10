@@ -365,7 +365,7 @@ test('rankings: playoff committee first, movement, votes, others and dropped', a
 test('college divisions: FBS by default, other divisions by group, missing ones come back empty', async () => {
   const { getStandings, getDivisionTeams } = await import('../src/data/espn.js');
   assert.equal((await getStandings('cfb')).groups[0].name, 'Big Ten');
-  assert.equal((await getStandings('cfb', 'fcs')).groups[0].rows[0].team.name, 'Montana');
+  assert.equal((await getStandings('cfb', 'fcs')).groups[0].rows[0].team.name, 'N Dakota St'); // same conference record, better overall
   assert.equal((await getStandings('cfb', 'd3')).groups[0].name, 'CCIW');
   const lower = await getDivisionTeams('cfb');
   assert.deepEqual(lower.map((t) => t.div), ['FCS', 'FCS', 'Division II', 'Division III', 'Division III']);

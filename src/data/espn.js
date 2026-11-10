@@ -273,7 +273,10 @@ function standingGroups(data, lg) {
   const groups = [];
   // College conferences sometimes come split (SEC East / West, MAC East / West): fold those into one conference table.
   const all = (node) => [...(node.standings?.entries || []), ...(node.children || []).flatMap(all)];
+  // The feed lists college teams by overall record; their conference finish is the "playoffSeed" stat.
+  const seedOf = (e) => Number((e.stats || []).find((x) => x.type === 'playoffseed' || (x.name === 'playoffSeed' && !String(x.type || '').includes('_')))?.value ?? NaN);
   const recPct = (r) => { const [w = 0, l = 0, t = 0] = String(r || '').split('-').map(Number); const g = w + l + t; return g ? (w + t / 2) / g : -1; };
+  const bySeed = (a, b) => (Number.isFinite(a.seed) && Number.isFinite(b.seed) ? a.seed - b.seed : 0) || recPct(b.col2) - recPct(a.col2) || recPct(b.overall) - recPct(a.overall);
   const walk = (node, depth = 0) => {
     if (!node || typeof node !== 'object') return;
     if (L.college && depth === 1 && !node.standings?.entries?.length && (node.children || []).some((c) => c.standings?.entries?.length)) {
@@ -282,8 +285,8 @@ function standingGroups(data, lg) {
       const confName = shortGroup(full);
       const subs = (node.children || []).filter((c) => c.standings?.entries?.length).map((c) => ({
         name: shortGroup(String(c.name || c.abbreviation || '')).replace(new RegExp('^' + confName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-–]\\s*', 'i'), '').replace(/^.*\s[-–]\s/, ''),
-        rows: all(c).map((e) => { const [, v] = col2Of(e, L); return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v }; })
-          .sort((a, b) => recPct(b.col2) - recPct(a.col2) || recPct(b.overall) - recPct(a.overall)),
+        rows: all(c).map((e) => { const [, v] = col2Of(e, L); return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v, seed: seedOf(e) }; })
+          .sort(bySeed),
       }));
       const rows = subs.flatMap((x) => x.rows);
       if (rows.length) groups.push({ name: confName, full, col2Label: 'CONF', rows, subs });
@@ -294,8 +297,9 @@ function standingGroups(data, lg) {
       let label = 'REC';
       const rows = entries.map((e) => {
         const [lab, v] = col2Of(e, L); label = lab;
-        return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v };
+        return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v, seed: seedOf(e) };
       });
+      if (L.college) rows.sort(bySeed);
       const full = node.name || node.abbreviation || L.name;
       groups.push({ name: shortGroup(full), full, col2Label: label, rows });
     }
