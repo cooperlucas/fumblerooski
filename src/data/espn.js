@@ -102,8 +102,17 @@ export async function ensureColors(teams, cap = 12) {
   return res.some((r) => r.status === 'fulfilled');
 }
 
+// The second color. When the chip had to use the alternate (primary is black or white), the primary is the second.
+function second(color, alt) {
+  const a = hexOk(color) ? '#' + String(color).toUpperCase() : null, b = hexOk(alt) ? '#' + String(alt).toUpperCase() : null;
+  return a && b && teamColor(color, alt, 'x') === b ? a : b;
+}
+// Teams whose feed colors are not what they wear. [primary, secondary]
+const COLOR_FIX = { 'nba:24': ['c4ced4', '000000'] }; // Spurs: silver and black
+
 export function normTeam(t, lg) {
   t = t || {};
+  if (t.id != null && COLOR_FIX[`${lg}:${t.id}`]) { const [c, a] = COLOR_FIX[`${lg}:${t.id}`]; t = { ...t, color: c, alternateColor: a }; }
   if (t.id != null) {
     const key = `${lg}:${t.id}`;
     if (hexOk(t.color)) learn(key, String(t.color), hexOk(t.alternateColor) ? String(t.alternateColor) : null);
@@ -116,7 +125,7 @@ export function normTeam(t, lg) {
     id: String(t.id ?? ''), lg,
     name, full: t.displayName || name, abbr,
     color: teamColor(t.color, t.alternateColor, (t.displayName || name) + lg),
-    color2: hexOk(t.alternateColor) ? '#' + String(t.alternateColor).toUpperCase() : null,
+    color2: second(t.color, t.alternateColor),
   };
 }
 
@@ -364,7 +373,7 @@ export async function getRoster(lg, teamId) {
 }
 
 // Table titles sit in a narrow first column: "Season Averages" -> "Averages", "2026 Regular Season" -> "2026".
-const shortTitle = (t) => cleanText(t).replace(/^Season\s+/i, '').replace(/\s+Regular Season$/i, '').replace(/^Misc(ellaneous)?\s+Totals$/i, 'Misc').replace(/^Regular Season$/i, 'Season');
+const shortTitle = (t) => cleanText(t).replace(/^Season\s+/i, '').replace(/\s+(Regular\s+)?Season$/i, '').replace(/^Misc(ellaneous)?\s+Totals$/i, 'Misc').replace(/^Regular Season$/i, 'Season');
 function normGamelog(d) {
   const labels = (d?.labels || []).map((l) => cleanText(l));
   const evs = d?.events || {};
@@ -689,6 +698,37 @@ export function normShots(rawPlays) {
   })).filter((sh) => sh.teamId && Number.isFinite(sh.x) && Number.isFinite(sh.y) && sh.x >= -2 && sh.x <= 52 && sh.y >= -6 && sh.y <= 95);
 }
 
+/* ---------- hockey shots on the rink ---------- */
+// Rink in feet, measured from center ice: x -100..100 (goal to goal), y -42.5..42.5.
+// Teams swap ends every period, so each team's shots are turned to face one goal: away shoots right, home shoots left.
+export function normIce(rawPlays, awayId, homeId) {
+  const kindOf = (p) => {
+    const t = `${p.type?.text || ''}`.toLowerCase();
+    if (p.scoringPlay === true || /^goal\b/.test(t)) return 'goal';
+    if (/block/.test(t)) return null; // credited to the blocker, so the spot says nothing about the shooter
+    if (/miss/.test(t)) return 'miss';
+    if (/shot|save/.test(t) || p.shootingPlay === true) return 'save';
+    return null;
+  };
+  let ev = (rawPlays || []).map((p) => ({
+    kind: p.coordinate ? kindOf(p) : null, teamId: String(p.team?.id ?? ''),
+    x: Number(p.coordinate?.x), y: Number(p.coordinate?.y), period: p.period?.number || 0,
+    text: cleanText(p.text || ''),
+  })).filter((e) => e.kind && (e.teamId === String(awayId) || e.teamId === String(homeId)) && Number.isFinite(e.x) && Number.isFinite(e.y));
+  if (!ev.length) return [];
+  // Some feeds count from a corner (0..200, 0..85) instead of from center ice.
+  if (!ev.some((e) => e.x < 0) && ev.some((e) => e.x > 100)) ev = ev.map((e) => ({ ...e, x: e.x - 100, y: e.y - 42.5 }));
+  ev = ev.filter((e) => Math.abs(e.x) <= 101 && Math.abs(e.y) <= 44);
+  const groups = new Map();
+  ev.forEach((e) => { const k = `${e.teamId}:${e.period}`; groups.set(k, [...(groups.get(k) || []), e]); });
+  for (const [k, list] of groups) {
+    const mean = list.reduce((n, e) => n + e.x, 0) / list.length;
+    const wantRight = k.startsWith(String(awayId) + ':');
+    if ((mean > 0) !== wantRight) list.forEach((e) => { e.x = -e.x; e.y = -e.y; });
+  }
+  return ev;
+}
+
 /* ---------- play-by-play (everything that is not football, which reads by drive) ---------- */
 export function normPlays(rawPlays) {
   let pa = 0, ph = 0;
@@ -730,6 +770,7 @@ export async function getGame(lg, id) {
     chart: started ? scoreSeries(game, timeline, L) : null,
     drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
     shots: L.sport === 'basketball' ? normShots(data.plays) : [],
+    ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),
   };

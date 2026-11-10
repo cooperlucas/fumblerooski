@@ -276,3 +276,26 @@ test('team colors: a stand-in color is replaced once the real one is known, acro
   await ensureColors([lions]);
   assert.equal(liveColor(lions), '#0076B6');
 });
+
+test('hockey ice chart: shots turned so away shoots right and home shoots left, blocks left out', async () => {
+  const { normIce } = await import('../src/data/espn.js');
+  const play = (team, type, x, y, period, goal) => ({ team: { id: team }, type: { text: type }, coordinate: { x, y }, period: { number: period }, scoringPlay: !!goal });
+  const ice = normIce([
+    play('A', 'Shot', 70, 10, 1), play('A', 'Goal', 85, -3, 1, true), play('A', 'Missed Shot', -60, 5, 2), play('A', 'Shot', -80, 2, 2),
+    play('H', 'Shot', -75, 0, 1), play('H', 'Blocked Shot', -50, 0, 1), play('H', 'Faceoff', 0, 0, 1), play('H', 'Shot', 66, 8, 2),
+  ], 'A', 'H');
+  assert.equal(ice.length, 6);
+  assert.ok(ice.filter((e) => e.teamId === 'A').every((e) => e.x > 0));
+  assert.ok(ice.filter((e) => e.teamId === 'H').every((e) => e.x < 0));
+  assert.deepEqual(ice.map((e) => e.kind), ['save', 'goal', 'miss', 'save', 'save', 'save']);
+  const corner = normIce([play('A', 'Shot', 180, 40, 1), play('H', 'Shot', 20, 45, 1)], 'A', 'H');
+  assert.equal(corner[0].x, 80);
+});
+
+test('second color: black-primary teams keep black as the secondary', async () => {
+  const { normTeam } = await import('../src/data/espn.js');
+  const t = normTeam({ id: 'zz1', displayName: 'Blackout Club', color: '000000', alternateColor: 'c4ced4' }, 'nhl');
+  assert.equal(t.color, '#C4CED4');
+  assert.equal(t.color2, '#000000');
+  assert.equal(normTeam({ id: '24', displayName: 'San Antonio Spurs', color: '000000', alternateColor: '5b6fd0' }, 'nba').color2, '#000000');
+});

@@ -317,7 +317,7 @@ function PlayerPage({ lg, id }) {
                 <p style={{ fontWeight: 600 }}>{[p.ht, p.wt, p.from].filter(Boolean).join(' · ')}</p>
               </div>
             </div>
-            {p.team ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${p.team.id}`)}><Blob team={p.team} size={22} /> {p.team.full}</button></div> : null}
+            {p.team ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${p.team.id}`)}><Blob team={p.team} size={28} /> {p.team.full}</button></div> : null}
             <div className="gtabs" role="tablist" aria-label="Player sections">
               {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
             </div>
@@ -536,6 +536,62 @@ function ShotChart({ shots, game, lg }) {
   );
 }
 
+/* ---------- hockey: every shot on the rink. Away team shoots right, home team shoots left. ---------- */
+export function IceChart({ ice, game }) {
+  const [per, setPer] = useState(0);
+  const cc = chartColors(game.away, game.home);
+  const col = (id) => (id === game.away.id ? cc.away.main : cc.home.main);
+  const periods = [...new Set(ice.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const shown = ice.filter((s) => !per || s.period === per);
+  const K = 3, W = 200 * K, H = 85 * K;
+  const X = (v) => (Math.max(-98, Math.min(98, v)) + 100) * K, Y = (v) => (42.5 - Math.max(-40.5, Math.min(40.5, v))) * K;
+  const count = (id, kind) => shown.filter((s) => s.teamId === id && (!kind || s.kind === kind)).length;
+  const dots = [25, 175].flatMap((x) => [20.5, 64.5].map((y) => [x * K, y * K]));
+  const order = { miss: 0, save: 1, goal: 2 };
+  return (
+    <section className="sec">
+      <H2>Ice Chart</H2>
+      {periods.length > 1 ? (
+        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>
+          <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>All</button>
+          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= 3 ? `P${p}` : 'OT'}</button>)}
+        </div>
+      ) : null}
+      <div className="card pad shotbox">
+        <div className="icekey">
+          {[game.away, game.home].map((t, i) => (
+            <span key={t.id} style={{ textAlign: i ? 'right' : 'left' }}><b style={{ color: col(t.id) }}>{t.abbr} {i ? '←' : '→'}</b><small>{count(t.id, 'goal')} goals · {count(t.id)} shots</small></span>
+          ))}
+        </div>
+        <div role="img" aria-label={`Shot locations. ${game.away.name}: ${count(game.away.id, 'goal')} goals on ${count(game.away.id)} shots. ${game.home.name}: ${count(game.home.id, 'goal')} goals on ${count(game.home.id)} shots.`}>
+          <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court" aria-hidden="true">
+            <rect x="2.5" y="2.5" width={W} height={H} rx={28 * K} fill="none" stroke="#6E3AB5" strokeWidth="3" />
+            <rect x="0" y="0" width={W} height={H} rx={28 * K} fill="#10162C" stroke="#22D3D6" strokeWidth="3" />
+            <path d={`M${100 * K} 0 V${H}`} stroke="#FF3D7F" strokeWidth="3" />
+            <path d={`M${75 * K} 0 V${H} M${125 * K} 0 V${H}`} stroke="#22D3D6" strokeWidth="4" opacity="0.8" />
+            <path d={`M${11 * K} ${6 * K} V${H - 6 * K} M${189 * K} ${6 * K} V${H - 6 * K}`} stroke="#FF3D7F" strokeWidth="1.5" opacity="0.7" />
+            <circle cx={100 * K} cy={H / 2} r={15 * K} fill="none" stroke="#22D3D6" strokeWidth="1.5" opacity="0.6" />
+            {dots.map(([x, y], i) => <circle key={i} cx={x + (x < W / 2 ? 6 * K : -6 * K)} cy={y} r={15 * K} fill="none" stroke="#FF3D7F" strokeWidth="1.5" opacity="0.45" />)}
+            <path d={`M${11 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 1 0 ${8 * K} Z M${189 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 0 0 ${8 * K} Z`} fill="rgba(34,211,214,.25)" stroke="#22D3D6" strokeWidth="1.5" />
+            {[...shown].sort((a, b) => order[a.kind] - order[b.kind]).map((s, i) => {
+              const x = X(s.x), y = Y(s.y), c = col(s.teamId);
+              if (s.kind === 'miss') return <path key={i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke={c} strokeWidth="2.4" strokeLinecap="round" opacity="0.85" />;
+              if (s.kind === 'save') return <circle key={i} cx={x} cy={y} r="5" fill="#10162C" stroke={c} strokeWidth="2.6" />;
+              return <g key={i}><rect x={x - 8} y={y - 8} width="16" height="16" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" transform={`rotate(45 ${x} ${y})`} /><circle cx={x} cy={y} r="4" fill={c} stroke="#0C1124" strokeWidth="1.2" /></g>;
+            })}
+          </svg>
+        </div>
+        <div className="legend" style={{ margin: '12px 0 0', flexWrap: 'wrap' }}>
+          <span className="lg" style={{ background: '#FFBE2E' }}>◆ GOAL</span>
+          <span className="lg" style={{ background: '#CBD2EA' }}>○ SAVED</span>
+          <span className="lg" style={{ background: '#CBD2EA' }}>✕ MISSED</span>
+        </div>
+        <p className="stamp" style={{ marginTop: 10, textAlign: 'left' }}>Each team's shots are turned to face one goal, so the ends do not flip between periods.</p>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- play-by-play (not football) ---------- */
 function PlayByPlay({ pbp, game, L }) {
   const periods = [...new Set(pbp.map((p) => p.period))].sort((a, b) => a - b);
@@ -618,6 +674,7 @@ function GamePage({ lg, id }) {
     ['summary', 'Summary'],
     d.drives.length ? ['drives', 'Drives'] : null,
     d.shots.length ? ['shots', 'Shot Chart'] : null,
+    d.ice?.length ? ['ice', 'Ice Chart'] : null,
     d.pbp.length ? ['plays', 'Plays'] : null,
     d.box.length ? ['box', 'Box Score'] : null,
     d.stats.length ? ['stats', 'Team Stats'] : null,
@@ -684,6 +741,7 @@ function GamePage({ lg, id }) {
             ) : null}
             {tab === 'drives' ? <div className="gtab solo"><Drives drives={d.drives} game={g} /></div> : null}
             {tab === 'shots' ? <div className="gtab solo"><ShotChart shots={d.shots} game={g} lg={lg} /></div> : null}
+            {tab === 'ice' ? <div className="gtab solo"><IceChart ice={d.ice} game={g} /></div> : null}
             {tab === 'plays' ? <div className="gtab solo"><PlayByPlay pbp={d.pbp} game={g} L={L} /></div> : null}
             {tab === 'box' ? <div className="gtab solo"><BoxScore box={d.box} game={g} sport={L.sport} /></div> : null}
             {tab === 'stats' ? (
