@@ -233,3 +233,22 @@ h1, h2, h3, p { margin: 0; }
 .gtab.solo > .sec { margin-top: 12px; }
 .gtab.solo > .sec > .h2, .gtab.solo > .sec > .sechead { display: none; }
 .gtab.solo > .sec > .seg:first-of-type { margin-top: 0 !important; }
+
+/* players */
+.jersey { flex: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); font-variant-numeric: tabular-nums; }
+.jersey.big { width: 62px; height: 62px; border-radius: 16px; font-size: 26px; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85), 3px 3px 0 #0C1124; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; margin-top: 12px; }
+.tile { padding: 12px 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line2); text-align: center; min-width: 0; }
+.tile b { display: block; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 22px; color: var(--yellow); text-shadow: 2px 2px 0 #6E3AB5; font-variant-numeric: tabular-nums; }
+.tile span { display: block; margin-top: 4px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--dim); }
+.ptitle { color: var(--teal); font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 12px; text-transform: uppercase; }
+.ptitle small { color: var(--dim); font-style: normal; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 12px 8px; margin-top: 12px; }
+.kv span { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; color: var(--dim); }
+.kv b { display: block; margin-top: 2px; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.plink { border: none; background: transparent; padding: 0; font: inherit; color: inherit; text-align: left; text-decoration: underline; text-decoration-color: rgba(255, 190, 46, 0.55); text-underline-offset: 3px; }
+.pbox tr.tap { cursor: pointer; }
+.pbox tr.span th { color: var(--yellow); text-align: center; border-bottom: none; padding-bottom: 2px; }
+.pbox tr.span th + th { box-shadow: -1px 0 0 #232C50; }
+.pbox .who small.res { display: block; font-size: 11px; font-weight: 700; color: var(--mute); }
+.pbox .who small.res.w { color: var(--lime); }

@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -18,13 +18,14 @@ export default function App() {
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a} lg={a} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
+  else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = 'scores'; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
   else if (name === 'about') { title = 'About'; tab = 'leagues'; body = <About />; }
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
 
   // Team, game and search screens draw their own header (they know the title or own the search box).
-  const ownHeader = name === 'team' || name === 'game' || name === 'search';
+  const ownHeader = name === 'team' || name === 'game' || name === 'search' || name === 'player';
   return (
     <div className="app">
       <DemoBar />
@@ -213,6 +214,8 @@ function TeamPage({ lg, id }) {
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
   const sched = q.data?.schedule || [];
+  const [view, setView] = useState('schedule');
+  const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
@@ -223,7 +226,7 @@ function TeamPage({ lg, id }) {
         <span className="res">{fin ? (<><b style={{ background: w ? 'rgba(155,227,58,.16)' : '#232C50', color: w ? '#9BE33A' : '#CBD2EA' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span style={{ color: 'var(--pink)' }}>LIVE {me.score}-{them.score}</span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
-              : <span style={{ color: 'var(--teal)' }}>{fmtTime(g.date)}</span>}</span>
+              : <span style={{ color: 'var(--teal)' }}>{g.tbd ? 'TBD' : fmtTime(g.date)}</span>}</span>
       </button>
     );
   };
@@ -244,10 +247,116 @@ function TeamPage({ lg, id }) {
               <button className={'btn' + (pinned ? ' on' : '')} aria-pressed={pinned} onClick={() => toggleFav(t)} style={{ flex: 1 }}>{pinned ? 'Pinned to Home' : 'Pin to Home'}</button>
               <button className="btn" onClick={() => go(`league/${lg}`)}><LgTag lg={lg} /> Standings</button>
             </div>
-            <section className="sec">
-              <H2>Schedule</H2>
-              {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
-            </section>
+            <div className="seg" role="group" aria-label="Team sections" style={{ marginTop: 14 }}>
+              <button aria-pressed={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>
+              <button aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button>
+            </div>
+            {view === 'schedule' ? (
+              <section className="sec" style={{ marginTop: 12 }}>
+                {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
+              </section>
+            ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>
+              : !ro.data?.groups.length ? <Empty>No roster listed for this team right now.</Empty>
+                : ro.data.groups.map((gr) => (
+                  <section className="sec" key={gr.title} style={{ marginTop: 12 }}>
+                    <div className="card">
+                      {ro.data.groups.length > 1 ? <div className="shead"><span className="nm">{gr.title}</span></div> : null}
+                      {gr.players.map((p) => (
+                        <button key={p.id} className="lrow" onClick={() => go(`player/${lg}/${p.id}`)}>
+                          <span className="jersey" style={{ background: t.color, color: inkOn(t.color) }}>{p.jersey || '·'}</span>
+                          <span className="nm">{p.name}<span className="sub">{[p.pos, p.cls, p.ht, p.wt].filter(Boolean).join(' · ')}</span></span>
+                          <span className="chev" aria-hidden="true">›</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+          </>
+        )}
+      </Page>
+    </>
+  );
+}
+
+/* ---------- Player ---------- */
+const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
+function PlayerPage({ lg, id }) {
+  const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
+  const [tab, setTab] = useState('season');
+  const d = q.data, p = d?.player;
+  const color = p?.team?.color || '#2B3352';
+  const log = d?.gamelog, career = d?.career || [];
+  // This season = each stat group's most recent row.
+  const season = career.map((c) => ({ ...c, row: c.rows[c.rows.length - 1] })).filter((c) => c.row);
+  const tabs = [['season', 'Season'], ['log', 'Game Log'], ['career', 'Career']];
+  return (
+    <>
+      <SubHeader title={p?.name || 'Player'} />
+      <Page>
+        {q.loading && !d ? <Loading rows={6} /> : q.error && !d ? <Problem error={q.error} retry={q.reload} /> : (
+          <>
+            <div className="teamhero" style={{ background: `linear-gradient(rgba(12,17,36,.3), rgba(12,17,36,.55)), ${color}` }}>
+              <span className="jersey big" style={{ background: color, color: inkOn(color) }}>{p.jersey || p.pos || '·'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2>{p.name || 'Player'}</h2>
+                <p>{[p.posName || p.pos, p.team?.full, p.cls].filter(Boolean).join(' · ')}</p>
+                <p style={{ fontWeight: 600 }}>{[p.ht, p.wt, p.from].filter(Boolean).join(' · ')}</p>
+              </div>
+            </div>
+            {p.team ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${p.team.id}`)}><Blob team={p.team} size={22} /> {p.team.full}</button></div> : null}
+            <div className="gtabs" role="tablist" aria-label="Player sections">
+              {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
+            </div>
+
+            {tab === 'season' ? (
+              <>
+                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{x.value}</b><span>{x.label}</span></div>)}</div> : null}
+                {season.map((c) => (
+                  <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
+                    <div className="ptitle">{c.row.season} {c.title}{c.row.team ? <small> {c.row.team}</small> : null}</div>
+                    <div className="kv">{c.labels.map((l, i) => <div key={i}><span>{l}</span><b>{c.row.stats[i] ?? ''}</b></div>)}</div>
+                  </div>
+                ))}
+                {!d.summary.items.length && !season.length ? <Empty>{d.missing.career ? 'Season stats did not load. Try again in a bit.' : 'No stats on record for this season.'}</Empty> : null}
+              </>
+            ) : null}
+
+            {tab === 'log' ? (
+              log.seasons.length ? log.seasons.map((sn, si) => (
+                <div className="card pbox" key={sn.title + si} style={{ marginTop: 12 }}>
+                  <table>
+                    <thead>
+                      {log.spans.length ? <tr className="span"><th className="who" />{log.spans.map((x, i) => <th key={i} colSpan={x.count}>{x.title}</th>)}</tr> : null}
+                      <tr><th scope="col" className="who">{sn.title || 'Games'}</th>{log.labels.map((l, i) => <th scope="col" key={i}>{l}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {sn.rows.map((r) => (
+                        <tr key={r.id} className="tap" onClick={() => go(`game/${lg}/${r.id}`)}>
+                          <th scope="row" className="who">{[fmtShort(r.date), r.at, r.opp].filter(Boolean).join(' ')}<small className={'res ' + (r.result === 'W' ? 'w' : '')}>{[r.result, r.score].filter(Boolean).join(' ')}</small></th>
+                          {log.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}
+                        </tr>
+                      ))}
+                      {sn.totals ? <tr className="tot"><th scope="row" className="who">Total</th>{log.labels.map((_, j) => <td key={j}>{sn.totals[j] ?? ''}</td>)}</tr> : null}
+                    </tbody>
+                  </table>
+                </div>
+              )) : <Empty>{d.missing.gamelog ? 'The game log did not load. Try again in a bit.' : 'No games logged yet.'}</Empty>
+            ) : null}
+
+            {tab === 'career' ? (
+              career.length ? career.map((c) => (
+                <div className="card pbox" key={c.key + c.title} style={{ marginTop: 12 }}>
+                  <table>
+                    <thead><tr><th scope="col" className="who">{c.title}</th>{c.labels.map((l, i) => <th scope="col" key={i}>{l}</th>)}</tr></thead>
+                    <tbody>
+                      {c.rows.map((r, i) => <tr key={r.season + r.team + i}><th scope="row" className="who">{r.season}{r.team ? <small> {r.team}</small> : null}</th>{c.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}</tr>)}
+                      {c.totals ? <tr className="tot"><th scope="row" className="who">Career</th>{c.labels.map((_, j) => <td key={j}>{c.totals[j] ?? ''}</td>)}</tr> : null}
+                    </tbody>
+                  </table>
+                </div>
+              )) : <Empty>{d.missing.career ? 'Career stats did not load. Try again in a bit.' : 'No career stats on record.'}</Empty>
+            ) : null}
+            <Stamp at={q.updatedAt} />
           </>
         )}
       </Page>
@@ -468,7 +577,7 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
+                    <tr><th scope="row" className="who">{r.id ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
                   </React.Fragment>
                 ))}
                 {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}
@@ -522,7 +631,7 @@ function GamePage({ lg, id }) {
                     <span className="rc">{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
-                  : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
+                  : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
               </div>
               {g.note || d.venue ? <p style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{[g.note, d.venue].filter(Boolean).join(' · ')}</p> : null}
             </div>
@@ -600,6 +709,12 @@ function Search() {
     const score = (t) => { const n = t.name.toLowerCase(), f = t.full.toLowerCase(); return n.startsWith(term) || f.startsWith(term) ? 0 : t.abbr.toLowerCase() === term ? 0 : f.includes(term) ? 1 : -1; };
     return q.data.map((t) => [score(t), t]).filter(([s]) => s >= 0).sort((a, b) => a[0] - b[0] || a[1].full.localeCompare(b[1].full)).slice(0, 40).map(([, t]) => t);
   }, [term, q.data]);
+  // Players come from the feed's own search, asked a beat after typing stops.
+  const [asked, setAsked] = useState('');
+  useEffect(() => { const h = setTimeout(() => setAsked(term.length >= 3 ? term : ''), 350); return () => clearTimeout(h); }, [term]);
+  const pq = useQuery(asked ? `psearch:${asked}` : null, () => searchPlayers(asked), () => 0);
+  const players = asked && asked === term ? (pq.data || []) : [];
+  const playersBusy = term.length >= 3 && (asked !== term || (pq.loading && !pq.data));
   const leagues = term ? LEAGUES.filter((l) => l.name.toLowerCase().includes(term) || l.short.toLowerCase().includes(term)) : [];
   const TeamRow = ({ t }) => (
     <button className="lrow" onClick={() => go(`team/${t.lg}/${t.id}`)}>
@@ -610,20 +725,30 @@ function Search() {
     <>
       <SubHeader>
         <label className="search">
-          <span style={{ position: 'absolute', left: -9999 }}>Search teams and leagues</span>
-          <input id="search-box" autoFocus type="search" enterKeyHint="search" placeholder="Search teams and leagues" value={text} onChange={(e) => setText(e.target.value)} />
+          <span style={{ position: 'absolute', left: -9999 }}>Search teams, players and leagues</span>
+          <input id="search-box" autoFocus type="search" enterKeyHint="search" placeholder="Teams, players, leagues" value={text} onChange={(e) => setText(e.target.value)} />
         </label>
       </SubHeader>
       <Page>
         {!term ? (
           <>
             {favs.length ? <section className="sec"><H2>Your Teams</H2><div className="card">{favs.map((t) => <TeamRow key={favKey(t)} t={{ ...t, full: t.name }} />)}</div></section> : null}
-            <Empty>Type a team or league. Open a team and tap Pin to put it on your Home screen.</Empty>
+            <Empty>Type a team, player or league. Open a team and tap Pin to put it on your Home screen.</Empty>
           </>
-        ) : q.loading && !q.data ? <Loading /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !leagues.length ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
+        ) : q.loading && !q.data ? <Loading /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !leagues.length && !players.length && !playersBusy ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
           <>
             {leagues.length ? <div className="card">{leagues.map((l) => <button key={l.id} className="lrow" onClick={() => go(`league/${l.id}`)}><span className="blob" aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 10, background: l.color, color: '#0C1124', fontSize: 9 }}>{l.short}</span><span className="nm">{l.name}</span><span className="chev" aria-hidden="true">›</span></button>)}</div> : null}
             {hits.length ? <div className="card">{hits.map((t) => <TeamRow key={favKey(t)} t={t} />)}</div> : null}
+            {players.length ? (
+              <section className="sec" style={{ marginTop: 14 }}>
+                <H2>Players</H2>
+                <div className="card">{players.map((p) => (
+                  <button key={p.lg + p.id} className="lrow" onClick={() => go(`player/${p.lg}/${p.id}`)}>
+                    <span className="nm">{p.name}{p.team ? <span className="sub">{p.team}</span> : null}</span><LgTag lg={p.lg} />
+                  </button>
+                ))}</div>
+              </section>
+            ) : playersBusy ? <p className="stamp">Looking for players...</p> : null}
           </>
         )}
       </Page>
@@ -643,6 +768,11 @@ function About() {
     try { const r = await getTeams('nfl'); teamId = teamId || r[0]?.id; push('Team search', r.length > 0, `${r.length} teams, read from the ${r.source || 'feed'}`); } catch (e) { push('Team search', false, e.message); }
     if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
     else push('Team page', false, 'No team to test with');
+    let playerId = null;
+    if (teamId) { try { const r = await getRoster('nfl', teamId); const n = r.groups.reduce((k, g) => k + g.players.length, 0); playerId = r.groups[0]?.players[0]?.id; push('Roster', n > 0, `${n} players`); } catch (e) { push('Roster', false, e.message); } }
+    if (playerId) { try { const r = await getPlayer('nfl', playerId); const miss = Object.entries(r.missing).filter(([, v]) => v).map(([k]) => k); push('Player page', !miss.length, `${r.player.name}: ${r.gamelog.seasons.reduce((k, x) => k + x.rows.length, 0)} games logged, ${r.career.length} career tables${miss.length ? ', did not load: ' + miss.join(', ') : ''}`); } catch (e) { push('Player page', false, e.message); } }
+    else push('Player page', false, 'No player to test with');
+    try { const r = await searchPlayers('allen'); push('Player search', r.length > 0, `${r.length} players for "allen"`); } catch (e) { push('Player search', false, e.message); }
     if (gameId) { try { const r = await getGame('nfl', gameId); push('Game page', true, `${r.game.away.abbr} at ${r.game.home.abbr}: ${r.stats.length} stat rows, ${r.plays.length} scoring plays`); } catch (e) { push('Game page', false, e.message); } }
     else push('Game page', false, 'No game on the slate to test with');
   };

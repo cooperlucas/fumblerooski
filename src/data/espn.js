@@ -5,11 +5,13 @@
 // Feed: ESPN's public site API. It is unofficial and its terms do not cover commercial use,
 // so treat it as private-beta only.
 
-import { LEAGUE } from './leagues.js';
+import { LEAGUE, LEAGUES } from './leagues.js';
 import { scrub, cleanText } from './guard.js';
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const V2 = 'https://site.api.espn.com/apis/v2/sports';
+const COMMON = 'https://site.web.api.espn.com/apis/common/v3/sports'; // player pages
+const SEARCH = 'https://site.web.api.espn.com/apis/common/v3/search';
 
 export class FeedError extends Error {
   constructor(message, status) { super(message); this.name = 'FeedError'; this.status = status; }
@@ -130,6 +132,8 @@ export function normEvent(ev, lg) {
     id: String(ev?.id ?? comp.id ?? ''), lg, date, state,
     // Short label from the feed ("Final/OT", "4:12 - 3rd", "Halftime"). Screens format kickoff times themselves.
     statusText: cleanText(type.shortDetail || type.detail || type.description || ''),
+    // The feed gives undecided kickoff times a placeholder clock time; flag them so screens say TBD.
+    tbd: state === 'pre' && (comp.timeValid === false || ev?.timeValid === false || /\bTBD\b/i.test(String(type.shortDetail || type.detail || ''))),
     period: st.period || 0,
     clock: st.displayClock || '',
     home: normSide(homeC, lg),
@@ -288,6 +292,127 @@ export async function getTeam(lg, id) {
     schedule: events.map((e) => normEvent(e, lg)).filter((g) => g.id),
     scheduleMissing: sched.status === 'rejected',
   };
+}
+
+/* ---------- players ---------- */
+const expOf = (a) => {
+  const e = a?.experience;
+  if (!e) return '';
+  if (e.abbreviation) return String(e.abbreviation);
+  if (e.displayValue) return String(e.displayValue);
+  return e.years == null ? '' : e.years === 0 ? 'Rookie' : `${e.years} yr`;
+};
+function normPlayerLite(a, lg) {
+  return {
+    id: String(a?.id ?? ''), lg,
+    name: cleanText(a?.displayName || a?.fullName || a?.shortName || ''),
+    jersey: a?.jersey != null ? String(a.jersey) : '',
+    pos: a?.position?.abbreviation || '',
+    cls: expOf(a),
+    ht: a?.displayHeight || '', wt: a?.displayWeight || '',
+  };
+}
+const byJersey = (x, y) => (parseInt(x.jersey, 10) || 999) - (parseInt(y.jersey, 10) || 999) || x.name.localeCompare(y.name);
+const GROUP_TITLE = { offense: 'Offense', defense: 'Defense', specialteam: 'Special Teams', specialteams: 'Special Teams', injuredreserveorout: 'Injured', practicesquad: 'Practice Squad' };
+
+// A team's roster. Football comes grouped (offense, defense, special teams); most other sports come as one list.
+export async function getRoster(lg, teamId) {
+  const data = await get(url(SITE, lg, `/teams/${encodeURIComponent(teamId)}/roster`));
+  const raw = data.athletes || [];
+  const grouped = raw.length && Array.isArray(raw[0]?.items);
+  const groups = (grouped ? raw : [{ position: 'Roster', items: raw }]).map((g) => {
+    const key = String(g.position || g.name || 'Roster');
+    return {
+      title: GROUP_TITLE[key.toLowerCase().replace(/[^a-z]/g, '')] || key.replace(/^./, (c) => c.toUpperCase()),
+      players: (g.items || []).map((a) => normPlayerLite(a, lg)).filter((p) => p.id && p.name).sort(byJersey),
+    };
+  }).filter((g) => g.players.length);
+  return { lg, teamId: String(teamId), groups };
+}
+
+function normGamelog(d) {
+  const labels = (d?.labels || []).map((l) => cleanText(l));
+  const evs = d?.events || {};
+  const spans = (d?.categories || []).filter((c) => c.count).map((c) => ({ title: cleanText(c.displayName || c.name || ''), count: c.count }));
+  const seasons = (d?.seasonTypes || []).map((st) => {
+    const rows = [];
+    (st.categories || []).forEach((c) => (c.events || []).forEach((e) => {
+      const ev = evs[e.eventId] || {};
+      rows.push({
+        id: String(e.eventId ?? ''), date: ev.gameDate || null,
+        opp: ev.opponent?.abbreviation || ev.opponent?.displayName || '', at: ev.atVs || '',
+        result: ev.gameResult || '', score: cleanText(ev.score || ''),
+        stats: (e.stats || []).map((v) => String(v ?? '')),
+      });
+    }));
+    const tot = st.summary?.stats?.find((x) => Array.isArray(x.stats))?.stats;
+    return { title: cleanText(st.displayName || ''), rows, totals: tot ? tot.map((v) => String(v ?? '')) : null };
+  }).filter((x) => x.rows.length);
+  return { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons };
+}
+function normCareer(d) {
+  return (d?.categories || []).map((c) => ({
+    key: String(c.name || ''), title: cleanText(c.displayName || c.name || ''),
+    labels: (c.labels || []).map((l) => cleanText(l)),
+    rows: (c.statistics || []).map((x) => ({
+      year: Number(x.season?.year) || 0,
+      season: String(x.season?.displayName || x.season?.year || ''),
+      team: String(d.teams?.[x.teamId]?.abbreviation || x.teamAbbreviation || '').toUpperCase(),
+      stats: (x.stats || []).map((v) => String(v ?? '')),
+    })).filter((r) => r.stats.length).sort((x, y) => x.year - y.year),
+    totals: Array.isArray(c.totals) && c.totals.length ? c.totals.map((v) => String(v ?? '')) : null,
+  })).filter((c) => c.rows.length && c.labels.length);
+}
+
+// One player: who they are, this season, game by game, and the career. Any piece can be missing.
+export async function getPlayer(lg, id) {
+  const pid = encodeURIComponent(id);
+  const [info, log, stats] = await Promise.allSettled([
+    get(url(COMMON, lg, `/athletes/${pid}`)),
+    get(url(COMMON, lg, `/athletes/${pid}/gamelog`)),
+    get(url(COMMON, lg, `/athletes/${pid}/stats`)),
+  ]);
+  if (info.status === 'rejected' && log.status === 'rejected' && stats.status === 'rejected') throw info.reason;
+  const a = info.status === 'fulfilled' ? (info.value.athlete || info.value || {}) : {};
+  const sum = a.statsSummary || {};
+  const born = a.displayBirthPlace || [a.birthPlace?.city, a.birthPlace?.state || a.birthPlace?.country].filter(Boolean).join(', ');
+  return {
+    player: {
+      ...normPlayerLite({ ...a, id: a.id ?? id }, lg),
+      posName: a.position?.displayName || '',
+      team: a.team?.id ? normTeam(a.team, lg) : null,
+      from: cleanText(born || ''),
+      status: cleanText(a.status?.name && a.status.type !== 'active' ? a.status.name : ''),
+    },
+    summary: {
+      title: cleanText(sum.displayName || ''),
+      items: (sum.statistics || []).map((x) => ({ label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? '') })).filter((x) => x.label && x.value).slice(0, 4),
+    },
+    gamelog: log.status === 'fulfilled' ? normGamelog(log.value) : { labels: [], spans: [], seasons: [] },
+    career: stats.status === 'fulfilled' ? normCareer(stats.value) : [],
+    missing: { info: info.status === 'rejected', gamelog: log.status === 'rejected', career: stats.status === 'rejected' },
+  };
+}
+
+// Player search across every league the app covers. The feed's own search, asked as you type.
+const LEAGUE_NUM = { 28: 'nfl', 23: 'cfb', 46: 'nba', 90: 'nhl', 10: 'mlb', 41: 'ncaam', 54: 'ncaaw', 59: 'wnba', 700: 'epl', 770: 'mls' };
+export async function searchPlayers(text) {
+  const q = new URLSearchParams({ query: text, limit: '25', type: 'player' }).toString();
+  const data = await get(`${SEARCH}?${q}`);
+  const items = data.items || data.results?.flatMap((r) => r.contents || r.items || []) || [];
+  const out = [], seen = new Set();
+  for (const it of items) {
+    if (it.type && it.type !== 'player') continue;
+    const slug = typeof it.league === 'string' ? it.league : it.league?.slug || it.defaultLeagueSlug || '';
+    const num = /~l:(\d+)/.exec(String(it.uid || ''))?.[1];
+    const lg = LEAGUES.find((l) => l.slug === slug)?.id || LEAGUE_NUM[num];
+    const id = String(it.id ?? /~a:(\d+)/.exec(String(it.uid || ''))?.[1] ?? '');
+    if (!lg || !id || seen.has(lg + id)) continue;
+    seen.add(lg + id);
+    const rel = (it.teamRelationships || [])[0];
+    out.push({ id, lg, name: cleanText(it.displayName || it.name || ''), team: cleanText(rel?.displayName || rel?.core?.displayName || it.subtitle || it.description || '') });
+  }
+  return out.filter((p) => p.name);
 }
 
 /* ---------- one game ---------- */

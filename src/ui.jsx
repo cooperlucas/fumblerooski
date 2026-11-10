@@ -34,6 +34,7 @@ export function statusLabel(g) {
   if (g.state === 'off') return g.statusText || 'Postponed';
   const d = new Date(g.date);
   if (isNaN(d)) return 'TBD';
+  if (g.tbd) return sameDay(d, new Date()) ? 'TBD' : fmtDate(g.date);
   return sameDay(d, new Date()) ? fmtTime(g.date) : fmtDate(g.date);
 }
 export const statusColor = (g) => (g.state === 'live' ? 'var(--pink)' : g.state === 'final' ? 'var(--soft)' : g.state === 'off' ? 'var(--mute)' : 'var(--teal)');
@@ -50,7 +51,7 @@ function lumOf(color) {
 export function Blob({ team, size = 28, radius }) {
   const light = lumOf(team.color) > 0.33;
   return (
-    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: team.color, color: light ? '#0C1124' : '#fff', fontSize: Math.max(8, Math.round(size * (team.abbr.length > 3 ? 0.27 : 0.32))) }}>
+    <span className="blob" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.28), background: team.color, color: light ? '#0C1124' : '#fff', fontSize: Math.max(8, Math.round(size * (team.abbr.length > 3 ? 0.22 : 0.3))) }}>
       {team.abbr}
     </span>
   );

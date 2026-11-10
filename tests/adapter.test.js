@@ -233,3 +233,27 @@ test('standings: real team colors come from the team list, plus division and con
   const c = await getStandings('cfb');
   assert.equal(c.views.length, 1);
 });
+
+test('players: roster, profile with game log and career, search, and no betting data', async () => {
+  const { getRoster, getPlayer, searchPlayers } = await import('../src/data/espn.js');
+  const r = await getRoster('nfl', '4');
+  assert.deepEqual(r.groups.map((g) => g.title), ['Offense', 'Defense']);
+  assert.deepEqual(r.groups[0].players.map((p) => p.jersey), ['9', '11', '28']);
+  assert.equal(r.groups[0].players[1].cls, 'Rookie');
+  const p = await getPlayer('nfl', 'aq');
+  assert.equal(p.player.name, 'Dexter Quarterback');
+  assert.equal(p.player.team.abbr, 'CIN');
+  assert.equal(p.summary.items.length, 4);
+  assert.ok(!JSON.stringify(p).includes('+450'));
+  assert.equal(p.gamelog.labels.length, 8);
+  assert.deepEqual(p.gamelog.spans.map((s) => s.count), [5, 3]);
+  assert.equal(p.gamelog.seasons[0].rows.length, 3);
+  assert.equal(p.gamelog.seasons[0].rows[0].opp, 'CLE');
+  assert.equal(p.career[0].rows.at(-1).season, '2026');
+  assert.equal(p.career[0].rows[0].team, 'CIN');
+  assert.equal(p.career[0].totals[3], '7,829');
+  const hits = await searchPlayers('de');
+  assert.ok(hits.some((h) => h.lg === 'cfb' && h.name === 'Kevin Demo'));
+  assert.ok(hits.every((h) => h.lg && h.name !== 'Somebody Cricket'));
+  assert.equal(hits[0].team.length > 0, true);
+});

@@ -197,8 +197,72 @@ function summary(lg, id) {
   };
 }
 
+/* ---------- players ---------- */
+const PLAYERS = {
+  nfl: [['aq', 'Dexter Quarterback', '9', 'QB', 6], ['ar', 'Devin Back', '28', 'RB', 3], ['aw', 'Dante Receiver', '11', 'WR', 0], ['ad', 'Dion Tackler', '54', 'LB', 8]],
+  cfb: [['cq', 'Kevin Demo', '7', 'QB', 'SR'], ['cr', 'Cam Runner', '22', 'RB', 'SO'], ['cd', 'Sam Safety', '3', 'S', 'JR']],
+  nba: [['p1', 'Dre Guard', '1', 'G', 4], ['p2', 'Dom Center', '34', 'C', 9], ['p3', 'Deon Sixth', '12', 'F', 1]],
+};
+const athlete = (lg, r) => ({
+  id: r[0], displayName: r[1], jersey: r[2], position: { abbreviation: r[3], displayName: r[3] },
+  experience: typeof r[4] === 'string' ? { abbreviation: r[4], displayValue: r[4] } : { years: r[4] },
+  displayHeight: `6' 2"`, displayWeight: '212 lbs', displayBirthPlace: 'Columbus, OH',
+});
+function roster(lg) {
+  const all = PLAYERS[lg].map((r) => athlete(lg, r));
+  if (lg === 'nba') return { athletes: all };
+  const off = all.filter((a) => ['QB', 'RB', 'WR'].includes(a.position.abbreviation));
+  return { athletes: [{ position: 'offense', items: off }, { position: 'defense', items: all.filter((a) => !off.includes(a)) }] };
+}
+function playerInfo(lg, id) {
+  const r = PLAYERS[lg].find((x) => x[0] === id) || PLAYERS[lg][0];
+  const nba = lg === 'nba';
+  return { athlete: { ...athlete(lg, r), team: team(lg, T[lg][0][0]), statsSummary: { displayName: 'This Season', statistics: nba
+    ? [{ abbreviation: 'PTS', displayValue: '24.1' }, { abbreviation: 'REB', displayValue: '5.2' }, { abbreviation: 'AST', displayValue: '7.8' }, { abbreviation: 'FG%', displayValue: '48.3' }]
+    : [{ abbreviation: 'YDS', displayValue: '2,104' }, { abbreviation: 'TD', displayValue: '17' }, { abbreviation: 'INT', displayValue: '4' }, { abbreviation: 'RTG', displayValue: '104.2' }] },
+    // betting noise the guard must drop
+    odds: { details: 'MVP +450' } } };
+}
+function playerLog(lg) {
+  const nba = lg === 'nba';
+  const labels = nba ? ['MIN', 'FG', '3PT', 'FT', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PTS'] : ['CMP', 'ATT', 'YDS', 'TD', 'INT', 'CAR', 'YDS', 'TD'];
+  const lines = nba
+    ? [['36', '10-19', '4-9', '5-5', '4', '8', '2', '0', '3', '29'], ['33', '8-17', '2-6', '3-4', '6', '9', '1', '1', '2', '21'], ['38', '11-22', '5-11', '4-4', '5', '6', '3', '0', '4', '31']]
+    : [['22', '31', '265', '2', '0', '4', '18', '0'], ['19', '33', '212', '1', '1', '6', '41', '1'], ['25', '36', '301', '3', '0', '3', '9', '0']];
+  const opp = T[lg].slice(1, 4);
+  const events = {}; const evs = lines.map((st, i) => {
+    const id = 'lg' + i; const d = new Date(); d.setDate(d.getDate() - 7 * (i + 1));
+    events[id] = { id, atVs: i % 2 ? '@' : 'vs', gameDate: d.toISOString(), gameResult: i === 1 ? 'L' : 'W', score: i === 1 ? '17-24' : '31-20', opponent: { id: opp[i % opp.length][0], abbreviation: opp[i % opp.length][3] } };
+    return { eventId: id, stats: st };
+  });
+  return {
+    labels, events,
+    categories: nba ? [] : [{ name: 'passing', displayName: 'Passing', count: 5 }, { name: 'rushing', displayName: 'Rushing', count: 3 }],
+    seasonTypes: [{ displayName: '2026 Regular Season', categories: [{ type: 'event', events: evs }], summary: { stats: [{ displayName: 'Totals', stats: nba ? ['35.7', '29-58', '11-26', '12-13', '15', '23', '6', '1', '9', '81'] : ['66', '100', '778', '6', '1', '13', '68', '1'] }] } }],
+  };
+}
+function playerCareer(lg) {
+  const nba = lg === 'nba';
+  const tm = T[lg][0];
+  const cat = (name, displayName, labels, rows, totals) => ({ name, displayName, labels, statistics: rows.map(([y, st]) => ({ season: { year: y, displayName: String(y) }, teamId: tm[0], stats: st })), totals });
+  return {
+    teams: { [tm[0]]: { abbreviation: tm[3] } },
+    categories: nba
+      ? [cat('averages', 'Averages', ['GP', 'MIN', 'PTS', 'REB', 'AST', 'FG%'], [[2024, ['71', '31.2', '18.4', '4.1', '6.2', '45.1']], [2025, ['78', '34.0', '22.9', '4.8', '7.1', '47.0']], [2026, ['10', '35.7', '24.1', '5.2', '7.8', '48.3']]], ['159', '32.9', '21.0', '4.5', '6.8', '46.3'])]
+      : [cat('passing', 'Passing', ['GP', 'CMP', 'ATT', 'YDS', 'TD', 'INT'], [[2024, ['12', '201', '330', '2,480', '18', '9']], [2025, ['13', '262', '401', '3,245', '23', '11']], [2026, ['9', '178', '270', '2,104', '17', '4']]], ['34', '641', '1,001', '7,829', '58', '24']),
+        cat('rushing', 'Rushing', ['GP', 'CAR', 'YDS', 'AVG', 'TD'], [[2025, ['13', '88', '354', '4.0', '5']], [2026, ['9', '52', '210', '4.0', '3']]], ['22', '140', '564', '4.0', '8'])],
+  };
+}
+const LEAGUE_SLUG = { nfl: 'nfl', cfb: 'college-football', nba: 'nba' };
+function playerSearch(text) {
+  const t = String(text || '').toLowerCase();
+  const items = Object.entries(PLAYERS).flatMap(([lg, rows]) => rows.filter((r) => r[1].toLowerCase().includes(t)).map((r) => ({ id: r[0], type: 'player', displayName: r[1], league: LEAGUE_SLUG[lg], teamRelationships: [{ displayName: T[lg][0][1] }] })));
+  return { items: [...items, { id: 'x1', type: 'player', displayName: 'Somebody Cricket', league: 'cricket' }] };
+}
+
 export async function demoFetch(u) {
   const { pathname, searchParams } = new URL(u);
+  if (pathname.endsWith('/common/v3/search')) return playerSearch(searchParams.get('query'));
   const m = pathname.match(/\/sports\/[^/]+\/([^/]+)\/(.*)$/);
   const lg = m && SPORT[m[1]];
   const rest = m ? m[2] : '';
@@ -209,6 +273,10 @@ export async function demoFetch(u) {
   if (rest === 'teams') return teamsList(lg);
   if (rest === 'summary') return summary(lg, searchParams.get('event'));
   let t = rest.match(/^teams\/([^/]+)\/schedule$/); if (t) return schedule(lg, t[1]);
+  if (/^teams\/[^/]+\/roster$/.test(rest)) return roster(lg);
+  if (/^athletes\/[^/]+\/gamelog$/.test(rest)) return playerLog(lg);
+  if (/^athletes\/[^/]+\/stats$/.test(rest)) return playerCareer(lg);
+  t = rest.match(/^athletes\/([^/]+)$/); if (t) return playerInfo(lg, t[1]);
   t = rest.match(/^teams\/([^/]+)$/); if (t) return teamInfo(lg, t[1]);
   throw new Error('demo: no fixture for ' + u);
 }
