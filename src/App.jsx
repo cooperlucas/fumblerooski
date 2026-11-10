@@ -160,12 +160,12 @@ function Scores() {
   const pickL = LEAGUE[lg] ? lg : null;
   // A league's own slate: today, or this week for football.
   const sb0 = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
-  // The feed's own default is the latest match day, finished or not. For day-by-day leagues show today, else the next game day.
+  // The feed's default slate is its latest match day, which can be finished. When it is, add the next game day underneath.
   const todayKey = ymdOf(new Date());
-  const target = sb0.data?.dates ? gameDayFor(sb0.data.dates.map((x) => x.replace(/-/g, '')), todayKey) : null;
   const baseDay = sb0.data?.current?.day ? sb0.data.current.day.replace(/-/g, '') : null;
-  const sbDay = useQuery(pickL && target && target !== baseDay ? `board:${pickL}:d${target}` : null, () => getScoreboard(pickL, target), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
-  const sb = target && target !== baseDay ? sbDay : sb0;
+  const nextDay = sb0.data?.dates && baseDay && baseDay < todayKey ? [...sb0.data.dates].map((x) => x.replace(/-/g, '')).sort().find((x) => x >= todayKey) : null;
+  const sbNext = useQuery(pickL && nextDay ? `board:${pickL}:d${nextDay}` : null, () => getScoreboard(pickL, nextDay), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const sb = sb0;
   const today = day.data?.games || [];
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
   const leagues = LEAGUES.filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
@@ -201,11 +201,17 @@ function Scores() {
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
             <H2>{LEAGUE[pickL].name}</H2>
-            <button className="link" onClick={() => go(`league/${pickL}/scores`)}>{sb0.data?.weeks ? 'All weeks' : 'Calendar'} ›</button>
+            <button className="link" onClick={() => go(`league/${pickL}`)}>Standings ›</button>
           </div>
-          {target && !sb.data.weeks ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{target === todayKey ? 'Today' : `${target > todayKey ? 'Next games' : 'Last played'}: ${dateOf(target).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}`}</p> : null}
+          {baseDay && !sb.data.weeks && baseDay !== todayKey ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{baseDay < todayKey ? 'Last played' : 'Next up'}: {dateOf(baseDay).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p> : null}
           {sb.data.weeks && sb.data.current.week ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</p> : null}
           {sb.data.games.length ? <Board games={sb.data.games} pick="all" favSet={favSet} /> : <Empty>No {LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
+          {nextDay && sbNext.data?.games?.length ? (
+            <>
+              <div className="sechead" style={{ marginTop: 22 }}><H2>{nextDay === todayKey ? 'Today' : `Next: ${dateOf(nextDay).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`}</H2></div>
+              <Board games={sbNext.data.games} pick="all" favSet={favSet} />
+            </>
+          ) : nextDay && sbNext.loading ? <Loading rows={2} /> : null}
         </>
       )}
       {!favs.length && !pickL ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
