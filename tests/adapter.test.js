@@ -248,6 +248,7 @@ test('players: roster, profile with game log and career, search, and no betting 
   assert.equal(p.gamelog.labels.length, 8);
   assert.deepEqual(p.gamelog.spans.map((s) => s.count), [5, 3]);
   assert.equal(p.gamelog.seasons[0].rows.length, 3);
+  assert.equal(p.gamelog.seasons[0].title, '2026');
   assert.equal(p.gamelog.seasons[0].rows[0].opp, 'CLE');
   assert.equal(p.career[0].rows.at(-1).season, '2026');
   assert.equal(p.career[0].rows[0].team, 'CLE'); // earlier season on another team, named from the team list

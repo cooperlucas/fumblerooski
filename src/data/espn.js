@@ -335,6 +335,8 @@ export async function getRoster(lg, teamId) {
   return { lg, teamId: String(teamId), groups };
 }
 
+// Table titles sit in a narrow first column: "Season Averages" -> "Averages", "2026 Regular Season" -> "2026".
+const shortTitle = (t) => cleanText(t).replace(/^Season\s+/i, '').replace(/\s+Regular Season$/i, '').replace(/^Misc(ellaneous)?\s+Totals$/i, 'Misc').replace(/^Regular Season$/i, 'Season');
 function normGamelog(d) {
   const labels = (d?.labels || []).map((l) => cleanText(l));
   const evs = d?.events || {};
@@ -351,13 +353,13 @@ function normGamelog(d) {
       });
     }));
     const tot = st.summary?.stats?.find((x) => Array.isArray(x.stats))?.stats;
-    return { title: cleanText(st.displayName || ''), rows, totals: tot ? tot.map((v) => String(v ?? '')) : null };
+    return { title: shortTitle(st.displayName || ''), rows, totals: tot ? tot.map((v) => String(v ?? '')) : null };
   }).filter((x) => x.rows.length);
   return { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons };
 }
 function normCareer(d) {
   return (d?.categories || []).map((c) => ({
-    key: String(c.name || ''), title: cleanText(c.displayName || c.name || ''),
+    key: String(c.name || ''), title: shortTitle(c.displayName || c.name || ''),
     labels: (c.labels || []).map((l) => cleanText(l)),
     rows: (c.statistics || []).map((x) => ({
       year: Number(x.season?.year) || 0,
