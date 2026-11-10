@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, headlineFor, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
 
 /* ---------- router ---------- */
-const ROOTS = new Set(['', 'scores', 'leagues', 'news']);
+const ROOTS = new Set(['', 'scores', 'leagues']);
 
 export default function App() {
   const parts = useRoute();
@@ -16,7 +16,6 @@ export default function App() {
   if (name === '') body = <Home />;
   else if (name === 'scores') body = <Scores />;
   else if (name === 'leagues') body = <Leagues />;
-  else if (name === 'news') body = <Headlines />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a} lg={a} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = 'scores'; body = <GamePage key={a + b} lg={a} id={b} />; }
@@ -42,9 +41,7 @@ function Home() {
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const today = useDay(0);
-  const yest = useDay(-1);
   const games = useMemo(() => sortGames(today.data?.games || [], favSet), [today.data, favSet]);
-  const stories = useStories(today.data, yest.data, favSet).slice(0, 4);
   const live = games.some((g) => g.state === 'live');
 
   if (today.loading && !today.data) return <Loading rows={5} />;
@@ -96,50 +93,8 @@ function Home() {
         ) : <Empty>No games on the board today.</Empty>}
       </section>
 
-      {stories.length ? (
-        <section className="sec">
-          <div className="sechead"><H2>Headlines</H2><button className="link" onClick={() => go('news')}>All headlines</button></div>
-          <div className="card">{stories.map((s) => <StoryRow key={s.key} s={s} />)}</div>
-        </section>
-      ) : null}
       <Stamp at={today.updatedAt} live={live} />
     </>
-  );
-}
-
-/* ---------- Headlines: written from final scores by template. The AI writer replaces this later. ---------- */
-function useStories(today, yest, favSet) {
-  return useMemo(() => {
-    const out = [];
-    [[today, 'Today'], [yest, 'Yesterday']].forEach(([d, when], di) => (d?.games || []).forEach((g) => {
-      const h = headlineFor(g); if (!h) return;
-      out.push({ key: g.lg + g.id, g, when, title: h.title, score: (isFavGame(g, favSet) ? 100 : 0) + h.weight * 2 - di });
-    }));
-    return out.sort((a, b) => b.score - a.score);
-  }, [today, yest, favSet]);
-}
-function StoryRow({ s }) {
-  const L = LEAGUE[s.g.lg];
-  return (
-    <button className="story" onClick={() => go(`game/${s.g.lg}/${s.g.id}`)}>
-      <span className="tag" style={{ background: L.color }}>{L.short}</span>
-      <span style={{ flex: 1, minWidth: 0 }}><span className="t">{s.title}</span><span className="w">{s.when} · {s.g.statusText || 'Final'}</span></span>
-    </button>
-  );
-}
-function Headlines() {
-  const favs = useFavs();
-  const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const today = useDay(0), yest = useDay(-1);
-  const stories = useStories(today.data, yest.data, favSet);
-  if ((today.loading || yest.loading) && !stories.length) return <Loading />;
-  if (today.error && yest.error && !stories.length) return <Problem error={today.error} retry={() => { today.reload(); yest.reload(); }} />;
-  return (
-    <section className="sec">
-      <H2>Headlines</H2>
-      {stories.length ? <div className="card">{stories.map((s) => <StoryRow key={s.key} s={s} />)}</div> : <Empty>No final scores yet today or yesterday. Headlines show up as games end.</Empty>}
-      <p className="stamp">Headlines are written straight from the final score. Full recaps are coming.</p>
-    </section>
   );
 }
 
@@ -210,6 +165,7 @@ function Leagues() {
 function LeaguePage({ lg }) {
   const L = LEAGUE[lg];
   const [tab, setTab] = useState('standings');
+  const [by, setBy] = useState(null);
   const st = useQuery(`standings:${lg}`, () => getStandings(lg), () => 600000);
   const sb = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
   return (
@@ -223,9 +179,17 @@ function LeaguePage({ lg }) {
           sb.data.games.length ? <div className="card">{sb.data.games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}</div> : <Empty>No {L.short} games on the current slate.</Empty>
       ) : (
         st.loading && !st.data ? <Loading rows={6} /> : st.error && !st.data ? <Problem error={st.error} retry={st.reload} /> :
-          !st.data.groups.length ? <Empty>No standings for {L.name} right now.</Empty> :
-            st.data.groups.map((gr, i) => (
-              <div className="card" key={gr.name + i}>
+          !st.data.groups.length ? <Empty>No standings for {L.name} right now.</Empty> : (() => {
+            const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];
+            const view = views.find((v) => v.id === by) || views[0];
+            return (<>
+            {views.length > 1 ? (
+              <div className="seg sub" role="group" aria-label="Group standings by">
+                {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => setBy(v.id)}>{v.label}</button>)}
+              </div>
+            ) : null}
+            {view.groups.map((gr, i) => (
+              <div className="card" key={view.id + gr.name + i}>
                 <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>{gr.col2Label}</span></div>
                 {gr.rows.map((r, j) => (
                   <button key={r.team.id} className="srow" onClick={() => go(`team/${lg}/${r.team.id}`)}>
@@ -234,7 +198,9 @@ function LeaguePage({ lg }) {
                   </button>
                 ))}
               </div>
-            ))
+            ))}
+            </>);
+          })()
       )}
     </>
   );
@@ -479,7 +445,7 @@ function PlayByPlay({ pbp, game, L }) {
   );
 }
 
-const Pct = ({ label, v }) => { const p = PCT_COLS.has(label) ? pctOf(v, 0) : ''; return p ? <small className="pct"> {p}</small> : null; };
+const Pct = ({ label, v, skip }) => { const p = !skip && PCT_COLS.has(label) ? pctOf(v, 0) : ''; return p ? <small className="pct"> {p}</small> : null; };
 function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];
@@ -502,10 +468,10 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} /></td>)}</tr>
+                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
                   </React.Fragment>
                 ))}
-                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} /></td>)}</tr> : null}
+                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}
               </tbody>
             </table>
           </div>
@@ -602,10 +568,10 @@ function GamePage({ lg, id }) {
                 <section className="sec">
                   <H2>Team Stats</H2>
                   <div className="card pad">
-                    {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1; return (
+                    {d.stats.map((s, i) => { const barC = chartColors(g.away, g.home); const max = Math.max(s.awayN, s.homeN) || 1; return (
                       <div className="statrow" key={s.label}>
                         <div className="lab"><span>{s.label}</span></div>
-                        {[[g.away, s.away, s.awayN, 'var(--teal)', s.awayPct], [g.home, s.home, s.homeN, 'var(--yellow)', s.homePct]].map(([t, v, n, c, pc]) => (
+                        {[[g.away, s.away, s.awayN, barC.away.main, s.awayPct], [g.home, s.home, s.homeN, barC.home.main, s.homePct]].map(([t, v, n, c, pc]) => (
                           <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
                         ))}
                       </div>); })}
@@ -685,7 +651,7 @@ function About() {
       <section className="card pad" style={{ marginTop: 4 }}>
         <p className="prose"><b>Pure sports. No odds. No ads.</b> Scores, standings and schedules for the teams you care about, and nothing that tells you what to bet.</p>
         <p className="prose">Betting lines are stripped out before anything reaches your screen. Your pinned teams are saved on this device only. There are no accounts and no tracking.</p>
-        <p className="prose">Headlines are written straight from the final score. Teams show as colors and abbreviations, not logos.</p>
+        <p className="prose">Teams show as colors and abbreviations, not logos.</p>
       </section>
       <section className="sec">
         <H2>Feed Check</H2>

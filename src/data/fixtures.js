@@ -73,9 +73,9 @@ function scoreboard(lg, dates) {
   return { leagues: [{ season: { type: { name: 'Regular Season' } } }], events: games.map(event) };
 }
 
-function standings(lg) {
+function standings(lg, level) {
   const entry = (r, i) => ({
-    team: { id: r[0], displayName: r[1], shortDisplayName: r[2], abbreviation: r[3], color: r[4], alternateColor: r[5] },
+    team: { id: r[0], displayName: r[1], shortDisplayName: r[2], abbreviation: r[3] }, // like the real feed: no colors here
     stats: [
       { name: 'wins', displayValue: r[6].split('-')[0] }, { name: 'losses', displayValue: r[6].split('-')[1] },
       { name: 'overall', displayValue: r[6], summary: r[6] }, { name: 'streak', displayValue: i % 2 ? 'L1' : 'W3' },
@@ -84,6 +84,11 @@ function standings(lg) {
   });
   const rows = T[lg], half = Math.ceil(rows.length / 2);
   const names = { nfl: ['American Football Conference', 'National Football Conference'], cfb: ['Big Ten Conference', 'Southeastern Conference'], nba: ['Eastern Conference', 'Western Conference'] }[lg];
+  if (level === '3' && lg !== 'cfb') {
+    const divs = lg === 'nfl' ? ['AFC North', 'AFC West', 'NFC North'] : ['Atlantic', 'Central'];
+    const per = Math.ceil(rows.length / divs.length);
+    return { name: lg, children: [{ name: names[0], children: divs.map((d, i) => ({ name: d, standings: { entries: rows.slice(i * per, (i + 1) * per).map(entry) } })) }] };
+  }
   return {
     name: lg, children: [
       { name: names[0], standings: { entries: rows.slice(0, half).map(entry) } },
@@ -200,7 +205,7 @@ export async function demoFetch(u) {
   await new Promise((r) => setTimeout(r, 60));
   if (!lg) return rest.startsWith('scoreboard') ? { events: [], leagues: [] } : rest === 'standings' ? { children: [] } : { sports: [{ leagues: [{ teams: [] }] }] };
   if (rest === 'scoreboard') return scoreboard(lg, searchParams.get('dates'));
-  if (rest === 'standings') return standings(lg);
+  if (rest === 'standings') return standings(lg, searchParams.get('level'));
   if (rest === 'teams') return teamsList(lg);
   if (rest === 'summary') return summary(lg, searchParams.get('event'));
   let t = rest.match(/^teams\/([^/]+)\/schedule$/); if (t) return schedule(lg, t[1]);

@@ -40,7 +40,7 @@ h1, h2, h3, p { margin: 0; }
 .stripes { flex: none; height: 10px; background: linear-gradient(to bottom, var(--teal) 0 2px, transparent 2px 4px, var(--ink) 4px 6px, transparent 6px 8px, var(--purple) 8px 10px); }
 .page { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px max(18px, env(safe-area-inset-right, 0px)) 28px max(18px, env(safe-area-inset-left, 0px)); }
 .enter { animation: frEnter 340ms cubic-bezier(.2, .8, .2, 1) both; }
-.tabs { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--bg); border-top: 1px solid var(--line2); }
+.tabs { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--bg); border-top: 1px solid var(--line2); }
 .tab { height: 54px; border: none; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-weight: 800; font-size: 11px; background: transparent; color: var(--mute); }
 .tab[aria-current="page"] { background: var(--chip); color: var(--yellow); }
 .demo { flex: none; text-align: center; padding: 5px 10px; background: var(--yellow); color: var(--bg); font-size: 11px; font-weight: 900; letter-spacing: 0.08em; }
@@ -113,6 +113,9 @@ h1, h2, h3, p { margin: 0; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--panel2); border: 1px solid var(--line2); border-radius: 14px; }
 .seg button { min-height: 40px; border: none; border-radius: 10px; background: transparent; font-weight: 800; font-size: 13px; color: var(--mute); }
 .seg button[aria-pressed="true"] { background: var(--chip); color: var(--yellow); }
+.seg.sub { margin-top: 10px; background: transparent; border-color: transparent; padding: 0; gap: 8px; }
+.seg.sub button { min-height: 34px; border: 1px solid var(--line2); border-radius: 999px; font-size: 12px; }
+.seg.sub button[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); color: #0C1124; }
 
 /* stories */
 .story { display: flex; gap: 12px; align-items: center; width: 100%; padding: 12px 14px; text-align: left; background: transparent; border: none; }

@@ -53,8 +53,32 @@ export function teamColor(color, alt, seed) {
   return hashColor(seed || 'team');
 }
 
+// Standings and a few other reads leave team colors out, so remember every real color we see
+// (scoreboards, team lists, game pages) and fill the gaps from that. Kept on the device between visits.
+const book = new Map(); // 'lg:id' -> [color, alt]
+let bookLoaded = false, bookTimer = null;
+const hasStore = () => typeof localStorage !== 'undefined';
+function loadBook() {
+  if (bookLoaded) return; bookLoaded = true;
+  if (!hasStore()) return;
+  try { const o = JSON.parse(localStorage.getItem('fr.colors.v1') || '{}'); for (const k of Object.keys(o)) if (!book.has(k)) book.set(k, o[k]); } catch { /* carry on without it */ }
+}
+function learn(key, color, alt) {
+  const old = book.get(key);
+  if (old && old[0] === color && old[1] === alt) return;
+  book.set(key, [color, alt]);
+  if (!hasStore() || bookTimer) return;
+  bookTimer = setTimeout(() => { bookTimer = null; try { localStorage.setItem('fr.colors.v1', JSON.stringify(Object.fromEntries(book))); } catch { /* full or private mode */ } }, 800);
+}
+const knowsColor = (t, lg) => hexOk(t?.color) || (loadBook(), book.has(`${lg}:${t?.id}`));
+
 export function normTeam(t, lg) {
   t = t || {};
+  if (t.id != null) {
+    const key = `${lg}:${t.id}`;
+    if (hexOk(t.color)) learn(key, String(t.color), hexOk(t.alternateColor) ? String(t.alternateColor) : null);
+    else { loadBook(); const k = book.get(key); if (k) t = { ...t, color: k[0], alternateColor: k[1] }; }
+  }
   // Game pages do not send the short name, so build it: schools go by place ("Virginia Tech"), pros by nickname ("Bills").
   const name = t.shortDisplayName || (LEAGUE[lg]?.college ? t.location : t.name) || t.displayName || t.name || t.location || 'TBD';
   const abbr = String(t.abbreviation || name).toUpperCase().slice(0, 4);
@@ -147,9 +171,25 @@ function col2Of(entry, L) {
   }
   return ['STREAK', stat(entry, 'streak')];
 }
-export async function getStandings(lg) {
+// Short names for standings headers: "American Football Conference" does not fit on a phone.
+const GROUP_SHORT = {
+  'american football conference': 'AFC', 'national football conference': 'NFC',
+  'american league': 'AL', 'national league': 'NL',
+  'atlantic coast conference': 'ACC', 'southeastern conference': 'SEC', 'mid-american conference': 'MAC',
+  'american athletic conference': 'American', 'conference usa': 'CUSA', 'fbs independents': 'Independents',
+  'eastern conference': 'East', 'western conference': 'West',
+};
+export function shortGroup(name) {
+  const n = String(name || '').trim();
+  const hit = GROUP_SHORT[n.toLowerCase()];
+  if (hit) return hit;
+  return n.replace(/^American Football Conference/i, 'AFC').replace(/^National Football Conference/i, 'NFC')
+    .replace(/^American League/i, 'AL').replace(/^National League/i, 'NL')
+    .replace(/\s+(Conference|Division)$/i, '');
+}
+
+function standingGroups(data, lg) {
   const L = LEAGUE[lg];
-  const data = await get(url(V2, lg, '/standings'));
   const groups = [];
   const walk = (node) => {
     if (!node || typeof node !== 'object') return;
@@ -160,32 +200,69 @@ export async function getStandings(lg) {
         const [lab, v] = col2Of(e, L); label = lab;
         return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v };
       });
-      groups.push({ name: node.name || node.abbreviation || L.name, col2Label: label, rows });
+      const full = node.name || node.abbreviation || L.name;
+      groups.push({ name: shortGroup(full), full, col2Label: label, rows });
     }
     (node.children || []).forEach(walk);
   };
   walk(data);
-  return { lg, groups };
+  return groups;
+}
+const entryTeams = (node, out = []) => {
+  if (!node || typeof node !== 'object') return out;
+  (node.standings?.entries || []).forEach((e) => out.push(e.team));
+  (node.children || []).forEach((c) => entryTeams(c, out));
+  return out;
+};
+// Pro leagues come grouped by conference; asking one level deeper gives divisions. Offer both when both exist.
+export async function getStandings(lg) {
+  const L = LEAGUE[lg];
+  const [conf, div] = await Promise.allSettled([
+    get(url(V2, lg, '/standings')),
+    L.college ? Promise.reject(new Error('skip')) : get(url(V2, lg, '/standings', { level: '3' })),
+  ]);
+  if (conf.status !== 'fulfilled') throw conf.reason;
+  // Standings rows usually carry no team colors: pull the team list once so the chips are the real colors.
+  if (entryTeams(conf.value).some((t) => !knowsColor(t, lg))) { try { await listTeams(lg); } catch { /* chips fall back */ } }
+  const groups = standingGroups(conf.value, lg);
+  const divisions = div.status === 'fulfilled' ? standingGroups(div.value, lg) : [];
+  const views = divisions.length > groups.length
+    ? [{ id: 'division', label: 'Division', groups: divisions }, { id: 'conference', label: groups.length > 1 ? 'Conference' : 'League', groups }]
+    : [{ id: 'conference', label: 'Conference', groups }];
+  return { lg, groups, views };
 }
 
 /* ---------- teams ---------- */
 // The feed's team list is flaky from browsers (the big-limit request can be refused), so try smaller asks,
 // then fall back to the teams inside standings, which is a read we know works.
 let teamsParams = [{ limit: '1000' }, { limit: '400' }, {}];
+const listMemo = new Map();
+function listTeams(lg) {
+  if (!listMemo.has(lg)) {
+    const p = (async () => {
+      let lastErr = null;
+      for (const params of teamsParams) {
+        try {
+          const data = await get(url(SITE, lg, '/teams', params));
+          const list = data.sports?.[0]?.leagues?.[0]?.teams || data.teams || [];
+          const teams = list.map((x) => normTeam(x.team || x, lg)).filter((t) => t.id);
+          if (teams.length) {
+            teamsParams = [params, ...teamsParams.filter((q) => q !== params)]; // start with what worked next time
+            teams.source = 'team list';
+            return teams;
+          }
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new FeedError('The team list came back empty.', 0);
+    })();
+    listMemo.set(lg, p);
+    p.catch(() => listMemo.delete(lg)); // a failed read can be retried later
+  }
+  return listMemo.get(lg);
+}
 export async function getTeams(lg) {
   let lastErr = null;
-  for (const params of teamsParams) {
-    try {
-      const data = await get(url(SITE, lg, '/teams', params));
-      const list = data.sports?.[0]?.leagues?.[0]?.teams || data.teams || [];
-      const teams = list.map((x) => normTeam(x.team || x, lg)).filter((t) => t.id);
-      if (teams.length) {
-        teamsParams = [params, ...teamsParams.filter((p) => p !== params)]; // start with what worked next time
-        teams.source = 'team list';
-        return teams;
-      }
-    } catch (e) { lastErr = e; }
-  }
+  try { return await listTeams(lg); } catch (e) { lastErr = e; }
   try {
     const seen = new Set();
     const teams = (await getStandings(lg)).groups.flatMap((g) => g.rows.map((r) => r.team)).filter((t) => t.id && !seen.has(t.id) && seen.add(t.id));

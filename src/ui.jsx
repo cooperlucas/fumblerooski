@@ -171,7 +171,6 @@ const TABS = [
   ['', 'Home', <path key="p" d="M4 11 L12 4 L20 11 V20 H14 V14 H10 V20 H4 Z" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />],
   ['scores', 'Scores', <g key="p" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5" strokeWidth="2.2" /><path d="M12 5 V19 M7 10 V14 M15.5 10 H18 V14 H15.5" strokeWidth="2" /></g>],
   ['leagues', 'Leagues', <path key="p" d="M7 4 H17 V9 A5 5 0 0 1 7 9 Z M12 14 V18 M8 20 H16 M7 6 H4 V8 A3 3 0 0 0 7 11 M17 6 H20 V8 A3 3 0 0 1 17 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />],
-  ['news', 'Headlines', <g key="p" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5" /><path d="M8 9 H16 M8 13 H16 M8 17 H13" /></g>],
 ];
 export function TabBar({ active }) {
   return (

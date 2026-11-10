@@ -116,11 +116,11 @@ export function sortGames(games, favSet) {
 
 /* ---------- team search index (cached on the device for a week) ---------- */
 export async function loadAllTeams() {
-  const saved = ls.get('fr.teams.v1', null);
+  const saved = ls.get('fr.teams.v2', null);
   if (!isDemo() && saved && Date.now() - saved.at < 7 * 864e5 && saved.teams?.length) return saved.teams;
   const res = await Promise.allSettled(LEAGUES.map((l) => getTeams(l.id)));
   const teams = res.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   if (!teams.length) throw res[0].reason;
-  if (!isDemo()) ls.set('fr.teams.v1', { at: Date.now(), teams });
+  if (!isDemo()) ls.set('fr.teams.v2', { at: Date.now(), teams });
   return teams;
 }

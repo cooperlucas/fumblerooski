@@ -218,3 +218,18 @@ test('team names on game pages: schools by place, pros by nickname', async () =>
   assert.equal(normTeam({ id: '2', displayName: 'Buffalo Bills', location: 'Buffalo', name: 'Bills', abbreviation: 'BUF' }, 'nfl').name, 'Bills');
   assert.equal(normTeam({ id: '3', displayName: 'Ohio State Buckeyes', shortDisplayName: 'Ohio State', location: 'Ohio State', name: 'Buckeyes' }, 'cfb').full, 'Ohio State Buckeyes');
 });
+
+test('standings: real team colors come from the team list, plus division and conference views', async () => {
+  const { getStandings, shortGroup } = await import('../src/data/espn.js');
+  const s = await getStandings('nfl');
+  const bills = s.groups.flatMap((g) => g.rows).find((r) => r.team.abbr === 'BUF');
+  assert.equal(bills.team.color, '#00338D');
+  assert.deepEqual(s.views.map((v) => v.id), ['division', 'conference']);
+  assert.equal(s.views[0].groups[0].name, 'AFC North');
+  assert.equal(s.groups[0].name, 'AFC');
+  assert.equal(shortGroup('Atlantic Coast Conference'), 'ACC');
+  assert.equal(shortGroup('Big Ten Conference'), 'Big Ten');
+  assert.equal(shortGroup('American League East'), 'AL East');
+  const c = await getStandings('cfb');
+  assert.equal(c.views.length, 1);
+});
