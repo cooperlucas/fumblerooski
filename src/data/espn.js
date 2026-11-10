@@ -492,6 +492,12 @@ export async function getTeamStatsFor(lg, id, season) {
     try {
       const d = await get(`https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}/seasons/${year}/types/2/teams/${encodeURIComponent(id)}/leaders?lang=en&region=us`);
       const skip = /leader$|rating|^PER$|minutes|fouls|offensiveRebounds|defensiveRebounds/i;
+      // Players who have moved on are not on today's roster: look those few up one by one.
+      const ids = [...new Set((d.categories || []).filter((c) => !skip.test(c.name)).flatMap((c) => (c.leaders || []).slice(0, 3).map((l) => /athletes\/(\d+)/.exec(String(l.athlete?.$ref || ''))?.[1]).filter(Boolean)))];
+      await Promise.allSettled(ids.filter((x) => !who.has(x)).slice(0, 30).map(async (x) => {
+        const a = (await get(url(COMMON, lg, `/athletes/${x}`))).athlete || {};
+        if (a.displayName) who.set(x, { id: x, name: cleanText(a.displayName), pos: a.position?.abbreviation || '', jersey: a.jersey ? String(a.jersey) : '' });
+      }));
       leaders = (d.categories || []).filter((c) => !skip.test(c.name)).map((c) => {
         const top = (c.leaders || []).slice(0, 3).map((l) => {
           const pid = /athletes\/(\d+)/.exec(String(l.athlete?.$ref || ''))?.[1] || '';
