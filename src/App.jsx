@@ -289,22 +289,6 @@ function TeamPage({ lg, id }) {
 }
 
 /* ---------- Game ---------- */
-const TIPS = {
-  'Total yards': 'Passing yards plus rushing yards. 100 yards is one full field, so 400 or more in a game is a big day.',
-  'Passing yards': 'Yards gained on completed passes, including whatever the receiver picks up after the catch.',
-  'Rushing yards': 'Yards gained running the ball. Teams that run well keep the clock moving.',
-  '3rd down': 'Conversions out of attempts. Turning 3rd down into a fresh set of downs keeps drives alive. Around 40% is solid.',
-  Turnovers: 'Times a team gave the ball away: interceptions and fumbles in football, bad passes and steals in basketball. Fewer is better.',
-  'Time of possession': 'How long each team had the ball. More time usually means longer drives and a rested defense.',
-  'Field goals': 'Shots made out of shots taken, not counting free throws. Making about half is really good.',
-  '3-pointers': 'Threes made out of threes taken. Hitting 35% or better from deep is solid.',
-  Rebounds: 'Grabbing the ball after a missed shot. More rebounds means more chances to score.',
-  Assists: 'A pass that leads right to a made basket. Lots of assists means the team is sharing the ball.',
-  'Shots on goal': 'Shots that would have gone in if the goalie had not stopped them.',
-  'Power play goals': 'Goals scored with an extra skater, because the other team had someone in the penalty box.',
-  'Faceoffs won': 'Who grabs the puck when the ref drops it to restart play. Winning faceoffs means more time with the puck.',
-  Possession: 'The share of the game each team had the ball.',
-};
 const PERIOD_WORD = { football: 'Q', basketball: 'Q', hockey: 'P', soccer: 'H', baseball: '' };
 
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
@@ -479,17 +463,12 @@ function PlayByPlay({ pbp, game, L }) {
   );
 }
 
-const COL_TIPS = {
-  '+/-': 'Plus/minus: how many points the team outscored the other team by while this player was on the floor.',
-  'C/ATT': 'Completions out of pass attempts.', TGTS: 'Targets: passes thrown to this player.', TFL: 'Tackles for loss.',
-};
 const Pct = ({ label, v }) => { const p = PCT_COLS.has(label) ? pctOf(v, 0) : ''; return p ? <small className="pct"> {p}</small> : null; };
 function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];
   const cur = box[side];
   const hasBench = sport === 'basketball';
-  const tips = [...new Set(cur.groups.flatMap((g) => g.labels))].filter((l) => COL_TIPS[l]);
   const noPm = sport === 'basketball' && cur.groups.length > 0 && !cur.groups.some((g) => g.labels.includes('+/-'));
   return (
     <section className="sec">
@@ -517,7 +496,6 @@ function BoxScore({ box, game, sport }) {
         );
       }) : <Empty>No player stats for {teams[side].name} yet.</Empty>}
       {noPm ? <p className="stamp" style={{ textAlign: 'left' }}>+/- is not available for this game. The feed does not send it for this league, and the play-by-play did not log every substitution, so it could not be counted.</p> : null}
-      {tips.length ? <p className="stamp" style={{ textAlign: 'left' }}>{tips.map((l) => <span key={l} style={{ display: 'block', marginTop: 4 }}><b style={{ color: 'var(--soft)' }}>{l}</b> {COL_TIPS[l]}</span>)}</p> : null}
     </section>
   );
 }
@@ -525,7 +503,6 @@ function BoxScore({ box, game, sport }) {
 function GamePage({ lg, id }) {
   const L = LEAGUE[lg];
   const q = useQuery(`game:${lg}:${id}`, () => getGame(lg, id), (d) => (d?.game?.state === 'live' ? 20000 : d?.game?.state === 'pre' ? 120000 : 0));
-  const [tip, setTip] = useState(null);
   const d = q.data, g = d?.game;
   const title = g ? `${g.away.abbr} at ${g.home.abbr}` : L.name;
   const started = g && (g.state === 'live' || g.state === 'final');
@@ -591,13 +568,12 @@ function GamePage({ lg, id }) {
               <section className="sec">
                 <H2>Team Stats</H2>
                 <div className="card pad">
-                  {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1, open = tip === i, has = !!TIPS[s.label]; return (
+                  {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1; return (
                     <div className="statrow" key={s.label}>
-                      <div className="lab"><span>{s.label}</span>{has ? <button className="q" aria-expanded={open} aria-label={open ? `Hide what ${s.label} means` : `What does ${s.label} mean?`} onClick={() => setTip(open ? null : i)}>?</button> : null}</div>
+                      <div className="lab"><span>{s.label}</span></div>
                       {[[g.away, s.away, s.awayN, 'var(--teal)', s.awayPct], [g.home, s.home, s.homeN, 'var(--yellow)', s.homePct]].map(([t, v, n, c, pc]) => (
                         <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
                       ))}
-                      {open ? <p className="tip">{TIPS[s.label]}</p> : null}
                     </div>); })}
                 </div>
               </section>
