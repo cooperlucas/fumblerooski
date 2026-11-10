@@ -283,6 +283,16 @@ function teamStatsFx(lg) {
     : [{ name: 'passing', totals: [`${2 + (i % 3)},${String(104 + i * 97).slice(-3)}`, String(265.4 - i * 11.2), String(19 - i), String(4 + i)] }, { name: 'rushing', totals: [`1,${String(80 + i * 53).padStart(3, '0')}`, String(131.5 - i * 7), String(12 - i)] }] })) };
 }
 
+/* ---------- polls ---------- */
+function rankingsFx(lg) {
+  const rows = T[lg] || T.cfb;
+  const poll = (id, name, shortName, type, order, pts) => ({ id, name, shortName, type, headline: `${name} Week 11`, occurrence: { displayValue: 'Week 11' },
+    ranks: order.map((k, i) => ({ current: i + 1, previous: [2, 1, 3, 0, 4, 7][i] ?? i + 1, points: pts ? 1550 - i * 61 : 0, firstPlaceVotes: pts && i < 2 ? 40 - i * 25 : 0, recordSummary: `${9 - i}-${i}`, team: { id: rows[k % rows.length][0], location: rows[k % rows.length][2], name: rows[k % rows.length][1], abbreviation: rows[k % rows.length][3] } })),
+    others: pts ? [{ points: 44, team: { id: 'x9', location: 'Demo Tech', abbreviation: 'DT' } }] : [], droppedOut: pts ? [{ team: { id: 'x8', location: 'Slipping State', abbreviation: 'SLIP' } }] : [] });
+  const order = rows.map((_, i) => i);
+  return { rankings: [poll('1', 'AP Top 25', 'AP Poll', 'ap', order, true), poll('2', 'AFCA Coaches Poll', 'Coaches Poll', 'usa', [...order].reverse(), true), poll('21', 'College Football Playoff Rankings', 'CFP Rankings', 'cfp', order, false)].filter((p) => lg === 'cfb' || p.type !== 'cfp') };
+}
+
 export async function demoFetch(u) {
   const { pathname, searchParams } = new URL(u);
   if (pathname.endsWith('/common/v3/search')) return playerSearch(searchParams.get('query'));
@@ -296,6 +306,7 @@ export async function demoFetch(u) {
   if (rest === 'teams') return teamsList(lg);
   if (rest === 'summary') return summary(lg, searchParams.get('event'));
   if (rest === 'leaders') return leadersFx(lg);
+  if (rest === 'rankings') return rankingsFx(lg);
   if (rest === 'statistics/byteam') return teamStatsFx(lg);
   let t = rest.match(/^teams\/([^/]+)\/schedule$/); if (t) return schedule(lg, t[1]);
   if (/^teams\/[^/]+\/roster$/.test(rest)) return roster(lg);

@@ -496,6 +496,34 @@ export async function searchPlayers(text) {
   return out.filter((p) => p.name);
 }
 
+/* ---------- college polls ---------- */
+// Polls in the order fans care about: the Playoff committee when it is out, then AP, then Coaches.
+const POLL_ORDER = (p) => (/playoff|cfp/i.test(p.name + p.type) ? 0 : /\bap\b/i.test(p.name + ' ' + p.type) ? 1 : /coach|usa/i.test(p.name + p.type) ? 2 : 3);
+export async function getRankings(lg) {
+  const d = await get(url(SITE, lg, '/rankings'));
+  const team = (r) => normTeam({ ...(r.team || {}), id: r.team?.id ?? r.id }, lg);
+  const polls = (d.rankings || []).map((p) => ({
+    id: String(p.id ?? p.type ?? p.name ?? ''),
+    name: cleanText(p.shortName || p.name || 'Poll'),
+    full: cleanText(p.name || p.shortName || 'Poll'),
+    type: String(p.type || ''),
+    note: cleanText(p.occurrence?.displayValue || p.headline || ''),
+    ranks: (p.ranks || []).map((r) => {
+      const cur = Number(r.current), prev = Number(r.previous);
+      return {
+        rank: cur, team: team(r),
+        record: String(r.recordSummary || r.team?.record || ''),
+        points: Number(r.points) || 0, firstPlace: Number(r.firstPlaceVotes) || 0,
+        move: !prev ? 'new' : prev === cur ? 0 : prev - cur, // positive = climbed
+      };
+    }).filter((r) => r.rank && r.team.id).sort((a, b) => a.rank - b.rank),
+    others: (p.others || []).map((r) => ({ team: team(r), points: Number(r.points) || 0 })).filter((r) => r.team.id && r.points).sort((a, b) => b.points - a.points),
+    dropped: (p.droppedOut || []).map((r) => team(r)).filter((t) => t.id),
+  })).filter((p) => p.ranks.length);
+  polls.sort((a, b) => POLL_ORDER(a) - POLL_ORDER(b));
+  return { lg, polls };
+}
+
 /* ---------- league stats: leaders and team tables ---------- */
 const SITE3 = 'https://site.api.espn.com/apis/site/v3/sports';
 // Who leads the league in each stat. The feed has moved this around, so try each place it has lived.

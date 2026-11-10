@@ -304,3 +304,14 @@ h1, h2, h3, p { margin: 0; }
 .pbox td.on { color: var(--ink); font-weight: 800; }
 .pbox .who .rk { display: inline-block; width: 28px; color: var(--dim); font-size: 11px; font-weight: 800; }
 .statbar { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+
+/* polls */
+.srow.poll .nm { display: flex; flex-direction: column; min-width: 0; }
+.srow.poll .nm .sub { font-size: 11px; font-weight: 700; color: var(--mute); }
+.mv { flex: none; width: 40px; text-align: right; font-size: 11px; font-weight: 900; color: var(--dim); font-variant-numeric: tabular-nums; }
+.mv.up { color: var(--lime); }
+.mv.dn { color: var(--pink); }
+.mv.new { color: var(--teal); letter-spacing: 0.06em; }
+.srow.poll .pts { flex: none; width: 48px; text-align: right; font-weight: 800; font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.pollnote { margin: 12px 4px 0; font-size: 12px; line-height: 1.5; color: var(--mute); }
+.pollnote b { color: var(--soft); }

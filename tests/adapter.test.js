@@ -335,3 +335,19 @@ test('built-in team colors cover teams the feed has not described yet', async ()
   assert.equal(liveColor({ id: '999002', lg: 'nfl', abbr: 'BUF', name: 'Bills', color: 'hsl(1 55% 38%)' }), '#00338D');
   assert.equal(liveColor({ id: '999003', lg: 'nhl', abbr: 'PHI', name: 'Flyers', color: 'hsl(1 55% 38%)' }), '#F74902');
 });
+
+test('rankings: playoff committee first, movement, votes, others and dropped', async () => {
+  const { getRankings } = await import('../src/data/espn.js');
+  const r = await getRankings('cfb');
+  assert.deepEqual(r.polls.map((p) => p.name), ['CFP Rankings', 'AP Poll', 'Coaches Poll']);
+  const ap = r.polls[1];
+  assert.equal(ap.ranks[0].rank, 1);
+  assert.equal(ap.ranks[0].move, 1);   // was 2, now 1
+  assert.equal(ap.ranks[1].move, -1);  // was 1, now 2
+  assert.equal(ap.ranks[2].move, 0);
+  assert.equal(ap.ranks[3].move, 'new');
+  assert.equal(ap.ranks[0].firstPlace, 40);
+  assert.equal(ap.others[0].points, 44);
+  assert.equal(ap.dropped.length, 1);
+  assert.deepEqual((await getRankings('ncaam')).polls, []); // no polls in the feed: empty, not an error
+});

@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -206,9 +206,10 @@ function LeaguePage({ lg, focus }) {
     <>
       <div className="seg" role="group" aria-label="View">
         <button aria-pressed={tab === 'standings'} onClick={() => setTab('standings')}>Standings</button>
+        {L.college ? <button aria-pressed={tab === 'rankings'} onClick={() => setTab('rankings')}>Rankings</button> : null}
         <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Scores</button>
       </div>
-      {tab === 'scores' ? (
+      {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? (
         sb.loading && !sb.data ? <Loading /> : sb.error && !sb.data ? <Problem error={sb.error} retry={sb.reload} /> :
           sb.data.games.length ? <div className="card">{sb.data.games.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}</div> : <Empty>No {L.short} games on the current slate.</Empty>
       ) : (
@@ -241,6 +242,42 @@ function LeaguePage({ lg, focus }) {
             </>);
           })()
       )}
+    </>
+  );
+}
+
+/* ---------- College polls ---------- */
+function Rankings({ lg, focus }) {
+  const q = useQuery(`rankings:${lg}`, () => getRankings(lg), () => 1800000);
+  const [pid, setPid] = useState(null);
+  if (q.loading && !q.data) return <Loading rows={8} />;
+  if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
+  const polls = q.data.polls;
+  if (!polls.length) return <Empty>No polls out for {LEAGUE[lg].name} right now.</Empty>;
+  const p = polls.find((x) => x.id === pid) || polls[0];
+  const hasPts = p.ranks.some((r) => r.points);
+  const move = (m) => (m === 'new' ? <span className="mv new">NEW</span> : m > 0 ? <span className="mv up">▲{m}</span> : m < 0 ? <span className="mv dn">▼{-m}</span> : <span className="mv">–</span>);
+  return (
+    <>
+      <div className="sechead" style={{ marginTop: 14 }}>
+        <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{p.note}</span>
+        {polls.length > 1 ? <Picker label="Poll" value={p.id} onChange={setPid}>{polls.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Picker> : <b className="ptitle">{p.name}</b>}
+      </div>
+      <div className="card" style={{ marginTop: 10 }}>
+        <div className="shead"><span className="nm">{p.full}</span><span>{hasPts ? 'PTS' : ''}</span></div>
+        {p.ranks.map((r) => (
+          <button key={r.team.id} className={'srow poll' + (String(focus) === r.team.id ? ' me' : '')} onClick={() => go(`team/${lg}/${r.team.id}`)}>
+            <span className="pos">{r.rank}</span>
+            <Blob team={r.team} />
+            <span className="nm">{r.team.name}<span className="sub">{[r.record, r.firstPlace ? `${r.firstPlace} first-place ${r.firstPlace === 1 ? 'vote' : 'votes'}` : ''].filter(Boolean).join(' · ')}</span></span>
+            {move(r.move)}
+            {hasPts ? <span className="pts">{r.points.toLocaleString('en-US')}</span> : null}
+          </button>
+        ))}
+      </div>
+      {p.others.length ? <p className="pollnote"><b>Others receiving votes:</b> {p.others.map((o) => `${o.team.name} ${o.points}`).join(', ')}</p> : null}
+      {p.dropped.length ? <p className="pollnote"><b>Dropped out:</b> {p.dropped.map((t) => t.name).join(', ')}</p> : null}
+      <Stamp at={q.updatedAt} />
     </>
   );
 }
@@ -977,6 +1014,7 @@ function About() {
     if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
     else push('Team page', false, 'No team to test with');
     try { const r = await listTeams('cfb'); push('Team colors', r.length > 0, `${r.length} college football teams with colors`); } catch (e) { push('Team colors', true, 'Using the colors built into the app (the feed\'s team list did not load, which is fine)'); }
+    try { const r = await getRankings('cfb'); push('Rankings', r.polls.length > 0, r.polls.map((p) => p.name).join(', ') || 'No polls'); } catch (e) { push('Rankings', false, e.message); }
     try { const r = await getLeaders('nfl'); push('League leaders', r.cats.length > 0, `${r.cats.length} stat categories`); } catch (e) { push('League leaders', false, e.message); }
     try { const r = await getTeamStats('nfl'); push('Team stats', r.cats.length > 0 && r.teams.length > 0, `${r.teams.length} teams, ${r.cats.length} stat groups`); } catch (e) { push('Team stats', false, e.message); }
     let playerId = null;
