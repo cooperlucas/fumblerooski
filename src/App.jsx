@@ -563,7 +563,7 @@ function LeaderCard({ lg, c, f }) {
           <span className="pos">{place[i]}</span>
           {r.team ? <Blob team={r.team} /> : null}
           <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
-          <span className="v">{r.value}</span>
+          <span className="v">{pct1(c.title, r.value)}</span>
         </button>
       ))}
       {(list.length > 5 || (deepOk && !wantDeep)) && !(loadingDeep && f) ? (
@@ -612,7 +612,7 @@ function TeamStats({ lg }) {
             {rows.map((t, i) => (
               <tr key={t.team.id} className="tap" onClick={() => go(`team/${lg}/${t.team.id}`)}>
                 <th scope="row" className="who"><span className="rk">{place[i]}</span>{t.team.name}</th>
-                {cat.labels.map((_, j) => <td key={j} className={sort.col === j ? 'on' : undefined}>{t.stats[cat.key][j] ?? ''}</td>)}
+                {cat.labels.map((_, j) => <td key={j} className={sort.col === j ? 'on' : undefined}>{pct1(cat.labels[j], t.stats[cat.key][j] ?? '')}</td>)}
               </tr>
             ))}
           </tbody>
@@ -743,7 +743,7 @@ function TeamSeason({ lg, id, season, team }) {
               <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}`)}>
                 <span className="jersey" style={{ width: 30, height: 30, fontSize: 12, background: team.color, color: inkOn(team.color) }}>{r.jersey || '·'}</span>
                 <span className="nm">{i === 0 ? <small className="lcat">{c.title}</small> : null}{r.name}{r.pos ? <small> {r.pos}</small> : null}{i === 0 && r.detail && r.detail !== r.value ? <small className="ldet">{r.detail}</small> : null}</span>
-                <span className="v">{r.value}</span>
+                <span className="v">{pct1(c.title, r.value)}</span>
                 {i === 0 && c.rows.length > 1 ? <span className="lmore" role="button" aria-label={open[c.key] ? 'Show fewer' : 'Show the next two'} onClick={(e) => { e.stopPropagation(); setOpen({ ...open, [c.key]: !open[c.key] }); }}>{open[c.key] ? '▴' : '▾'}</span> : <span className="lmore" />}
               </button>
             )))}
@@ -753,12 +753,21 @@ function TeamSeason({ lg, id, season, team }) {
       {groups.map((g) => (
         <div className="card pad" key={g.title} style={{ marginTop: 12 }}>
           <div className="ptitle">{g.title}</div>
-          <div className="kv">{g.items.map((x) => <div key={x.label}><span>{x.label}</span><b>{x.value}</b>{x.rank ? <em className="krank">{ordinal(x.rank)}</em> : null}</div>)}</div>
+          <div className="kv">{g.items.map((x) => <div key={x.label}><span>{x.label}</span><b>{pct1(x.label, x.value)}</b>{x.rank ? <em className="krank">{ordinal(x.rank)}</em> : null}</div>)}</div>
         </div>
       ))}
     </>
   );
 }
+
+/* ---------- percentages: one decimal everywhere (57 -> 57.0, 73.333 -> 73.3) ---------- */
+// Win percentages and save percentages written as .700 / .945 are left as they are.
+const isPctLabel = (l) => /%|pct|percent/i.test(String(l || ''));
+const pct1 = (label, v) => {
+  const t = String(v ?? '').trim();
+  if (!isPctLabel(label) || !/^-?\d+(\.\d+)?%?$/.test(t)) return v;
+  return Number(t.replace('%', '')).toFixed(1) + (t.endsWith('%') ? '%' : '');
+};
 
 /* ---------- Player ---------- */
 const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };
@@ -793,11 +802,11 @@ function PlayerPage({ lg, id }) {
 
             {tab === 'season' ? (
               <>
-                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{x.value}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
+                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
                     <div className="ptitle">{c.row.season} {c.title}</div>
-                    <div className="kv">{c.labels.map((l, i) => <div key={i}><span>{l}</span><b>{c.row.stats[i] ?? ''}</b></div>)}</div>
+                    <div className="kv">{c.labels.map((l, i) => <div key={i}><span>{l}</span><b>{pct1(l, c.row.stats[i] ?? '')}</b></div>)}</div>
                   </div>
                 ))}
                 {!d.summary.items.length && !season.length ? <Empty>{d.missing.career ? 'Season stats did not load. Try again in a bit.' : 'No stats on record for this season.'}</Empty> : null}
@@ -816,10 +825,10 @@ function PlayerPage({ lg, id }) {
                       {sn.rows.map((r) => (
                         <tr key={r.id} className="tap" onClick={() => go(`game/${lg}/${r.id}`)}>
                           <th scope="row" className="who">{[fmtShort(r.date), r.at, r.opp].filter(Boolean).join(' ')}<small className={'res ' + (r.result === 'W' ? 'w' : '')}>{[r.result, r.score].filter(Boolean).join(' ')}</small></th>
-                          {log.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}
+                          {log.labels.map((l, j) => <td key={j}>{pct1(l, r.stats[j] ?? '')}</td>)}
                         </tr>
                       ))}
-                      {sn.totals ? <tr className="tot"><th scope="row" className="who">Total</th>{log.labels.map((_, j) => <td key={j}>{sn.totals[j] ?? ''}</td>)}</tr> : null}
+                      {sn.totals ? <tr className="tot"><th scope="row" className="who">Total</th>{log.labels.map((l, j) => <td key={j}>{pct1(l, sn.totals[j] ?? '')}</td>)}</tr> : null}
                     </tbody>
                   </table>
                 </div>
@@ -832,8 +841,8 @@ function PlayerPage({ lg, id }) {
                   <table>
                     <thead><tr><th scope="col" className="who">{c.title}</th>{c.labels.map((l, i) => <th scope="col" key={i}>{l}</th>)}</tr></thead>
                     <tbody>
-                      {c.rows.map((r, i) => <tr key={r.season + r.team + i}><th scope="row" className="who">{r.season}{r.team && r.team !== p.team?.abbr ? <small className="was"> {r.team}</small> : null}</th>{c.labels.map((_, j) => <td key={j}>{r.stats[j] ?? ''}</td>)}</tr>)}
-                      {c.totals ? <tr className="tot"><th scope="row" className="who">Career</th>{c.labels.map((_, j) => <td key={j}>{c.totals[j] ?? ''}</td>)}</tr> : null}
+                      {c.rows.map((r, i) => <tr key={r.season + r.team + i}><th scope="row" className="who">{r.season}{r.team && r.team !== p.team?.abbr ? <small className="was"> {r.team}</small> : null}</th>{c.labels.map((l, j) => <td key={j}>{pct1(l, r.stats[j] ?? '')}</td>)}</tr>)}
+                      {c.totals ? <tr className="tot"><th scope="row" className="who">Career</th>{c.labels.map((l, j) => <td key={j}>{pct1(l, c.totals[j] ?? '')}</td>)}</tr> : null}
                     </tbody>
                   </table>
                 </div>
@@ -1159,7 +1168,7 @@ function PlayByPlay({ pbp, game, L }) {
   );
 }
 
-const Pct = ({ label, v, skip }) => { const p = !skip && PCT_COLS.has(label) ? pctOf(v, 0) : ''; return p ? <small className="pct"> {p}</small> : null; };
+const Pct = ({ label, v, skip }) => { const p = !skip && PCT_COLS.has(label) ? pctOf(v, 1) : ''; return p ? <small className="pct"> {p}</small> : null; };
 function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];
@@ -1183,10 +1192,10 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.id && linkPlayers ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
+                    <tr><th scope="row" className="who">{r.id && linkPlayers ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{pct1(gr.labels[j], v)}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
                   </React.Fragment>
                 ))}
-                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}
+                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{pct1(gr.labels[j], v)}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}
               </tbody>
             </table>
           </div>
@@ -1291,7 +1300,7 @@ function GamePage({ lg, id }) {
                       <div className="statrow" key={s.label}>
                         <div className="lab"><span>{s.label}</span></div>
                         {[[g.away, s.away, s.awayN, barC.away.main, s.awayPct], [g.home, s.home, s.homeN, barC.home.main, s.homePct]].map(([t, v, n, c, pc]) => (
-                          <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
+                          <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{pct1(s.label, v)}{pc ? <small> {pc}</small> : null}</span></div>
                         ))}
                       </div>); })}
                   </div>

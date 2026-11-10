@@ -1192,7 +1192,7 @@ function normPreview(data, game, lg) {
     const h = H.find((x) => x.name === s.name);
     if (!h) return null;
     const pct = /pct|percent/i.test(s.name);
-    return { key: s.name, label: short(s.label || s.displayName || s.name), away: String(s.displayValue ?? '') + (pct ? '%' : ''), home: String(h.displayValue ?? '') + (pct ? '%' : ''),
+    return { key: s.name, label: short(s.label || s.displayName || s.name), away: pct ? `${Number(s.displayValue).toFixed(1)}%` : String(s.displayValue ?? ''), home: pct ? `${Number(h.displayValue).toFixed(1)}%` : String(h.displayValue ?? ''),
       awayN: num(s.displayValue), homeN: num(h.displayValue), pct, lowerBetter: /against|allowed|turnover/i.test(s.name + ' ' + (s.label || '')) };
   }).filter((r) => r && r.awayN != null && r.homeN != null && (r.awayN || r.homeN) && !/^team turnovers$/i.test(r.label));
   compare.sort((a, b) => a.lowerBetter - b.lowerBetter); // offense first, then what they give up
