@@ -330,7 +330,10 @@ function LeaguePage({ lg, focus }) {
   const divs = DIVISIONS[lg] || [];
   const [div, setDiv] = useSticky('div', divs[0]?.id);
   const [hunting, setHunting] = useSticky('hunting', !!focus && divs.length > 1);
-  const st = useQuery(`standings:${lg}${divs.length ? ':' + div : ''}`, () => getStandings(lg, div), () => 600000);
+  const [yr, setYr] = useSticky('yr', null); // null = this season
+  const [conf, setConf] = useSticky('conf', 'all');
+  const st = useQuery(`standings:${lg}${divs.length ? ':' + div : ''}${yr ? ':' + yr : ''}`, () => getStandings(lg, div, yr), () => 600000);
+  const seasonsQ = useQuery(`standings:${lg}${divs.length ? ':' + divs[0].id : ''}`, () => getStandings(lg, divs[0]?.id), () => 600000); // the year list
   // From a team page: if the team is not in this division, step down the divisions until we find it.
   useEffect(() => {
     if (!hunting || !st.data) return;
@@ -338,12 +341,17 @@ function LeaguePage({ lg, focus }) {
     const i = divs.findIndex((d) => d.id === div);
     if (i >= 0 && i < divs.length - 1) setDiv(divs[i + 1].id); else { setDiv(divs[0].id); setHunting(false); }
   }, [hunting, st.data, div]);
-  const divPicker = divs.length > 1 ? (
-    <div className="sechead" style={{ marginTop: 14 }}>
-      <span />
-      <Picker label="Division" value={div} onChange={(v) => { setHunting(false); setAll(true); setDiv(v); }}>{divs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</Picker>
+  const seasons = seasonsQ.data?.seasons || st.data?.seasons || [];
+  const curView = st.data?.views?.find((v) => v.id === by) || st.data?.views?.[0];
+  const confGroups = curView?.groups || st.data?.groups || [];
+  const confNames = confGroups.length > 1 ? confGroups.map((g) => g.name) : [];
+  const divPicker = (
+    <div className="filters">
+      {divs.length > 1 ? <Picker label="Division" value={div} onChange={(v) => { setHunting(false); setAll(true); setConf('all'); setDiv(v); }}>{divs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</Picker> : null}
+      {confNames.length ? <Picker label="Conference" value={confNames.includes(conf) ? conf : 'all'} onChange={(v) => { setAll(true); setConf(v); }}><option value="all">All {L.college || curView?.id === 'conference' && curView?.label === 'Conference' ? 'conferences' : curView?.id === 'division' ? 'divisions' : 'teams'}</option>{confNames.map((n) => <option key={n} value={n}>{n}</option>)}</Picker> : null}
+      {seasons.length > 1 ? <Picker label="Season" value={String(yr || seasons[0].year)} onChange={(v) => { setHunting(false); setAll(true); setYr(Number(v) === seasons[0].year ? null : Number(v)); }}>{seasons.map((x) => <option key={x.year} value={x.year}>{x.label}</option>)}</Picker> : null}
     </div>
-  ) : null;
+  );
   useEffect(() => {
     if (!st.data) return;
     const groups = [...st.data.groups].sort((x, y) => y.rows.some((r) => r.team.id === String(focus)) - x.rows.some((r) => r.team.id === String(focus)));
@@ -364,12 +372,13 @@ function LeaguePage({ lg, focus }) {
             // Coming from a team page: show just that team's group, with the team lit up.
             const has = (gr) => gr.rows.some((r) => r.team.id === String(focus));
             const mine = focus && !all ? view.groups.filter(has) : [];
-            const shown = mine.length ? mine : view.groups;
+            const picked = conf !== 'all' && view.groups.some((g) => g.name === conf) ? view.groups.filter((g) => g.name === conf) : null;
+            const shown = picked || (mine.length ? mine : view.groups);
             return (<>
             {divPicker}
             {views.length > 1 ? (
               <div className="seg sub" role="group" aria-label="Group standings by">
-                {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => setBy(v.id)}>{v.label}</button>)}
+                {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => { setConf('all'); setBy(v.id); }}>{v.label}</button>)}
               </div>
             ) : null}
             {shown.map((gr, i) => (

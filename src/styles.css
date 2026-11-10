@@ -380,3 +380,5 @@ button.pick.date { cursor: pointer; }
 .cday.on .gdot { background: var(--bg); }
 .lghead .link { font-size: 12px; }
 .lghead .link { margin-left: auto; }
+.filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.filters .pick select { max-width: 46vw; text-overflow: ellipsis; }
