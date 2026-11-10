@@ -282,12 +282,13 @@ function Leaders({ lg }) {
     <>
       {q.data.cats.map((c) => {
         const rows = open[c.key] ? c.rows : c.rows.slice(0, 5);
+        const place = places(c.rows.map((r) => r.value));
         return (
           <div className="card" key={c.key} style={{ marginTop: 12 }}>
             <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
             {rows.map((r, i) => (
               <button key={i} className={'lead' + (i === 0 ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
-                <span className="pos">{i + 1}</span>
+                <span className="pos">{place[i]}</span>
                 {r.team ? <Blob team={r.team} /> : null}
                 <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
                 <span className="v">{r.value}</span>
@@ -301,6 +302,15 @@ function Leaders({ lg }) {
     </>
   );
 }
+// Places with ties shown the sports way: 1, 2, T3, T3, 5. Equal values share the first place they reach.
+function places(values) {
+  const key = (v) => String(v).replace(/,/g, '').trim();
+  return values.map((v, i) => {
+    let first = i; while (first > 0 && key(values[first - 1]) === key(v)) first--;
+    const tied = (first < i) || (i + 1 < values.length && key(values[i + 1]) === key(v));
+    return (tied ? 'T' : '') + (first + 1);
+  });
+}
 const numOf = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : -Infinity; };
 function TeamStats({ lg }) {
   const q = useQuery(`teamstats:${lg}`, () => getTeamStats(lg), () => 600000);
@@ -313,6 +323,7 @@ function TeamStats({ lg }) {
   if (!cats.length) return <Empty>No team stats listed for {LEAGUE[lg].name} right now.</Empty>;
   const cat = cats.find((c) => c.key === catKey) || cats[0];
   const rows = q.data.teams.filter((t) => t.stats[cat.key]).sort((a, b) => (numOf(b.stats[cat.key][sort.col]) - numOf(a.stats[cat.key][sort.col])) * -sort.dir || a.team.name.localeCompare(b.team.name));
+  const place = places(rows.map((t) => t.stats[cat.key][sort.col] ?? ''));
   const pickCol = (i) => setSort(sort.col === i ? { col: i, dir: -sort.dir } : { col: i, dir: -1 });
   return (
     <>
@@ -326,7 +337,7 @@ function TeamStats({ lg }) {
           <tbody>
             {rows.map((t, i) => (
               <tr key={t.team.id} className="tap" onClick={() => go(`team/${lg}/${t.team.id}`)}>
-                <th scope="row" className="who"><span className="rk">{i + 1}</span>{t.team.name}</th>
+                <th scope="row" className="who"><span className="rk">{place[i]}</span>{t.team.name}</th>
                 {cat.labels.map((_, j) => <td key={j} className={sort.col === j ? 'on' : undefined}>{t.stats[cat.key][j] ?? ''}</td>)}
               </tr>
             ))}
