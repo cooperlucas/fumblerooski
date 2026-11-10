@@ -622,7 +622,7 @@ export async function getLeaders(lg) {
   let lastErr = null;
   for (const [base, path] of tries) {
     try {
-      const d = await get(url(base, lg, path));
+      const d = await get(url(base, lg, path, { limit: '100' })); // ask for deep lists so the screen can filter and page
       const raw = d.leaders?.categories || d.categories || d.stats || d.leaders || [];
       const cats = (Array.isArray(raw) ? raw : []).map((c) => ({
         key: String(c.name || c.abbreviation || c.displayName || ''),

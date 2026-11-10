@@ -339,20 +339,57 @@ function Stats({ start }) {
     </>
   );
 }
+// Leader filters: conference groupings from the standings, plus the usual college buckets.
+const POWER = { cfb: ['acc', 'big ten', 'big 12', 'sec'], ncaam: ['acc', 'big ten', 'big 12', 'sec', 'big east'], ncaaw: ['acc', 'big ten', 'big 12', 'sec', 'big east'] };
+const isPower = (lg, name) => (POWER[lg] || []).includes(String(name).toLowerCase());
+function useLeaderFilters(lg) {
+  const st = useQuery(`standings:${lg}${DIVISIONS[lg] ? ':' + DIVISIONS[lg][0].id : ''}`, () => getStandings(lg, DIVISIONS[lg]?.[0]?.id), () => 600000);
+  return useMemo(() => {
+    const groups = st.data?.groups || [];
+    if (!groups.length) return [];
+    const ids = (gs) => new Set(gs.flatMap((g) => g.rows.map((r) => r.team.id)));
+    const out = [];
+    if (POWER[lg]) {
+      const p = groups.filter((g) => isPower(lg, g.name));
+      const rest = groups.filter((g) => !isPower(lg, g.name) && !/independ/i.test(g.name));
+      if (p.length) out.push({ id: 'power', label: lg === 'cfb' ? 'Power 4' : 'Power conferences', ids: ids(p) });
+      if (lg === 'cfb' && rest.length) out.push({ id: 'g6', label: 'Group of 6', ids: ids(rest) });
+      if (lg !== 'cfb' && rest.length) out.push({ id: 'mid', label: 'Mid-majors', ids: ids(rest) });
+    }
+    groups.forEach((g) => out.push({ id: 'g:' + g.name, label: g.name, ids: ids([g]) }));
+    return out;
+  }, [lg, st.data]);
+}
 function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
-  const [open, setOpen] = useState({});
+  const filters = useLeaderFilters(lg);
+  const [fid, setFid] = useState('all');
+  const [shown, setShown] = useState({});
   if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
   if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
+  const f = filters.find((x) => x.id === fid);
+  const pickFilter = (v) => { setFid(v); setShown({}); };
   return (
     <>
+      {filters.length ? (
+        <div className="sechead" style={{ marginTop: 12 }}>
+          <span />
+          <Picker label="Filter leaders" value={fid} onChange={pickFilter}>
+            <option value="all">{lg === 'cfb' ? 'All FBS' : LEAGUE[lg].college ? 'All Division I' : `All ${LEAGUE[lg].short}`}</option>
+            {filters.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+          </Picker>
+        </div>
+      ) : null}
       {q.data.cats.map((c) => {
-        const rows = open[c.key] ? c.rows : c.rows.slice(0, 5);
-        const place = places(c.rows.map((r) => r.value));
+        const list = f ? c.rows.filter((r) => r.team && f.ids.has(r.team.id)) : c.rows;
+        const n = shown[c.key] || 5;
+        const rows = list.slice(0, n);
+        const place = places(list.map((r) => r.value));
         return (
           <div className="card" key={c.key} style={{ marginTop: 12 }}>
             <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
+            {!rows.length ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>No one from {f?.label} in this list.</span></div> : null}
             {rows.map((r, i) => (
               <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
                 <span className="pos">{place[i]}</span>
@@ -361,7 +398,13 @@ function Leaders({ lg }) {
                 <span className="v">{r.value}</span>
               </button>
             ))}
-            {c.rows.length > 5 ? <button className="lead" style={{ justifyContent: 'center' }} onClick={() => setOpen({ ...open, [c.key]: !open[c.key] })}><span className="link">{open[c.key] ? 'Show fewer' : `Show all ${c.rows.length}`}</span></button> : null}
+            {list.length > 5 ? (
+              <div className="morebar">
+                {n < list.length ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: n + 25 })}>Show {Math.min(25, list.length - n)} more</button> : null}
+                {n < list.length && list.length - n > 25 ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: list.length })}>All {list.length}</button> : null}
+                {n > 5 ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: 5 })}>Show fewer</button> : null}
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -1058,7 +1101,7 @@ function About() {
     try { const r = await listTeams('cfb'); push('Team colors', r.length > 0, `${r.length} college football teams with colors`); } catch (e) { push('Team colors', true, 'Using the colors built into the app (the feed\'s team list did not load, which is fine)'); }
     try { const got = []; for (const d of DIVISIONS.cfb.slice(1)) { const r = await getStandings('cfb', d.id); if (r.groups.length) got.push(`${d.label} ${r.groups.reduce((n, g) => n + g.rows.length, 0)}`); } push('College divisions', got.length > 0, got.join(', ') || 'Only FBS came back'); } catch (e) { push('College divisions', false, e.message); }
     try { const r = await getRankings('cfb'); push('Rankings', r.polls.some((p) => p.type === 'cfp'), r.polls.map((p) => `${p.name} (wk ${p.week || '?'})`).join(', ') || 'No polls'); } catch (e) { push('Rankings', false, e.message); }
-    try { const r = await getLeaders('nfl'); push('League leaders', r.cats.length > 0, `${r.cats.length} stat categories`); } catch (e) { push('League leaders', false, e.message); }
+    try { const r = await getLeaders('nfl'); push('League leaders', r.cats.length > 0, `${r.cats.length} stat categories, up to ${Math.max(0, ...r.cats.map((c) => c.rows.length))} players deep`); } catch (e) { push('League leaders', false, e.message); }
     try { const r = await getTeamStats('nfl'); push('Team stats', r.cats.length > 0 && r.teams.length > 0, `${r.teams.length} teams, ${r.cats.length} stat groups`); } catch (e) { push('Team stats', false, e.message); }
     let playerId = null;
     if (teamId) { try { const r = await getRoster('nfl', teamId); const n = r.groups.reduce((k, g) => k + g.players.length, 0); playerId = r.groups[0]?.players[0]?.id; push('Roster', n > 0, `${n} players`); } catch (e) { push('Roster', false, e.message); } }
