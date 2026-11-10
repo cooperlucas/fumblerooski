@@ -1000,6 +1000,39 @@ export function normShots(rawPlays) {
   })).filter((sh) => sh.teamId && Number.isFinite(sh.x) && Number.isFinite(sh.y) && sh.x >= -2 && sh.x <= 52 && sh.y >= -6 && sh.y <= 95);
 }
 
+/* ---------- soccer shots on the pitch ---------- */
+// The feed's commentary tags each shot with where it was struck: x 0..100 toward the goal being attacked, y 0..100 across.
+// Away attacks the right goal and home the left, so the two sides never overlap.
+const PITCH_KIND = (t) => (/^goal\b|own goal|penalty - scored/i.test(t) ? 'goal' : /penalty - (saved|missed)/i.test(t) ? (/saved/i.test(t) ? 'save' : 'miss') : /on target/i.test(t) ? 'save' : /woodwork|post|bar/i.test(t) ? 'post' : /block/i.test(t) ? 'block' : /off target|miss/i.test(t) ? 'miss' : null);
+export function normPitch(data, game) {
+  const src = (data.commentary || []).map((c) => c.play).filter(Boolean);
+  const plays = src.length ? src : (data.keyEvents || []);
+  const sideOf = (team) => {
+    const id = String(team?.id ?? ''), nm = String(team?.displayName || team?.name || '').toLowerCase();
+    for (const [side, t] of [['away', game.away], ['home', game.home]]) {
+      if (id && id === t.id) return side;
+      const names = [t.full, t.name, t.short].filter(Boolean).map((x) => String(x).toLowerCase());
+      if (nm && names.some((n) => n && (nm === n || nm.startsWith(n) || n.startsWith(nm)))) return side;
+    }
+    return null;
+  };
+  const seen = new Set();
+  return plays.map((p) => {
+    const kind = PITCH_KIND(String(p.type?.text || ''));
+    const x = Number(p.fieldPositionX), y = Number(p.fieldPositionY);
+    const side = sideOf(p.team);
+    if (!kind || !side || !Number.isFinite(x) || !Number.isFinite(y) || p.shootout) return null;
+    const key = `${kind}:${x}:${y}:${p.period?.number}`;
+    if (seen.has(key)) return null; seen.add(key);
+    const away = side === 'away';
+    return {
+      kind, side, teamId: away ? game.away.id : game.home.id, period: p.period?.number || 0, clock: p.clock?.displayValue || '',
+      x: away ? x : 100 - x, y: away ? y : 100 - y,
+      who: cleanText(p.participants?.[0]?.athlete?.displayName || ''), text: cleanText(p.text || ''),
+    };
+  }).filter(Boolean);
+}
+
 /* ---------- hockey shots on the rink ---------- */
 // Rink in feet, measured from center ice: x -100..100 (goal to goal), y -42.5..42.5.
 // Teams swap ends every period, so each team's shots are turned to face one goal: away shoots right, home shoots left.
@@ -1124,6 +1157,7 @@ export async function getGame(lg, id) {
     drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
     shots: L.sport === 'basketball' ? normShots(data.plays) : [],
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
+    pitch: L.sport === 'soccer' ? normPitch(data, game) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),
     preview: started ? null : normPreview(data, game, lg),

@@ -969,6 +969,70 @@ export function IceChart({ ice, game }) {
   );
 }
 
+/* ---------- soccer: every shot on the pitch. Away attacks right, home attacks left. ---------- */
+const PITCH_KINDS = [['goal', 'Goal'], ['save', 'Saved'], ['miss', 'Off target'], ['block', 'Blocked'], ['post', 'Woodwork']];
+function PitchChart({ shots, game }) {
+  const [per, setPer] = useState(0);
+  const [off, setOff] = useState({}); // kinds switched off
+  const cc = chartColors(game.away, game.home);
+  const col = (side) => (side === 'away' ? cc.away.main : cc.home.main);
+  const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const shown = shots.filter((s) => (!per || s.period === per) && !off[s.kind]);
+  const K = 4, W = 105 * K, H = 68 * K;
+  const X = (v) => (v / 100) * W, Y = (v) => (v / 100) * H;
+  const n = (side, kind) => shots.filter((s) => s.side === side && (!per || s.period === per) && (!kind || s.kind === kind || (kind === 'on' && (s.kind === 'goal' || s.kind === 'save')))).length;
+  const box = (x, w, h) => <rect x={x} y={(H - h * K) / 2} width={w * K} height={h * K} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />;
+  const mark = (s, i) => {
+    const x = X(s.x), y = Y(s.y), c = col(s.side);
+    if (s.kind === 'goal') return <g key={i}><circle cx={x} cy={y} r="8" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" /><circle cx={x} cy={y} r="3" fill="#0C1124" /></g>;
+    if (s.kind === 'save') return <circle key={i} cx={x} cy={y} r="6" fill={c} stroke="#fff" strokeWidth="1.8" />;
+    if (s.kind === 'post') return <rect key={i} x={x - 5} y={y - 5} width="10" height="10" fill="#fff" stroke={c} strokeWidth="2.4" transform={`rotate(45 ${x} ${y})`} />;
+    if (s.kind === 'block') return <g key={i}><circle cx={x} cy={y} r="6" fill="#123524" stroke={c} strokeWidth="2.2" /><path d={`M${x - 3.5} ${y - 3.5} L${x + 3.5} ${y + 3.5}`} stroke={c} strokeWidth="2" /></g>;
+    return <circle key={i} cx={x} cy={y} r="6" fill="none" stroke={c} strokeWidth="2.4" />;
+  };
+  const order = { miss: 0, block: 1, post: 2, save: 3, goal: 4 };
+  return (
+    <section className="sec">
+      <H2>Shot Map</H2>
+      {periods.length > 1 ? (
+        <div className="chips" role="group" aria-label="Half" style={{ marginTop: 8 }}>
+          <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>Full match</button>
+          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p === 1 ? '1st half' : p === 2 ? '2nd half' : p <= 4 ? `Extra time ${p - 2}` : 'Extra'}</button>)}
+        </div>
+      ) : null}
+      <div className="card pad shotbox">
+        <div className="icekey">
+          {[['away', game.away], ['home', game.home]].map(([side, t]) => (
+            <span key={side} style={{ textAlign: side === 'home' ? 'right' : 'left' }}><b style={{ color: col(side) }}>{t.abbr} {side === 'home' ? '←' : '→'}</b><small>{n(side, 'goal')} goals · {n(side, 'on')} on target · {n(side)} shots</small></span>
+          ))}
+        </div>
+        <div role="img" aria-label={`Shot map. ${game.away.name}: ${n('away')} shots, ${n('away', 'on')} on target. ${game.home.name}: ${n('home')} shots, ${n('home', 'on')} on target.`}>
+          <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court" aria-hidden="true">
+            <rect x="2.5" y="2.5" width={W} height={H} rx="6" fill="none" stroke="#6E3AB5" strokeWidth="3" />
+            <rect x="0" y="0" width={W} height={H} rx="6" fill="#123524" />
+            {Array.from({ length: 10 }, (_, i) => i % 2 ? <rect key={i} x={(i * W) / 10} y="0" width={W / 10} height={H} fill="rgba(255,255,255,.035)" /> : null)}
+            <rect x="0" y="0" width={W} height={H} rx="6" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />
+            <path d={`M${W / 2} 0 V${H}`} stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />
+            <circle cx={W / 2} cy={H / 2} r={9.15 * K} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />
+            <circle cx={W / 2} cy={H / 2} r="2.5" fill="rgba(255,255,255,.7)" />
+            {box(0, 16.5, 40.3)}{box(W - 16.5 * K, 16.5, 40.3)}{box(0, 5.5, 18.3)}{box(W - 5.5 * K, 5.5, 18.3)}
+            <circle cx={11 * K} cy={H / 2} r="2.5" fill="rgba(255,255,255,.7)" /><circle cx={W - 11 * K} cy={H / 2} r="2.5" fill="rgba(255,255,255,.7)" />
+            <path d={`M${16.5 * K} ${H / 2 - 7.3 * K} A${9.15 * K} ${9.15 * K} 0 0 1 ${16.5 * K} ${H / 2 + 7.3 * K}`} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />
+            <path d={`M${W - 16.5 * K} ${H / 2 - 7.3 * K} A${9.15 * K} ${9.15 * K} 0 0 0 ${W - 16.5 * K} ${H / 2 + 7.3 * K}`} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.5" />
+            <rect x={-4} y={H / 2 - 3.66 * K} width="4" height={7.32 * K} fill="#fff" /><rect x={W} y={H / 2 - 3.66 * K} width="4" height={7.32 * K} fill="#fff" />
+            {[...shown].sort((a, b) => order[a.kind] - order[b.kind]).map(mark)}
+          </svg>
+        </div>
+        <div className="chips" role="group" aria-label="Show shots" style={{ marginTop: 12 }}>
+          {PITCH_KINDS.filter(([k]) => shots.some((s) => s.kind === k)).map(([k, label]) => (
+            <button key={k} className="chipb" aria-pressed={!off[k]} onClick={() => setOff({ ...off, [k]: !off[k] })}>{label}</button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- play-by-play (not football) ---------- */
 function PlayByPlay({ pbp, game, L }) {
   const periods = [...new Set(pbp.map((p) => p.period))].sort((a, b) => a - b);
@@ -1053,6 +1117,7 @@ function GamePage({ lg, id }) {
     d.drives.length ? ['drives', 'Drives'] : null,
     d.shots.length ? ['shots', 'Shot Chart'] : null,
     d.ice?.length ? ['ice', 'Ice Chart'] : null,
+    d.pitch?.length ? ['pitch', 'Shot Map'] : null,
     d.pbp.length ? ['plays', 'Plays'] : null,
     d.box.length ? ['box', 'Box Score'] : null,
     d.stats.length ? ['stats', 'Team Stats'] : null,
@@ -1120,6 +1185,7 @@ function GamePage({ lg, id }) {
             {tab === 'drives' ? <div className="gtab solo"><Drives drives={d.drives} game={g} /></div> : null}
             {tab === 'shots' ? <div className="gtab solo"><ShotChart shots={d.shots} game={g} lg={lg} /></div> : null}
             {tab === 'ice' ? <div className="gtab solo"><IceChart ice={d.ice} game={g} /></div> : null}
+            {tab === 'pitch' ? <div className="gtab solo"><PitchChart shots={d.pitch} game={g} /></div> : null}
             {tab === 'plays' ? <div className="gtab solo"><PlayByPlay pbp={d.pbp} game={g} L={L} /></div> : null}
             {tab === 'box' ? <div className="gtab solo"><BoxScore box={d.box} game={g} sport={L.sport} /></div> : null}
             {tab === 'stats' ? (
