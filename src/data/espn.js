@@ -277,10 +277,16 @@ function standingGroups(data, lg) {
   const walk = (node, depth = 0) => {
     if (!node || typeof node !== 'object') return;
     if (L.college && depth === 1 && !node.standings?.entries?.length && (node.children || []).some((c) => c.standings?.entries?.length)) {
-      const rows = all(node).map((e) => { const [, v] = col2Of(e, L); return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v }; })
-        .sort((a, b) => recPct(b.col2) - recPct(a.col2) || recPct(b.overall) - recPct(a.overall));
+      // Keep the divisions as sections inside the one conference table (East first, then West, as the feed orders them).
       const full = node.name || node.abbreviation || L.name;
-      if (rows.length) groups.push({ name: shortGroup(full), full, col2Label: 'CONF', rows });
+      const confName = shortGroup(full);
+      const subs = (node.children || []).filter((c) => c.standings?.entries?.length).map((c) => ({
+        name: shortGroup(String(c.name || c.abbreviation || '')).replace(new RegExp('^' + confName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-–]\\s*', 'i'), '').replace(/^.*\s[-–]\s/, ''),
+        rows: all(c).map((e) => { const [, v] = col2Of(e, L); return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v }; })
+          .sort((a, b) => recPct(b.col2) - recPct(a.col2) || recPct(b.overall) - recPct(a.overall)),
+      }));
+      const rows = subs.flatMap((x) => x.rows);
+      if (rows.length) groups.push({ name: confName, full, col2Label: 'CONF', rows, subs });
       return;
     }
     const entries = node.standings?.entries;
