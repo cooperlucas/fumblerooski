@@ -780,7 +780,10 @@ function Search() {
   const pq = useQuery(asked ? `psearch:${asked}` : null, () => searchPlayers(asked), () => 0);
   const players = asked && asked === term ? (pq.data || []) : [];
   const playersBusy = term.length >= 3 && (asked !== term || (pq.loading && !pq.data));
-  useEffect(() => { ensureColors(hits, 12); }, [hits]);
+  // Real colors for what is on screen, once typing pauses (so half-typed words do not queue up lookups).
+  useEffect(() => { if (!hits.length) return undefined; const h = setTimeout(() => ensureColors(hits, 10), 200); return () => clearTimeout(h); }, [hits]);
+  // And quietly fill in every pro team once, a few at a time, so later searches are right from the first letter.
+  useEffect(() => { if (q.data) ensureColors(q.data.filter((t) => !LEAGUE[t.lg]?.college), 400, 3); }, [q.data]);
   const leagues = term ? LEAGUES.filter((l) => l.name.toLowerCase().includes(term) || l.short.toLowerCase().includes(term)) : [];
   const TeamRow = ({ t }) => (
     <button className="lrow" onClick={() => go(`team/${t.lg}/${t.id}`)}>

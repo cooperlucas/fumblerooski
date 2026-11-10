@@ -92,18 +92,30 @@ export function liveColor(team) {
   return k ? teamColor(k[0], k[1], team.name) : team.color;
 }
 // Look up real colors for teams still showing a stand-in (a few team reads, remembered for good). True if any were learned.
-const colorTried = new Set();
-export async function ensureColors(teams, cap = 12) {
+const colorBusy = new Set(), colorFails = new Map();
+export async function ensureColors(teams, cap = 12, pool = 6) {
   const need = [];
   for (const t of teams || []) {
     const key = `${t?.lg}:${t?.id}`;
-    if (!t?.id || !LEAGUE[t.lg] || /^#/.test(t.color || '') || bookGet(t.lg, t.id) || colorTried.has(key)) continue;
-    colorTried.add(key); need.push(t);
+    if (!t?.id || !LEAGUE[t.lg] || /^#/.test(t.color || '') || bookGet(t.lg, t.id) || colorBusy.has(key) || (colorFails.get(key) || 0) >= 2) continue;
+    colorBusy.add(key); need.push([key, t]);
     if (need.length >= cap) break;
   }
   if (!need.length) return false;
-  const res = await Promise.allSettled(need.map((t) => get(url(SITE, t.lg, `/teams/${encodeURIComponent(t.id)}`)).then((d) => normTeam(d.team?.id ? d.team : { ...(d.team || {}), id: t.id }, t.lg))));
-  return res.some((r) => r.status === 'fulfilled');
+  let next = 0, got = false;
+  const worker = async () => {
+    while (next < need.length) {
+      const [key, t] = need[next++];
+      try {
+        const d = await get(url(SITE, t.lg, `/teams/${encodeURIComponent(t.id)}`));
+        normTeam(d.team?.id ? d.team : { ...(d.team || {}), id: t.id }, t.lg);
+        if (bookGet(t.lg, t.id)) got = true; else colorFails.set(key, 2); // the feed has no color for this team
+      } catch { colorFails.set(key, (colorFails.get(key) || 0) + 1); } // a failed read gets one more try later
+      colorBusy.delete(key);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(pool, need.length) }, worker));
+  return got;
 }
 
 // The second color. When the chip had to use the alternate (primary is black or white), the primary is the second.
