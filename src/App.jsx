@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -364,12 +364,11 @@ function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   const filters = useLeaderFilters(lg);
   const [fid, setFid] = useState('all');
-  const [shown, setShown] = useState({});
   if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
   if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
   const f = filters.find((x) => x.id === fid);
-  const pickFilter = (v) => { setFid(v); setShown({}); };
+  const pickFilter = (v) => setFid(v);
   return (
     <>
       {filters.length ? (
@@ -381,35 +380,45 @@ function Leaders({ lg }) {
           </Picker>
         </div>
       ) : null}
-      {q.data.cats.map((c) => {
-        const list = f ? c.rows.filter((r) => r.team && f.ids.has(r.team.id)) : c.rows;
-        const n = shown[c.key] || 5;
-        const rows = list.slice(0, n);
-        const place = places(list.map((r) => r.value));
-        return (
-          <div className="card" key={c.key} style={{ marginTop: 12 }}>
-            <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
-            {!rows.length ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>No one from {f?.label} in this list.</span></div> : null}
-            {rows.map((r, i) => (
-              <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
-                <span className="pos">{place[i]}</span>
-                {r.team ? <Blob team={r.team} /> : null}
-                <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
-                <span className="v">{r.value}</span>
-              </button>
-            ))}
-            {list.length > 5 ? (
-              <div className="morebar">
-                {n < list.length ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: n + 25 })}>Show {Math.min(25, list.length - n)} more</button> : null}
-                {n < list.length && list.length - n > 25 ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: list.length })}>All {list.length}</button> : null}
-                {n > 5 ? <button className="link" onClick={() => setShown({ ...shown, [c.key]: 5 })}>Show fewer</button> : null}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
+      {q.data.cats.map((c) => <LeaderCard key={c.key} lg={lg} c={c} f={f} />)}
       <Stamp at={q.updatedAt} />
     </>
+  );
+}
+// One stat's leaders. Top 10 comes with the page; filtering or asking for more pulls that stat's full board.
+function LeaderCard({ lg, c, f }) {
+  const [n, setN] = useState(5);
+  useEffect(() => setN(5), [f?.id]);
+  const deepOk = canGoDeep(lg, c.key);
+  const wantDeep = deepOk && (!!f || n > 5);
+  const deep = useQuery(wantDeep ? `deep:${lg}:${c.key}` : null, () => getDeepLeader(lg, c.key), () => 600000);
+  const base = wantDeep && deep.data?.length ? deep.data : c.rows;
+  const list = f ? base.filter((r) => r.team && f.ids.has(r.team.id)) : base;
+  const rows = list.slice(0, n);
+  const place = places(list.map((r) => r.value));
+  const loadingDeep = wantDeep && deep.loading && !deep.data;
+  const total = !wantDeep && deepOk ? null : list.length; // unknown until the full board loads
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
+      {loadingDeep && f ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>Loading the full list...</span></div>
+        : !rows.length ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>No one from {f?.label} {deepOk ? 'has this stat yet.' : 'in the top 10.'}</span></div> : null}
+      {(loadingDeep && f ? [] : rows).map((r, i) => (
+        <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
+          <span className="pos">{place[i]}</span>
+          {r.team ? <Blob team={r.team} /> : null}
+          <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
+          <span className="v">{r.value}</span>
+        </button>
+      ))}
+      {(list.length > 5 || (deepOk && !wantDeep)) && !(loadingDeep && f) ? (
+        <div className="morebar">
+          {n < list.length || (deepOk && !wantDeep) ? <button className="link" onClick={() => setN(n + 25)}>{loadingDeep ? 'Loading...' : total == null ? 'Show more' : `Show ${Math.min(25, list.length - n)} more`}</button> : null}
+          {total != null && n < list.length && list.length - n > 25 ? <button className="link" onClick={() => setN(list.length)}>All {list.length}</button> : null}
+          {n > 5 ? <button className="link" onClick={() => setN(5)}>Show fewer</button> : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 // Places with ties shown the sports way: 1, 2, T3, T3, 5. Equal values share the first place they reach.

@@ -604,6 +604,46 @@ export async function getRankings(lg) {
 }
 
 /* ---------- league stats: leaders and team tables ---------- */
+// Deep lists for one leader category, from the feed's per-stat leaderboard (hundreds deep, checked live).
+// Each leader category maps to [stat group, stat name, category the feed wants filled] (formats checked live). Percentages and goalie
+// rates are left out on purpose: that board does not apply minimums, so a 1-for-1 shooter would lead.
+const DEEP = {
+  football: {
+    passingYards: ['passing', 'passingYards', 'offense:passing'], passingTouchdowns: ['passing', 'passingTouchdowns', 'offense:passing'], quarterbackRating: ['passing', 'QBRating', 'offense:passing'],
+    rushingYards: ['rushing', 'rushingYards', 'offense:rushing'], rushingTouchdowns: ['rushing', 'rushingTouchdowns', 'offense:rushing'],
+    receivingYards: ['receiving', 'receivingYards', 'offense:receiving'], receptions: ['receiving', 'receptions', 'offense:receiving'], receivingTouchdowns: ['receiving', 'receivingTouchdowns', 'offense:receiving'],
+    sacks: ['defensive', 'sacks', 'defense'], totalTackles: ['defensive', 'totalTackles', 'defense'], passesDefended: ['defensive', 'passesDefended', 'defense'],
+    totalPoints: ['scoring', 'totalPoints', 'scoring'],
+  },
+  basketball: {
+    pointsPerGame: ['offensive', 'avgPoints'], assistsPerGame: ['offensive', 'avgAssists'], reboundsPerGame: ['general', 'avgRebounds'],
+    stealsPerGame: ['defensive', 'avgSteals'], blocksPerGame: ['defensive', 'avgBlocks'], '3PointsMadePerGame': ['offensive', 'avgThreePointFieldGoalsMade'],
+    minutesPerGame: ['general', 'avgMinutes'], doubleDouble: ['general', 'doubleDouble'], points: ['offensive', 'points'], avgTurnovers: ['offensive', 'avgTurnovers'], foulsPerGame: ['general', 'avgFouls'],
+  },
+  hockey: {
+    goals: ['offensive', 'goals'], assists: ['offensive', 'assists'], points: ['offensive', 'points'], plusMinus: ['general', 'plusMinus'],
+    penaltyMinutes: ['penalties', 'penaltyMinutes'], wins: ['general', 'wins'], shutouts: ['defensive', 'shutouts'],
+  },
+};
+export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key];
+export async function getDeepLeader(lg, key) {
+  const m = DEEP[LEAGUE[lg]?.sport]?.[key];
+  if (!m) return null;
+  const [group, stat, cat] = m;
+  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${group}.${stat}:desc`, limit: LEAGUE[lg].college ? '300' : '150', ...(cat ? { category: cat } : {}) }));
+  const idx = (d.categories || []).find((c) => c.name === group)?.names?.indexOf(stat) ?? -1;
+  if (idx < 0) return null;
+  return (d.athletes || []).map((x) => {
+    const a = x.athlete || {};
+    const v = String((x.categories || []).find((c) => c.name === group)?.totals?.[idx] ?? '');
+    return {
+      value: v,
+      player: { id: String(a.id ?? ''), name: cleanText(a.displayName || ''), pos: a.position?.abbreviation || '' },
+      team: a.teamId ? normTeam({ id: a.teamId, abbreviation: a.teamShortName, displayName: a.teamName, shortDisplayName: a.teamShortName }, lg) : null,
+    };
+  }).filter((r) => r.value && r.value !== '-' && r.value !== '0' && r.player.name);
+}
+
 const SITE3 = 'https://site.api.espn.com/apis/site/v3/sports';
 // Who leads the league in each stat. The feed has moved this around, so try each place it has lived.
 // The feed's display text rounds half sacks away ("8" for 8.5), so trust the number when it has a fraction.
