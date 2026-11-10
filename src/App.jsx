@@ -287,7 +287,7 @@ function Leaders({ lg }) {
           <div className="card" key={c.key} style={{ marginTop: 12 }}>
             <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
             {rows.map((r, i) => (
-              <button key={i} className={'lead' + (i === 0 ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
+              <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
                 <span className="pos">{place[i]}</span>
                 {r.team ? <Blob team={r.team} /> : null}
                 <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
