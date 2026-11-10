@@ -282,7 +282,7 @@ function Rankings({ lg, focus }) {
   return (
     <>
       <div className="sechead" style={{ marginTop: 14 }}>
-        <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{[p.note, p.released && !isNaN(new Date(p.released)) ? `Released ${new Date(p.released).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}` : ''].filter(Boolean).join(' · ')}</span>
+        <span className="released">{p.note ? <b>{p.note}</b> : null}{p.released ? <span>Released {new Date(p.released).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span> : null}</span>
         {polls.length > 1 ? <Picker label="Poll" value={p.id} onChange={setPid}>{polls.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Picker> : <b className="ptitle">{p.name}</b>}
       </div>
       <div className="card" style={{ marginTop: 10 }}>
@@ -299,7 +299,6 @@ function Rankings({ lg, focus }) {
       </div>
       {p.others.length ? <p className="pollnote"><b>Others receiving votes:</b> {p.others.map((o) => `${o.team.name} ${o.points}`).join(', ')}</p> : null}
       {p.dropped.length ? <p className="pollnote"><b>Dropped out:</b> {p.dropped.map((t) => t.name).join(', ')}</p> : null}
-      <Stamp at={q.updatedAt} />
     </>
   );
 }

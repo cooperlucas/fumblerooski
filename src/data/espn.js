@@ -498,6 +498,10 @@ export async function searchPlayers(text) {
 /* ---------- college polls ---------- */
 // Polls in the order fans care about: the Playoff committee when it is out, then AP, then Coaches.
 const POLL_ORDER = (p) => (/playoff|cfp/i.test(p.name + p.type) ? 0 : /\bap\b/i.test(p.name + ' ' + p.type) ? 1 : /coach|usa/i.test(p.name + p.type) ? 2 : 3);
+// When a poll came out. The feed has used several field names for this, at the poll and at the top level.
+const okDate = (v) => (v && !isNaN(new Date(v)) ? String(v) : null);
+const releasedOf = (p, d) => okDate(p.date) || okDate(p.lastUpdated) || okDate(p.releaseDate) || okDate(p.occurrence?.date)
+  || okDate(p.occurrence?.lastUpdated) || okDate(d?.date) || okDate(d?.lastUpdated) || null;
 function normPolls(d, lg) {
   const team = (r) => normTeam({ ...(r.team || {}), id: r.team?.id ?? r.id }, lg);
   return (d?.rankings || []).map((p) => ({
@@ -506,7 +510,7 @@ function normPolls(d, lg) {
     full: cleanText(p.name || p.shortName || 'Poll'),
     type: String(p.type || ''),
     week: Number(p.occurrence?.number) || 0,
-    released: p.date || p.lastUpdated || null, // when this poll came out
+    released: releasedOf(p, d), // when this poll came out
     note: cleanText(p.occurrence?.displayValue || p.headline || ''),
     ranks: (p.ranks || []).map((r) => {
       const cur = Number(r.current), prev = Number(r.previous);
