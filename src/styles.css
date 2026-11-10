@@ -411,3 +411,5 @@ button.pick.date { cursor: pointer; }
 .teamhero .hrank { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
 .teamhero .hrank b { color: #FFBE2E; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; text-shadow: 1px 1px 0 #0C1124; }
 .teamhero .hrank span { font-size: 12px; font-weight: 800; color: rgba(255, 255, 255, 0.85); }
+.stamp.tiny { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; opacity: 0.8; }
+.stamp.tiny .dot { width: 6px; height: 6px; }

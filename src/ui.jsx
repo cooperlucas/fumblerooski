@@ -132,9 +132,10 @@ export function Problem({ error, retry }) {
   );
 }
 export const Empty = ({ children }) => <div className="note">{children}</div>;
+// Only while something is live, and small: a quiet sign the scores are moving on their own.
 export function Stamp({ at, live }) {
-  if (!at) return null;
-  return <p className="stamp">Updated {new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}{live ? ' · refreshing every 30 seconds' : ''}</p>;
+  if (!at || !live) return null;
+  return <p className="stamp tiny"><span className="dot" aria-hidden="true" />Live · updates on its own</p>;
 }
 
 /* ---------- chrome ---------- */
