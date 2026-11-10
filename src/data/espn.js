@@ -284,9 +284,8 @@ const entryTeams = (node, out = []) => {
 // Pro leagues come grouped by conference; asking one level deeper gives divisions. Offer both when both exist.
 // College divisions. The first is the default view. Group ids are the feed's; where unsure, several are tried in turn.
 export const DIVISIONS = {
-  cfb: [{ id: 'fbs', label: 'FBS', groups: [] }, { id: 'fcs', label: 'FCS', groups: ['81'] }, { id: 'd2', label: 'Division II', groups: ['57', '35'] }, { id: 'd3', label: 'Division III', groups: ['58', '36'] }],
-  ncaam: [{ id: 'd1', label: 'Division I', groups: [] }, { id: 'd2', label: 'Division II', groups: ['51'] }, { id: 'd3', label: 'Division III', groups: ['52'] }],
-  ncaaw: [{ id: 'd1', label: 'Division I', groups: [] }, { id: 'd2', label: 'Division II', groups: ['51'] }, { id: 'd3', label: 'Division III', groups: ['52'] }],
+  cfb: [{ id: 'fbs', label: 'FBS', groups: [] }, { id: 'fcs', label: 'FCS', groups: ['81'] }, { id: 'd2', label: 'Division II', groups: ['57'] }, { id: 'd3', label: 'Division III', groups: ['58'] }],
+  // College hoops: the feed only has Division I standings (checked live), so no dropdown there.
 };
 // Divisions whose teams the feed covers in full (rosters, player pages).
 export const FULL_DIVISIONS = { cfb: ['fbs', 'fcs'], ncaam: ['d1'], ncaaw: ['d1'] };
@@ -622,7 +621,7 @@ export async function getLeaders(lg) {
   let lastErr = null;
   for (const [base, path] of tries) {
     try {
-      const d = await get(url(base, lg, path, { limit: '100' })); // ask for deep lists so the screen can filter and page
+      const d = await get(url(base, lg, path)); // no limit param: the feed errors on it (checked live)
       const raw = d.leaders?.categories || d.categories || d.stats || d.leaders || [];
       const cats = (Array.isArray(raw) ? raw : []).map((c) => ({
         key: String(c.name || c.abbreviation || c.displayName || ''),
