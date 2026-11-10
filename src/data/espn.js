@@ -7,6 +7,7 @@
 
 import { LEAGUE, LEAGUES } from './leagues.js';
 import { scrub, cleanText } from './guard.js';
+import { COLLEGE_COLORS, PRO_COLORS } from './teamColors.js';
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const V2 = 'https://site.api.espn.com/apis/v2/sports';
@@ -78,17 +79,22 @@ function learn(key, color, alt) {
 }
 // A school has the same id in every college sport, so a color learned in one covers the others.
 const COLLEGE = LEAGUES.filter((l) => l.college).map((l) => l.id);
-function bookGet(lg, id) {
+// Colors that ship with the app: the fallback when the feed has not told us a team's colors yet.
+function builtIn(lg, id, abbr) {
+  const v = LEAGUE[lg]?.college ? COLLEGE_COLORS[id] : (PRO_COLORS[lg]?.[id] || PRO_COLORS[lg]?.[String(abbr || '').toUpperCase()]);
+  return v ? [v.slice(0, 6), v.length >= 12 ? v.slice(6, 12) : null] : null;
+}
+function bookGet(lg, id, abbr) {
   loadBook();
   let k = book.get(`${lg}:${id}`);
   if (!k && LEAGUE[lg]?.college) for (const o of COLLEGE) { k = book.get(`${o}:${id}`); if (k) break; }
-  return k;
+  return k || builtIn(lg, id, abbr);
 }
-const knowsColor = (t, lg) => hexOk(t?.color) || !!bookGet(lg, t?.id);
+const knowsColor = (t, lg) => hexOk(t?.color) || !!bookGet(lg, t?.id, t?.abbreviation);
 // Teams saved earlier (search index, pinned teams) may carry a stand-in color: use the real one once we know it.
 export function liveColor(team) {
   if (!team || /^#/.test(team.color || '')) return team?.color;
-  const k = team.id && team.lg ? bookGet(team.lg, team.id) : null;
+  const k = team.id && team.lg ? bookGet(team.lg, team.id, team.abbr) : null;
   return k ? teamColor(k[0], k[1], team.name) : team.color;
 }
 // Look up real colors for teams still showing a stand-in (a few team reads, remembered for good). True if any were learned.
@@ -97,7 +103,7 @@ export async function ensureColors(teams, cap = 12, pool = 2) {
   const need = [];
   for (const t of teams || []) {
     const key = `${t?.lg}:${t?.id}`;
-    if (!t?.id || !LEAGUE[t.lg] || /^#/.test(t.color || '') || bookGet(t.lg, t.id) || colorBusy.has(key) || (colorFails.get(key) || 0) >= 2) continue;
+    if (!t?.id || !LEAGUE[t.lg] || /^#/.test(t.color || '') || bookGet(t.lg, t.id, t.abbr) || colorBusy.has(key) || (colorFails.get(key) || 0) >= 2) continue;
     colorBusy.add(key); need.push([key, t]);
     if (need.length >= cap) break;
   }
@@ -109,7 +115,7 @@ export async function ensureColors(teams, cap = 12, pool = 2) {
       try {
         const d = await get(url(SITE, t.lg, `/teams/${encodeURIComponent(t.id)}`));
         normTeam(d.team?.id ? d.team : { ...(d.team || {}), id: t.id }, t.lg);
-        if (bookGet(t.lg, t.id)) got = true; else colorFails.set(key, 2); // the feed has no color for this team
+        if (bookGet(t.lg, t.id, t.abbr)) got = true; else colorFails.set(key, 2); // the feed has no color for this team
       } catch { colorFails.set(key, (colorFails.get(key) || 0) + 1); } // a failed read gets one more try later
       colorBusy.delete(key);
     }
@@ -132,7 +138,7 @@ export function normTeam(t, lg) {
   if (t.id != null) {
     const key = `${lg}:${t.id}`;
     if (hexOk(t.color)) learn(key, String(t.color), hexOk(t.alternateColor) ? String(t.alternateColor) : null);
-    else { const k = bookGet(lg, t.id); if (k) t = { ...t, color: k[0], alternateColor: k[1] }; }
+    else { const k = bookGet(lg, t.id, t.abbreviation); if (k) t = { ...t, color: k[0], alternateColor: k[1] }; }
   }
   // Game pages do not send the short name, so build it: schools go by place ("Virginia Tech"), pros by nickname ("Bills").
   const name = t.shortDisplayName || (LEAGUE[lg]?.college ? t.location : t.name) || t.displayName || t.name || t.location || 'TBD';

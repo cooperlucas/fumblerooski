@@ -326,3 +326,11 @@ test('football box score: defense gets FF (from the play-by-play) and FR (from t
   assert.deepEqual(def.rows[1].stats.slice(-2), ['0', '0']);
   assert.ok(g.box[1].groups.some((x) => x.key === 'fumbles'));
 });
+
+test('built-in team colors cover teams the feed has not described yet', async () => {
+  const { normTeam, liveColor } = await import('../src/data/espn.js');
+  assert.equal(normTeam({ id: '277', displayName: 'West Virginia Mountaineers', abbreviation: 'WVU' }, 'ncaaw').color, '#FFC600');
+  assert.equal(normTeam({ id: '999021', displayName: 'New York Mets', abbreviation: 'NYM' }, 'mlb').color, '#002D72');
+  assert.equal(liveColor({ id: '999002', lg: 'nfl', abbr: 'BUF', name: 'Bills', color: 'hsl(1 55% 38%)' }), '#00338D');
+  assert.equal(liveColor({ id: '999003', lg: 'nhl', abbr: 'PHI', name: 'Flyers', color: 'hsl(1 55% 38%)' }), '#F74902');
+});
