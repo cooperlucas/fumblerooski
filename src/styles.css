@@ -325,3 +325,4 @@ h1, h2, h3, p { margin: 0; }
 .released span { font-size: 12px; font-weight: 700; color: var(--mute); }
 .trank { display: block; margin-top: 5px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; color: var(--teal); }
 .morebar { display: flex; justify-content: center; gap: 22px; padding: 12px 14px; border-top: 1px solid #232C50; }
+.lrow .nm small.orec { font-size: 12px; font-weight: 700; color: var(--mute); }

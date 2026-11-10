@@ -390,6 +390,15 @@ export async function getTeam(lg, id) {
   };
 }
 
+// Every team's current overall record in a league, from the standings (all college divisions). id -> '8-1'
+export async function getRecords(lg) {
+  const divs = LEAGUE[lg]?.college ? (DIVISIONS[lg] || [{ id: undefined }]).map((d) => d.id) : [undefined];
+  const out = {};
+  const res = await Promise.allSettled(divs.map((d) => getStandings(lg, d)));
+  res.forEach((r) => { if (r.status === 'fulfilled') r.value.groups.forEach((g) => g.rows.forEach((x) => { if (x.overall && !out[x.team.id]) out[x.team.id] = x.overall; })); });
+  return out;
+}
+
 /* ---------- players ---------- */
 const expOf = (a) => {
   const e = a?.experience;

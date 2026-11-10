@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
@@ -479,13 +479,14 @@ function TeamPage({ lg, id }) {
   const full = isCovered(useCovered(lg), id);
   const view = full ? viewRaw : 'schedule';
   const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
+  const recs = useQuery(`records:${lg}`, () => getRecords(lg), () => 600000).data || {};
   const row = (g) => {
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
     return (
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
         <Blob team={them} />
-        <span className="nm">{home ? 'vs' : 'at'} {them.name}<span className="sub">{fmtDate(g.date)}</span></span>
+        <span className="nm">{home ? 'vs' : 'at'} {them.name}{recs[them.id] || them.record ? <small className="orec"> {recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'rgba(155,227,58,.16)' : '#232C50', color: w ? '#9BE33A' : '#CBD2EA' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span style={{ color: 'var(--pink)' }}>LIVE {me.score}-{them.score}</span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
