@@ -18,7 +18,7 @@ export class FeedError extends Error {
 let fetcher = async (url) => {
   let res;
   try { res = await fetch(url, { headers: { accept: 'application/json' } }); }
-  catch (e) { throw new FeedError('Could not reach the scores feed. Check your connection.', 0); }
+  catch (e) { throw new FeedError('Could not reach the scores feed. Check your connection.', 0); } // offline, or the browser blocked the request
   if (!res.ok) throw new FeedError(`The scores feed answered with an error (${res.status}).`, res.status);
   return res.json();
 };
@@ -167,10 +167,30 @@ export async function getStandings(lg) {
 }
 
 /* ---------- teams ---------- */
+// The feed's team list is flaky from browsers (the big-limit request can be refused), so try smaller asks,
+// then fall back to the teams inside standings, which is a read we know works.
+let teamsParams = [{ limit: '1000' }, { limit: '400' }, {}];
 export async function getTeams(lg) {
-  const data = await get(url(SITE, lg, '/teams', { limit: '1000' }));
-  const list = data.sports?.[0]?.leagues?.[0]?.teams || data.teams || [];
-  return list.map((x) => normTeam(x.team || x, lg)).filter((t) => t.id);
+  let lastErr = null;
+  for (const params of teamsParams) {
+    try {
+      const data = await get(url(SITE, lg, '/teams', params));
+      const list = data.sports?.[0]?.leagues?.[0]?.teams || data.teams || [];
+      const teams = list.map((x) => normTeam(x.team || x, lg)).filter((t) => t.id);
+      if (teams.length) {
+        teamsParams = [params, ...teamsParams.filter((p) => p !== params)]; // start with what worked next time
+        teams.source = 'team list';
+        return teams;
+      }
+    } catch (e) { lastErr = e; }
+  }
+  try {
+    const seen = new Set();
+    const teams = (await getStandings(lg)).groups.flatMap((g) => g.rows.map((r) => r.team)).filter((t) => t.id && !seen.has(t.id) && seen.add(t.id));
+    if (teams.length) { teams.source = 'standings'; return teams; }
+  } catch (e) { lastErr = lastErr || e; }
+  if (lastErr) throw lastErr;
+  return [];
 }
 
 export async function getTeam(lg, id) {

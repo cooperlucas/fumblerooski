@@ -94,3 +94,11 @@ test('helpers', () => {
   assert.equal(teamColor('000000', 'fb4f14', 'x'), '#FB4F14');
   assert.equal(teamColor('ffffff', 'ffffff', 'x').startsWith('hsl('), true);
 });
+
+test('team list falls back to standings when the feed refuses the team list', async () => {
+  setFetcher(async (u) => { if (/\/teams(\?|$)/.test(new URL(u).pathname + new URL(u).search)) throw new Error('blocked'); return demoFetch(u); });
+  const teams = await getTeams('nfl');
+  assert.equal(teams.length, 6); assert.equal(teams.source, 'standings'); assert.equal(teams[0].name, 'Bengals');
+  setFetcher(demoFetch);
+  assert.equal((await getTeams('nfl')).source, 'team list');
+});

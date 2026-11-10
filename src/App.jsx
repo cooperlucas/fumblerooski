@@ -476,9 +476,10 @@ function About() {
     setChecks([]);
     let gameId = null, teamId = null;
     try { const r = await getScoreboard('nfl'); gameId = r.games[0]?.id; push('Scores', true, `${r.games.length} NFL games on the slate`); } catch (e) { push('Scores', false, e.message); }
-    try { const r = await getStandings('nfl'); push('Standings', r.groups.length > 0, `${r.groups.length} groups, ${r.groups.reduce((n, g) => n + g.rows.length, 0)} teams`); } catch (e) { push('Standings', false, e.message); }
-    try { const r = await getTeams('nfl'); teamId = r[0]?.id; push('Team list', r.length > 0, `${r.length} teams`); } catch (e) { push('Team list', false, e.message); }
-    if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id, `${r.team.full} ${r.record}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ' (schedule missing)' : ''}`); } catch (e) { push('Team page', false, e.message); } }
+    try { const r = await getStandings('nfl'); teamId = r.groups[0]?.rows[0]?.team.id; push('Standings', r.groups.length > 0, `${r.groups.length} groups, ${r.groups.reduce((n, g) => n + g.rows.length, 0)} teams`); } catch (e) { push('Standings', false, e.message); }
+    try { const r = await getTeams('nfl'); teamId = teamId || r[0]?.id; push('Team search', r.length > 0, `${r.length} teams, read from the ${r.source || 'feed'}`); } catch (e) { push('Team search', false, e.message); }
+    if (teamId) { try { const r = await getTeam('nfl', teamId); push('Team page', !!r.team.id && !r.scheduleMissing, `${r.team.full} ${r.record || '(no record)'}, ${r.schedule.length} on the schedule${r.scheduleMissing ? ', schedule did not load' : ''}`); } catch (e) { push('Team page', false, e.message); } }
+    else push('Team page', false, 'No team to test with');
     if (gameId) { try { const r = await getGame('nfl', gameId); push('Game page', true, `${r.game.away.abbr} at ${r.game.home.abbr}: ${r.stats.length} stat rows, ${r.plays.length} scoring plays`); } catch (e) { push('Game page', false, e.message); } }
     else push('Game page', false, 'No game on the slate to test with');
   };
