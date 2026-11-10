@@ -4,7 +4,7 @@
   --bg: #0C1124; --panel: #151B33; --panel2: #10162C; --chip: #1C2443;
   --line: #26305A; --line2: #1E2747; --line3: #2C3762;
   --ink: #F5F5F7; --soft: #CBD2EA; --mute: #8E99BF; --dim: #6F7AA3;
-  --teal: #22D3D6; --purple: #8B5CF6; --deep: #6E3AB5; --yellow: #FFE135; --pink: #FF3D7F; --lime: #9BE33A; --gold: #F5C04A;
+  --teal: #22D3D6; --purple: #8B5CF6; --deep: #6E3AB5; --yellow: #FFBE2E; --pink: #FF3D7F; --lime: #9BE33A; --gold: #F5C04A;
   --font: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
 }
@@ -149,7 +149,7 @@ h1, h2, h3, p { margin: 0; }
 .bar .track { height: 10px; border-radius: 5px; background: #232C50; overflow: hidden; }
 .bar .fill { height: 100%; border-radius: 5px; transform-origin: left center; animation: frGrow 800ms cubic-bezier(.2, .8, .2, 1) both; }
 .bar .val { text-align: right; font-variant-numeric: tabular-nums; }
-.tip { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 225, 53, 0.1); color: #F3E9A6; font-size: 13px; font-weight: 600; line-height: 1.45; }
+.tip { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 190, 46, 0.1); color: #F3E9A6; font-size: 13px; font-weight: 600; line-height: 1.45; }
 .flow { display: block; width: 100%; height: auto; animation: frReveal 1.4s cubic-bezier(.4, 0, .2, 1) 150ms both; }
 .flowlab { font-stretch: 125%; font-size: 11px; font-weight: 900; font-style: italic; }
 .flowsegs { display: flex; margin-top: 8px; }

@@ -189,3 +189,21 @@ test('basketball shots and play-by-play', async () => {
   assert.equal(g.pbp[0].scoring, true); assert.equal(g.pbp[1].scoring, false); assert.equal(g.pbp[5].period, 2);
   assert.equal(g.chart.stepped, true, 'with play-by-play the score chart uses real times');
 });
+
+test('chart colors: team colors, brightened for navy, and never two lines that look the same', async () => {
+  const { chartColors, lum, inkOn, brighten } = await import('../src/data/colors.js');
+  const navy = { color: '#00274C', color2: '#FFCB05' }, scarlet = { color: '#BA0C2F', color2: '#FFFFFF' };
+  const a = chartColors(navy, scarlet);
+  assert.ok(lum(a.away) >= 0.15, 'dark navy is lifted so it shows up'); assert.ok(lum(a.home) >= 0.15);
+  assert.notEqual(a.away, a.home);
+  // two red teams: the away side falls back to its second color
+  const b = chartColors({ color: '#C8102E', color2: '#FFB612' }, { color: '#BA0C2F', color2: '#FFFFFF' });
+  assert.equal(b.away, '#FFB612');
+  assert.equal(brighten('#FFB612'), '#FFB612', 'a color that already reads is left alone');
+  const red = brighten('#BA0C2F'); assert.ok(parseInt(red.slice(1, 3), 16) > 200 && parseInt(red.slice(3, 5), 16) < 110, 'scarlet stays red, not pink: ' + red);
+  // two red teams with no usable second color: white
+  assert.equal(chartColors({ color: '#C8102E', color2: null }, { color: '#BA0C2F' }).away, '#F5F5F7');
+  assert.equal(inkOn('#FFB612'), '#0C1124'); assert.equal(inkOn('#1D428A'), '#FFFFFF');
+  const g = (await getScoreboard('nfl')).games[0];
+  assert.match(g.home.color2, /^#[0-9A-F]{6}$/);
+});

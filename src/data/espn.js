@@ -61,6 +61,7 @@ export function normTeam(t, lg) {
     id: String(t.id ?? ''), lg,
     name, full: t.displayName || name, abbr,
     color: teamColor(t.color, t.alternateColor, (t.displayName || name) + lg),
+    color2: hexOk(t.alternateColor) ? '#' + String(t.alternateColor).toUpperCase() : null,
   };
 }
 

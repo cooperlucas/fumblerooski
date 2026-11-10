@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getTeam, getGame, getScoreboard, getTeams, headlineFor, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
+import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
 
 /* ---------- router ---------- */
@@ -292,7 +293,7 @@ function TeamPage({ lg, id }) {
 const PERIOD_WORD = { football: 'Q', basketball: 'Q', hockey: 'P', soccer: 'H', baseball: '' };
 
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
-// like a late-80s broadcast graphic. Away is teal, home is yellow, same as the stat bars.
+// like a late-80s broadcast graphic. Each line is that team's own color, brightened to read on navy.
 function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1)))); const f = raw / pow; return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow); }
 function ScoreChart({ chart, game, L }) {
   const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 14, y1 = 158;
@@ -303,13 +304,14 @@ function ScoreChart({ chart, game, L }) {
   const reg = L.periods || chart.periods, word = PERIOD_WORD[L.sport] ?? '';
   const label = (i) => (i < reg ? `${word}${i + 1}` : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
   const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
-  const sides = [[game.away, 'a', '#22D3D6'], [game.home, 'h', '#FFE135']];
+  const cc = chartColors(game.away, game.home);
+  const sides = [[game.away, 'a', cc.away], [game.home, 'h', cc.home]];
   return (
     <section className="sec">
       <H2>Score Chart</H2>
       <div className="card pad chart">
         <div className="legend">
-          {sides.map(([t, k, c]) => <span key={k} className="lg" style={{ background: c }}>{t.abbr} <b>{end[k]}</b></span>)}
+          {sides.map(([t, k, c]) => <span key={k} className="lg" style={{ background: c, color: inkOn(c) }}>{t.abbr} <b>{end[k]}</b></span>)}
         </div>
         <div role="img" aria-label={`Score over time. ${game.away.name} ${end.a}, ${game.home.name} ${end.h}.`}>
           <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
@@ -332,7 +334,7 @@ function DriveField({ d, game }) {
   if (d.x0 == null || d.x1 == null) return null;
   const W = 300, H = 26, ez = 22, fx = (v) => ez + (v / 100) * (W - ez * 2);
   const a = fx(d.x0), b = fx(d.x1), dir = d.side === 'away' ? 1 : -1;
-  const color = d.isScore ? '#FFE135' : d.turnover ? '#FF3D7F' : '#22D3D6';
+  const color = d.isScore ? '#FFBE2E' : d.turnover ? '#FF3D7F' : '#22D3D6';
   const tip = Math.abs(b - a) < 3 ? a + dir * 3 : b; // show at least a stub for a drive that went nowhere
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="field" aria-hidden="true">
@@ -412,7 +414,7 @@ function ShotChart({ shots, game, lg }) {
       ) : null}
       <div className="card pad shotbox">
         <div className="legend">
-          <span className="lg" style={{ background: '#FFE135' }}>MADE <b>{made}</b></span>
+          <span className="lg" style={{ background: '#FFBE2E' }}>MADE <b>{made}</b></span>
           <span className="lg" style={{ background: '#FF7AA6' }}>MISSED <b>{shown.length - made}</b></span>
         </div>
         <div role="img" aria-label={`${teams[side].name} shots: ${made} made of ${shown.length}.`}>
@@ -422,7 +424,7 @@ function ShotChart({ shots, game, lg }) {
             <path d={court} fill="none" stroke="#22D3D6" strokeWidth="3" strokeLinejoin="miter" />
             <circle cx={X(25)} cy={Y(0)} r="5" fill="none" stroke="#FF7A1A" strokeWidth="3" />
             {shown.filter((s) => !s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <path key={'m' + i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke="#FF7AA6" strokeWidth="2.6" strokeLinecap="square" />; })}
-            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <rect key={'k' + i} x={x - 5} y={y - 5} width="10" height="10" fill="#FFE135" stroke="#0C1124" strokeWidth="1.6" />; })}
+            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <rect key={'k' + i} x={x - 5} y={y - 5} width="10" height="10" fill="#FFBE2E" stroke="#0C1124" strokeWidth="1.6" />; })}
           </svg>
         </div>
         <p className="stamp" style={{ marginTop: 10 }}>Field goals {made}-{shown.length}{pctTxt(made, shown.length)} · Threes {made3}-{threes.length}{pctTxt(made3, threes.length)}</p>
