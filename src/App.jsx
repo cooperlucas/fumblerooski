@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getTeam, getGame, getScoreboard, getTeams, headlineFor } from './data/espn.js';
+import { getStandings, getTeam, getGame, getScoreboard, getTeams, headlineFor, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, isDemo, setDemo, demoLocked } from './data/store.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime } from './ui.jsx';
 
@@ -307,36 +307,38 @@ const TIPS = {
 };
 const PERIOD_WORD = { football: 'Q', basketball: 'Q', hockey: 'P', soccer: 'H', baseball: '' };
 
-function Momentum({ flow, game, L }) {
-  const W = 320, H = 140, mid = 70, amp = 58;
-  const x = (t) => 6 + t * (W - 12), y = (d) => mid - (d / flow.max) * amp;
-  let line = `M${x(0)} ${y(0)}`;
-  flow.points.forEach((p, i) => { if (i) line += ` H${x(p.t).toFixed(1)} V${y(p.d).toFixed(1)}`; });
-  const area = `${line} H${x(1)} V${mid} H${x(0)} Z`;
-  const n = flow.periods, segs = Array.from({ length: Math.min(n, L.periods || n) }, (_, i) => `${PERIOD_WORD[L.sport] ?? ''}${i + 1}`);
-  const extra = n > segs.length;
+// Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
+// like a late-80s broadcast graphic. Away is teal, home is yellow, same as the stat bars.
+function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1)))); const f = raw / pow; return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow); }
+function ScoreChart({ chart, game, L }) {
+  const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 14, y1 = 158;
+  const step = niceStep(chart.max), top = Math.max(step, Math.ceil(chart.max / step) * step);
+  const x = (t) => x0 + t * (x1 - x0), y = (v) => y1 - (v / top) * (y1 - y0);
+  const path = (k) => chart.points.map((p, i) => (i === 0 ? `M${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}` : chart.stepped ? `H${x(p.t).toFixed(1)} V${y(p[k]).toFixed(1)}` : `L${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}`)).join(' ');
+  const end = chart.points[chart.points.length - 1];
+  const reg = L.periods || chart.periods, word = PERIOD_WORD[L.sport] ?? '';
+  const label = (i) => (i < reg ? `${word}${i + 1}` : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
+  const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+  const sides = [[game.away, 'a', '#22D3D6'], [game.home, 'h', '#FFE135']];
   return (
-    <section className="card pad" style={{ marginTop: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-        <h2 className="wide ital" style={{ fontWeight: 900, fontSize: 14, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--teal)' }}>Momentum</h2>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--mute)' }}>How the lead swung</span>
+    <section className="sec">
+      <H2>Score Chart</H2>
+      <div className="card pad chart">
+        <div className="legend">
+          {sides.map(([t, k, c]) => <span key={k} className="lg" style={{ background: c }}>{t.abbr} <b>{end[k]}</b></span>)}
+        </div>
+        <div role="img" aria-label={`Score over time. ${game.away.name} ${end.a}, ${game.home.name} ${end.h}.`}>
+          <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+            {ticks.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} stroke={v === 0 ? '#3A4672' : '#232C50'} strokeWidth={v === 0 ? 2 : 1} /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">{v}</text></g>)}
+            {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} stroke="#2C3762" strokeDasharray="2 4" />)}
+            {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={i} x={x((a + b) / 2)} y={H - 18} textAnchor="middle" className="per">{label(i)}</text>; })}
+            {sides.map(([, k]) => <path key={'s' + k} d={path(k)} transform="translate(3 3)" fill="none" stroke="#6E3AB5" strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
+            {sides.map(([, k, c]) => <path key={k} d={path(k)} fill="none" stroke={c} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
+            {sides.map(([, k, c]) => <rect key={'e' + k} x={x(end.t) - 5} y={y(end[k]) - 5} width="10" height="10" fill={c} stroke="#0C1124" strokeWidth="2" />)}
+            <path d={`M${x0} ${H - 8} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 5} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 2} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
+          </svg>
+        </div>
       </div>
-      <div className="flowlab" style={{ marginTop: 12, color: 'var(--yellow)' }}>▲ {game.home.name} ahead</div>
-      <div role="img" aria-label={`Lead over time. Final: ${game.away.name} ${game.away.score}, ${game.home.name} ${game.home.score}.`} style={{ marginTop: 4 }}>
-        <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-          <defs>
-            <clipPath id="frTop"><rect x="0" y="0" width={W} height={mid} /></clipPath>
-            <clipPath id="frBot"><rect x="0" y={mid} width={W} height={H - mid} /></clipPath>
-          </defs>
-          <path d={area} fill="#FFE135" fillOpacity="0.32" clipPath="url(#frTop)" />
-          <path d={area} fill="#22D3D6" fillOpacity="0.32" clipPath="url(#frBot)" />
-          {Array.from({ length: n - 1 }, (_, i) => <path key={i} d={`M${x((i + 1) / n)} 0 V${H}`} stroke="#2C3762" strokeDasharray="3 4" />)}
-          <path d={`M0 ${mid} H${W}`} stroke="#3A4672" strokeWidth="1.5" strokeDasharray="3 4" />
-          <path d={line} fill="none" stroke="#F5F5F7" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        </svg>
-      </div>
-      <div className="flowlab" style={{ marginTop: 4, color: 'var(--teal)' }}>▼ {game.away.name} ahead</div>
-      <div className="flowsegs">{segs.map((s) => <span key={s}>{s}</span>)}{extra ? <span>OT</span> : null}</div>
     </section>
   );
 }
@@ -345,12 +347,14 @@ const COL_TIPS = {
   '+/-': 'Plus/minus: how many points the team outscored the other team by while this player was on the floor.',
   'C/ATT': 'Completions out of pass attempts.', TGTS: 'Targets: passes thrown to this player.', TFL: 'Tackles for loss.',
 };
+const Pct = ({ label, v }) => { const p = PCT_COLS.has(label) ? pctOf(v, 0) : ''; return p ? <small className="pct"> {p}</small> : null; };
 function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];
   const cur = box[side];
   const hasBench = sport === 'basketball';
   const tips = [...new Set(cur.groups.flatMap((g) => g.labels))].filter((l) => COL_TIPS[l]);
+  const noPm = sport === 'basketball' && cur.groups.length > 0 && !cur.groups.some((g) => g.labels.includes('+/-'));
   return (
     <section className="sec">
       <H2>Box Score</H2>
@@ -367,15 +371,16 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}</td>)}</tr>
+                    <tr><th scope="row" className="who">{r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{v}<Pct label={gr.labels[j]} v={v} /></td>)}</tr>
                   </React.Fragment>
                 ))}
-                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}</td>)}</tr> : null}
+                {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{v}<Pct label={gr.labels[j]} v={v} /></td>)}</tr> : null}
               </tbody>
             </table>
           </div>
         );
       }) : <Empty>No player stats for {teams[side].name} yet.</Empty>}
+      {noPm ? <p className="stamp" style={{ textAlign: 'left' }}>+/- is not available for this game. The feed does not send it for this league, and the play-by-play did not log every substitution, so it could not be counted.</p> : null}
       {tips.length ? <p className="stamp" style={{ textAlign: 'left' }}>{tips.map((l) => <span key={l} style={{ display: 'block', marginTop: 4 }}><b style={{ color: 'var(--soft)' }}>{l}</b> {COL_TIPS[l]}</span>)}</p> : null}
     </section>
   );
@@ -439,6 +444,8 @@ function GamePage({ lg, id }) {
               </section>
             ) : null}
 
+            {d.chart ? <ScoreChart chart={d.chart} game={g} L={L} /> : null}
+
             {d.box.length ? <BoxScore box={d.box} game={g} sport={L.sport} /> : null}
 
             {d.stats.length ? (
@@ -448,8 +455,8 @@ function GamePage({ lg, id }) {
                   {d.stats.map((s, i) => { const max = Math.max(s.awayN, s.homeN) || 1, open = tip === i, has = !!TIPS[s.label]; return (
                     <div className="statrow" key={s.label}>
                       <div className="lab"><span>{s.label}</span>{has ? <button className="q" aria-expanded={open} aria-label={open ? `Hide what ${s.label} means` : `What does ${s.label} mean?`} onClick={() => setTip(open ? null : i)}>?</button> : null}</div>
-                      {[[g.away, s.away, s.awayN, 'var(--teal)'], [g.home, s.home, s.homeN, 'var(--yellow)']].map(([t, v, n, c]) => (
-                        <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}</span></div>
+                      {[[g.away, s.away, s.awayN, 'var(--teal)', s.awayPct], [g.home, s.home, s.homeN, 'var(--yellow)', s.homePct]].map(([t, v, n, c, pc]) => (
+                        <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{v}{pc ? <small> {pc}</small> : null}</span></div>
                       ))}
                       {open ? <p className="tip">{TIPS[s.label]}</p> : null}
                     </div>); })}

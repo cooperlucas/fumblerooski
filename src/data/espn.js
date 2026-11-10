@@ -214,8 +214,8 @@ export async function getTeam(lg, id) {
 /* ---------- one game ---------- */
 // Which box-score rows we show, in order, and what we call them. Labels match the plain-English tips.
 const STAT_PICKS = {
-  football: [['totalYards', 'Total yards'], ['netPassingYards', 'Passing yards'], ['rushingYards', 'Rushing yards'], ['thirdDownEff', '3rd down'], ['turnovers', 'Turnovers'], ['possessionTime', 'Time of possession']],
-  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['totalRebounds', 'Rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers']],
+  football: [['totalYards', 'Total yards'], ['netPassingYards', 'Passing yards'], ['rushingYards', 'Rushing yards'], ['thirdDownEff', '3rd down'], ['fourthDownEff', '4th down'], ['turnovers', 'Turnovers'], ['possessionTime', 'Time of possession']],
+  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['freeThrowsMade-freeThrowsAttempted', 'Free throws'], ['totalRebounds', 'Rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers']],
   hockey: [['shotsTotal', 'Shots on goal'], ['powerPlayGoals', 'Power play goals'], ['faceoffsWon', 'Faceoffs won'], ['hits', 'Hits'], ['blockedShots', 'Blocked shots']],
   soccer: [['possessionPct', 'Possession'], ['totalShots', 'Shots'], ['shotsOnTarget', 'Shots on goal'], ['wonCorners', 'Corners'], ['foulsCommitted', 'Fouls']],
   baseball: [['hits', 'Hits'], ['runs', 'Runs'], ['errors', 'Errors'], ['homeRuns', 'Home runs'], ['strikeouts', 'Strikeouts']],
@@ -228,6 +228,15 @@ export function statNumber(v) {
   const n = parseFloat(s.replace(/[^0-9.\-]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
+// "41-88" or "22/31" as a percentage ("46.6%"), or '' when it is not a made-of-attempted pair.
+export function pctOf(v, digits = 1) {
+  const m = String(v ?? '').trim().match(/^(\d+)\s*[-/]\s*(\d+)$/);
+  if (!m || !+m[2] || +m[1] > +m[2]) return '';
+  return `${(100 * +m[1] / +m[2]).toFixed(digits)}%`;
+}
+// Only these are made-of-attempted. Things like sacks ("1-7") and penalties ("5-45") look the same but are not.
+const PCT_STATS = new Set(['Field goals', '3-pointers', 'Free throws', '3rd down', '4th down']);
+export const PCT_COLS = new Set(['FG', '3PT', 'FT', 'C/ATT']);
 function statRows(box, awayId, homeId, sport) {
   const teams = box?.teams || [];
   const of = (id) => (teams.find((t) => String(t.team?.id) === String(id))?.statistics) || [];
@@ -238,7 +247,8 @@ function statRows(box, awayId, homeId, sport) {
     if (!x || !y) return null;
     const av = String(x.displayValue ?? ''), hv = String(y.displayValue ?? '');
     if (!av && !hv) return null;
-    return { label: label || x.label || x.displayName || name, away: av, home: hv, awayN: statNumber(av), homeN: statNumber(hv) };
+    const lab = label || x.label || x.displayName || name, pct = PCT_STATS.has(lab);
+    return { label: lab, away: av, home: hv, awayN: statNumber(av), homeN: statNumber(hv), awayPct: pct ? pctOf(av) : '', homePct: pct ? pctOf(hv) : '' };
   };
   let rows = (STAT_PICKS[sport] || []).map(([n, l]) => row(n, l)).filter(Boolean);
   // The feed names stats differently per sport. If none of ours matched, show the first few it does have.
@@ -251,12 +261,14 @@ const BOX_FIRST = {
   basketball: ['MIN', 'PTS', 'REB', 'AST', '+/-', 'FG', '3PT', 'FT', 'STL', 'BLK', 'TO'],
 };
 const FOOTBALL_GROUPS = ['passing', 'rushing', 'receiving', 'defensive', 'interceptions', 'kicking', 'punting'];
+// The feed's display text puts the team in front ("Buffalo Passing"). The plain stat name is cleaner.
 const titleOf = (g, sport) => {
-  const t = String(g.text || g.displayName || g.name || '').trim();
+  const t = String(g.name || g.text || g.displayName || '').trim();
   if (!t) return sport === 'basketball' ? 'Players' : 'Stats';
-  return t.charAt(0).toUpperCase() + t.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+  return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/([a-z])([A-Z])/g, '$1 $2');
 };
-export function playerBox(box, awayId, homeId, sport) {
+// plusMinus: optional { athleteId: number } worked out from the play-by-play, used when the feed has no +/- column.
+export function playerBox(box, awayId, homeId, sport, plusMinus) {
   const out = [];
   for (const id of [awayId, homeId]) {
     const side = (box?.players || []).find((p) => String(p.team?.id) === String(id));
@@ -265,6 +277,10 @@ export function playerBox(box, awayId, homeId, sport) {
       const keys = g.keys || g.names || [];
       // Make sure plus/minus is labeled the way fans know it even if the feed only names the key.
       labels.forEach((l, i) => { if (!l && /plusMinus/i.test(keys[i] || '')) labels[i] = '+/-'; });
+      const addPm = sport === 'basketball' && plusMinus && !labels.includes('+/-');
+      const pmIdx = labels.length;
+      if (addPm) labels.push('+/-');
+      const pmText = (a) => { const v = plusMinus[String(a.athlete?.id ?? '')] ?? 0; return v > 0 ? `+${v}` : String(v); };
       const first = BOX_FIRST[sport] || [];
       const order = [...first.map((l) => labels.indexOf(l)).filter((i) => i >= 0), ...labels.map((_, i) => i).filter((i) => !first.includes(labels[i]))];
       const rows = (g.athletes || []).filter((a) => !a.didNotPlay && (a.stats || []).length).map((a) => ({
@@ -272,7 +288,7 @@ export function playerBox(box, awayId, homeId, sport) {
         name: cleanText(a.athlete?.shortName || a.athlete?.displayName || ''),
         pos: a.athlete?.position?.abbreviation || '',
         starter: a.starter === true,
-        stats: order.map((i) => String(a.stats[i] ?? '')),
+        stats: order.map((i) => (addPm && i === pmIdx ? pmText(a) : String(a.stats[i] ?? ''))),
       })).filter((r) => r.name);
       return { key: String(g.name || '').toLowerCase(), title: titleOf(g, sport), labels: order.map((i) => labels[i]), rows, totals: Array.isArray(g.totals) && g.totals.length ? order.map((i) => String(g.totals[i] ?? '')) : null };
     }).filter((g) => g.rows.length && g.labels.length);
@@ -282,33 +298,93 @@ export function playerBox(box, awayId, homeId, sport) {
   return out.some((t) => t.groups.length) ? out : [];
 }
 
-const clockFrac = (clock, len) => {
-  const m = String(clock || '').match(/^(\d+):(\d{2})/);
-  if (!m || !len) return null;
-  const rem = +m[1] + +m[2] / 60;
-  return Math.min(1, Math.max(0, 1 - rem / len));
-};
-// Momentum: who led, by how much, across the game. Built only from points scored. No predictions.
-export function momentum(game, plays, L) {
-  const pts = [{ t: 0, d: 0 }];
-  const n = Math.max(L.periods || 4, game.period || 0, game.home.lines.length);
-  const scored = plays.filter((p) => Number.isFinite(p.home) && Number.isFinite(p.away));
-  if (scored.length >= 2) {
-    scored.forEach((p, i) => {
-      const f = L.sport === 'soccer' ? null : clockFrac(p.clock, L.periodLen);
-      const per = Math.max(1, p.period || 1);
-      const t = f == null ? (i + 1) / (scored.length + 1) : Math.min(1, (per - 1 + f) / n);
-      pts.push({ t, d: p.home - p.away });
-    });
+/* ---------- score chart: both teams' scores across the game. Facts only, no predictions. ---------- */
+const OT_LEN = { football: 10, basketball: 5, hockey: 5 };
+// Minutes of game time elapsed at a play, or null if the clock cannot be read.
+function elapsed(period, clock, L) {
+  const c = String(clock ?? '').trim();
+  if (L.sport === 'soccer') { const m = c.match(/(\d+)/); return m ? +m[1] : null; }
+  if (!L.periodLen) return null;
+  let left = null;
+  let m = c.match(/^(\d+):(\d{2})/); if (m) left = +m[1] + +m[2] / 60;
+  else if (/^\d+(\.\d+)?$/.test(c)) left = +c / 60; // last minute shows as seconds ("34.5")
+  if (left == null) return null;
+  const per = Math.max(1, period || 1), reg = L.periods, ot = OT_LEN[L.sport] || L.periodLen;
+  const len = per <= reg ? L.periodLen : ot;
+  const base = per <= reg ? (per - 1) * L.periodLen : reg * L.periodLen + (per - reg - 1) * ot;
+  return base + Math.min(len, Math.max(0, len - left));
+}
+// plays: [{ period, clock, away, home }] in game order. Falls back to period scores when plays are missing.
+export function scoreSeries(game, plays, L) {
+  const played = Math.max(L.periods || 0, game.home.lines.length, game.away.lines.length, game.period || 0);
+  const ot = OT_LEN[L.sport] || L.periodLen || 0;
+  let pts = [{ m: 0, a: 0, h: 0 }], pa = 0, ph = 0, timed = !!L.periodLen;
+  for (const p of plays) {
+    if (!Number.isFinite(p.away) || !Number.isFinite(p.home) || (p.away === pa && p.home === ph) || p.away < pa || p.home < ph) continue;
+    const m = elapsed(p.period, p.clock, L);
+    if (m == null) timed = false;
+    pts.push({ m, a: p.away, h: p.home }); pa = p.away; ph = p.home;
+  }
+  let bounds = [], total = null;
+  if (pts.length >= 3 && timed) {
+    total = L.sport === 'soccer' ? Math.max(90, ...pts.map((p) => p.m)) : L.periods * L.periodLen + Math.max(0, played - L.periods) * ot;
+    let last = 0;
+    pts.forEach((p) => { p.m = Math.max(last, Math.min(total, p.m)); last = p.m; p.t = p.m / total; });
+    const ends = L.sport === 'soccer' ? [45, total] : Array.from({ length: played }, (_, i) => (i < L.periods ? (i + 1) * L.periodLen : L.periods * L.periodLen + (i - L.periods + 1) * ot));
+    bounds = ends.map((e) => e / total);
   } else if (game.home.lines.length >= 2 && game.home.lines.length === game.away.lines.length) {
-    let h = 0, a = 0;
-    game.home.lines.forEach((v, i) => { h += +v || 0; a += +game.away.lines[i] || 0; pts.push({ t: (i + 1) / game.home.lines.length, d: h - a }); });
+    const n = game.home.lines.length; let h = 0, a = 0;
+    pts = [{ t: 0, a: 0, h: 0 }];
+    game.home.lines.forEach((v, i) => { h += +v || 0; a += +game.away.lines[i] || 0; pts.push({ t: (i + 1) / n, a, h, soft: true }); });
+    bounds = Array.from({ length: n }, (_, i) => (i + 1) / n);
   } else return null;
-  const last = pts[pts.length - 1];
-  if (last.t < 1) pts.push({ t: 1, d: last.d });
-  pts.sort((x, y) => x.t - y.t);
-  const max = Math.max(1, ...pts.map((p) => Math.abs(p.d)));
-  return { points: pts, max, periods: n };
+  // End the lines at the final whistle, or at the current moment of a live game.
+  const lastPt = pts[pts.length - 1];
+  const fa = parseInt(game.away.score, 10), fh = parseInt(game.home.score, 10);
+  let end = game.state === 'final' ? 1 : lastPt.t;
+  if (game.state === 'live' && total) { const now = elapsed(game.period, game.clock, L); if (now != null) end = Math.max(lastPt.t, Math.min(1, now / total)); }
+  const endA = Number.isFinite(fa) ? Math.max(fa, lastPt.a) : lastPt.a, endH = Number.isFinite(fh) ? Math.max(fh, lastPt.h) : lastPt.h;
+  if (end > lastPt.t || endA !== lastPt.a || endH !== lastPt.h) pts.push({ t: Math.max(end, lastPt.t), a: endA, h: endH });
+  return { points: pts.map((p) => ({ t: p.t, a: p.a, h: p.h })), max: Math.max(1, endA, endH), bounds, periods: bounds.length, stepped: !pts.some((p) => p.soft), end: pts[pts.length - 1].t };
+}
+
+/* ---------- plus/minus worked out from the play-by-play ---------- */
+// Some leagues (college hoops) do not send +/-. If every substitution is in the play-by-play we can count it:
+// follow who is on the floor, and credit each basket to the ten players out there.
+// If the lineups ever stop adding up to five a side, we return null and show nothing rather than a wrong number.
+export function plusMinusFromPlays(rawPlays, starters, awayId, homeId) {
+  const on = { [awayId]: new Set(starters[awayId] || []), [homeId]: new Set(starters[homeId] || []) };
+  if (on[awayId].size !== 5 || on[homeId].size !== 5) return null;
+  const pm = {}; let pa = 0, ph = 0, subs = 0;
+  for (const p of rawPlays || []) {
+    const text = String(p.text || ''), type = String(p.type?.text || '');
+    const tid = String(p.team?.id ?? ''), who = (p.participants || []).map((x) => String(x.athlete?.id ?? '')).filter(Boolean);
+    if (/substitution/i.test(type) || /subbing (in|out)|enters the game/i.test(text)) {
+      const set = on[tid]; if (!set || !who.length) return null;
+      if (/enters the game for/i.test(text) && who.length >= 2) { if (set.has(who[0]) || !set.has(who[1])) return null; set.delete(who[1]); set.add(who[0]); }
+      else if (/subbing out/i.test(text)) { if (!set.has(who[0])) return null; set.delete(who[0]); }
+      else if (/subbing in|enters the game/i.test(text)) { if (set.has(who[0])) return null; set.add(who[0]); }
+      else return null;
+      subs++; continue;
+    }
+    const a = Number(p.awayScore), h = Number(p.homeScore);
+    if (!Number.isFinite(a) || !Number.isFinite(h) || (a === pa && h === ph)) continue;
+    if (a < pa || h < ph) return null;
+    if (on[awayId].size !== 5 || on[homeId].size !== 5) return null;
+    const d = (a - pa) - (h - ph);
+    on[awayId].forEach((id) => { pm[id] = (pm[id] || 0) + d; });
+    on[homeId].forEach((id) => { pm[id] = (pm[id] || 0) - d; });
+    pa = a; ph = h;
+  }
+  return subs > 0 && pa + ph > 0 ? pm : null; // no substitutions logged means we cannot know who was on the floor
+}
+function startersOf(box, ids) {
+  const out = {};
+  for (const id of ids) {
+    const side = (box?.players || []).find((p) => String(p.team?.id) === String(id));
+    out[id] = (side?.statistics?.[0]?.athletes || []).filter((a) => a.starter === true).map((a) => String(a.athlete?.id ?? ''));
+  }
+  return out;
 }
 
 export async function getGame(lg, id) {
@@ -317,6 +393,7 @@ export async function getGame(lg, id) {
   const comp = data.header?.competitions?.[0];
   if (!comp) throw new FeedError('That game is not in the feed.', 404);
   const game = normEvent({ id: data.header.id || id, date: comp.date, competitions: [comp] }, lg);
+  const started = game.state === 'live' || game.state === 'final';
   const plays = (data.scoringPlays || []).map((p) => ({
     text: cleanText(p.text),
     kind: cleanText(p.type?.text || p.scoringType?.displayName || ''),
@@ -325,12 +402,19 @@ export async function getGame(lg, id) {
     teamId: String(p.team?.id ?? ''),
     away: Number(p.awayScore), home: Number(p.homeScore),
   })).filter((p) => p.text);
+  // Basketball has no scoring-play list, but its full play-by-play carries the running score.
+  const all = Array.isArray(data.plays) && data.plays.length ? data.plays : (data.scoringPlays || []);
+  const timeline = all.map((p) => ({ period: p.period?.number || 0, clock: p.clock?.displayValue || '', away: Number(p.awayScore), home: Number(p.homeScore) }));
+  let plusMinus = null;
+  if (L.sport === 'basketball' && started) {
+    try { plusMinus = plusMinusFromPlays(data.plays, startersOf(data.boxscore, [game.away.id, game.home.id]), game.away.id, game.home.id); } catch { plusMinus = null; }
+  }
   return {
     game,
     stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport),
-    box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport),
+    box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus),
     plays,
-    flow: game.state === 'final' ? momentum(game, plays, L) : null,
+    chart: started ? scoreSeries(game, timeline, L) : null,
     venue: cleanText(data.gameInfo?.venue?.fullName || ''),
   };
 }

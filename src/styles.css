@@ -145,7 +145,7 @@ h1, h2, h3, p { margin: 0; }
 .statrow .lab { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 800; }
 .q { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line3); background: transparent; color: var(--soft); font-weight: 900; font-size: 13px; padding: 0; }
 .q[aria-expanded="true"] { background: var(--yellow); color: var(--bg); border-color: var(--yellow); }
-.bar { display: grid; grid-template-columns: 40px 1fr 48px; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; font-weight: 800; }
+.bar { display: grid; grid-template-columns: 40px 1fr minmax(48px, auto); align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; font-weight: 800; }
 .bar .track { height: 10px; border-radius: 5px; background: #232C50; overflow: hidden; }
 .bar .fill { height: 100%; border-radius: 5px; transform-origin: left center; animation: frGrow 800ms cubic-bezier(.2, .8, .2, 1) both; }
 .bar .val { text-align: right; font-variant-numeric: tabular-nums; }
@@ -195,3 +195,12 @@ h1, h2, h3, p { margin: 0; }
 .pbox td.down { color: #FF7AA6; }
 .pbox tr.bench th { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding-top: 12px; }
 .pbox tr.tot th, .pbox tr.tot td { color: var(--ink); font-weight: 900; border-top: 1px solid #2C3762; }
+
+.bar .val small { font-weight: 800; color: var(--yellow); }
+.pbox td small.pct { font-size: 11px; font-weight: 800; color: var(--yellow); }
+/* score chart */
+.chart .legend { display: flex; gap: 10px; margin-bottom: 10px; }
+.chart .lg { padding: 4px 10px; border-radius: 6px; color: #0C1124; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 12px; letter-spacing: 0.04em; box-shadow: 3px 3px 0 #6E3AB5; }
+.chart .lg b { font-size: 15px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.chart .ax { fill: #6F7AA3; font-size: 9px; font-weight: 800; font-family: var(--font); }
+.chart .per { fill: #8E99BF; font-size: 10px; font-weight: 900; font-style: italic; font-stretch: 125%; font-family: var(--font); letter-spacing: 0.06em; }

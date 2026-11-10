@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor } from '../src/data/espn.js';
+import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries } from '../src/data/espn.js';
+import { LEAGUE } from '../src/data/leagues.js';
 import { demoFetch } from '../src/data/fixtures.js';
 import { scrub, isBetting, cleanText } from '../src/data/guard.js';
 
@@ -62,19 +63,23 @@ test('teams list and team page (schedule scores arrive as objects)', async () =>
   assert.equal(t.schedule[0].home.score, '27'); assert.equal(t.schedule[0].away.score, '13');
 });
 
-test('game page: stats, scoring plays without the sportsbook line, momentum for finals only', async () => {
+test('game page: stats, scoring plays without the sportsbook line, score chart', async () => {
   const fin = await getGame('nfl', 'g2');
   assert.equal(fin.game.state, 'final');
   assert.equal(fin.stats[0].label, 'Total yards'); assert.equal(fin.stats[0].home, '412');
   assert.equal(fin.plays.length, 5, 'the sportsbook-sponsored play is dropped');
   assert.doesNotMatch(JSON.stringify(fin), BET);
-  assert.ok(fin.flow && fin.flow.points.length >= 3);
-  assert.equal(fin.flow.points.at(-1).d, 14);
+  assert.ok(fin.chart && fin.chart.stepped);
+  assert.deepEqual(fin.chart.points.at(-1), { t: 1, a: 13, h: 27 });
+  assert.ok(Math.abs(fin.chart.points[1].t - (15 - (9 + 14 / 60)) / 60) < 1e-9, 'first touchdown at 9:14 left in Q1');
+  assert.equal(fin.chart.points[1].h, 7);
+  assert.equal(fin.chart.periods, 4);
   const live = await getGame('nfl', 'g1');
-  assert.equal(live.flow, null);
+  assert.ok(live.chart, 'live games get a chart too');
   const hoops = await getGame('nba', 'g10');
   assert.equal(hoops.stats[0].label, 'Field goals');
-  assert.ok(hoops.flow, 'basketball momentum falls back to quarter scores');
+  assert.equal(hoops.chart.stepped, false, 'no play-by-play in this fixture, so the chart uses quarter scores');
+  assert.deepEqual(hoops.chart.points.at(-1), { t: 1, a: 118, h: 96 });
 });
 
 test('headlines come from the score, by template', async () => {
@@ -118,7 +123,44 @@ test('player box score: basketball leads with PTS, REB, AST and +/-, and skips p
 test('player box score: football shows passing, rushing, receiving in that order', async () => {
   const { box } = await getGame('nfl', 'g2');
   assert.deepEqual(box[1].groups.map((g) => g.title), ['Passing', 'Rushing', 'Receiving']);
+  assert.ok(box[1].groups.every((g) => !/demo|team/i.test(g.title)), 'no team name in front of the group title');
   assert.equal(box[1].groups[0].rows[0].stats[0], '22/31');
   const pre = await getGame('nfl', 'g3');
   assert.deepEqual(pre.box, []);
+});
+
+test('percentages: only real made-of-attempted stats get one', async () => {
+  assert.equal(pctOf('41-88'), '46.6%'); assert.equal(pctOf('22/31', 0), '71%'); assert.equal(pctOf('0-0'), ''); assert.equal(pctOf('412'), ''); assert.equal(pctOf('31:24'), '');
+  const hoops = await getGame('nba', 'g10');
+  const fg = hoops.stats.find((s) => s.label === 'Field goals');
+  assert.equal(fg.awayPct, '46.6%'); assert.equal(fg.homePct, '51.1%');
+  assert.equal(hoops.stats.find((s) => s.label === 'Rebounds').awayPct, '');
+  const fb = await getGame('nfl', 'g2');
+  assert.equal(fb.stats.find((s) => s.label === '3rd down').homePct, '57.1%');
+});
+
+test('plus/minus from play-by-play: counted when lineups add up, withheld when they do not', () => {
+  const A = ['a1', 'a2', 'a3', 'a4', 'a5'], H = ['h1', 'h2', 'h3', 'h4', 'h5'];
+  const score = (a, h) => ({ text: 'made shot', type: { text: 'JumpShot' }, awayScore: a, homeScore: h });
+  const sub = (tid, id, dir) => ({ text: `Player subbing ${dir} for Team`, type: { text: 'Substitution' }, team: { id: tid }, participants: [{ athlete: { id } }], awayScore: 0, homeScore: 0 });
+  const fix = (plays) => { let a = 0, h = 0; return plays.map((p) => { if (p.type.text === 'Substitution') return { ...p, awayScore: a, homeScore: h }; a = p.awayScore; h = p.homeScore; return p; }); };
+  const plays = fix([score(2, 0), score(2, 3), sub('A', 'a5', 'out'), sub('A', 'a6', 'in'), score(5, 3), score(5, 5)]);
+  const pm = plusMinusFromPlays(plays, { A, H }, 'A', 'H');
+  // a1 played all four baskets (+2 -3 +3 -2 = 0), a5 only the first two (-1), a6 only the last two (+1)
+  assert.equal(pm.a1, 0); assert.equal(pm.a5, -1); assert.equal(pm.a6, 1); assert.equal(pm.h1, 0);
+  // a sub for a player who is not on the floor means the log is incomplete: no numbers at all
+  assert.equal(plusMinusFromPlays(fix([score(2, 0), sub('A', 'zz', 'out')]), { A, H }, 'A', 'H'), null);
+  // six on the floor when a basket is scored: withheld
+  assert.equal(plusMinusFromPlays(fix([sub('A', 'a6', 'in'), score(2, 0)]), { A, H }, 'A', 'H'), null);
+  // no substitutions logged at all: withheld
+  assert.equal(plusMinusFromPlays([score(2, 0), score(2, 2)], { A, H }, 'A', 'H'), null);
+});
+
+test('score chart: overtime stretches the clock, live games stop at the current score', () => {
+  const side = (score, lines) => ({ score: String(score), lines: lines.map(String) });
+  const g = { state: 'final', period: 5, clock: '0:00', away: side(24, [7, 7, 3, 7, 0]), home: side(27, [3, 14, 0, 7, 3]) };
+  const c = scoreSeries(g, [{ period: 1, clock: '10:00', away: 7, home: 0 }, { period: 4, clock: '0:30', away: 24, home: 24 }, { period: 5, clock: '5:00', away: 24, home: 27 }], LEAGUE.nfl);
+  assert.equal(c.periods, 5); assert.equal(c.bounds[3], 60 / 70);
+  assert.deepEqual(c.points.at(-1), { t: 1, a: 24, h: 27 });
+  assert.equal(c.points[3].t, 65 / 70);
 });

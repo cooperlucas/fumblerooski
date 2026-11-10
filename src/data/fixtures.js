@@ -135,7 +135,7 @@ function summary(lg, id) {
       { team: { id: h }, statistics: grp([ath('p5', 'D. Wing', 'F', ['38', '9-21', '3-8', '4-4', '1', '6', '7', '5', '1', '1', '4', '3', '-12', '25'], true)]) },
     ];
   } else if (started) {
-    const g3 = (name, labels, rows) => ({ name, text: name, labels, keys: labels, athletes: rows, totals: [] });
+    const g3 = (name, labels, rows) => ({ name, text: `Demo Team ${name}`, labels, keys: labels, athletes: rows, totals: [] });
     const side = (q, r, w) => [
       g3('receiving', ['REC', 'YDS', 'AVG', 'TD', 'LONG', 'TGTS'], [ath(w + 'w', 'D. Receiver', 'WR', ['7', '104', '14.9', '1', '32', '10'])]),
       g3('passing', ['C/ATT', 'YDS', 'AVG', 'TD', 'INT', 'SACKS', 'QBR', 'RTG'], [ath(q + 'q', 'D. Quarterback', 'QB', ['22/31', '265', '8.5', '2', '0', '1-7', '71.2', '118.4'])]),
