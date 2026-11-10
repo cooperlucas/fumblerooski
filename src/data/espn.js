@@ -48,7 +48,7 @@ function hashColor(s) {
 // A team chip needs a color that shows up on a navy screen with white letters.
 export function teamColor(color, alt, seed) {
   const a = hexOk(color) ? color : null, b = hexOk(alt) ? alt : null;
-  const usable = (h) => h && lum(h) > 0.012 && lum(h) < 0.55;
+  const usable = (h) => h && lum(h) > 0.012 && lum(h) < 0.7; // silver and gold are fine (chips switch to dark letters); near-white is not
   if (usable(a)) return '#' + a.toUpperCase();
   if (usable(b)) return '#' + b.toUpperCase();
   if (a && lum(a) <= 0.012) return '#2B3352'; // near-black team color: lift it off the background
