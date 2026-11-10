@@ -86,8 +86,9 @@ function Ticker() {
             <span className={fin && a < h ? 'dim' : undefined}>{g.away.abbr}{pre ? '' : <b> {g.away.score}</b>}</span>
             <span className="at">{pre ? 'at' : ''}</span>
             <span className={fin && h < a ? 'dim' : undefined}>{g.home.abbr}{pre ? '' : <b> {g.home.score}</b>}</span>
-            <span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
-            {!fin && g.tv?.national?.length ? <span className="ttv">{g.tv.national[0]}</span> : null}
+            <span className="tstk"><span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
+              {!fin && g.tv?.national?.length ? <span className="ttv">{g.tv.national[0]}</span> : null}
+            </span>
           </button>
         );
       })}
