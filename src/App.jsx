@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
@@ -769,9 +769,12 @@ function TeamPage({ lg, id, season }) {
 function TeamSeason({ lg, id, season, team }) {
   const [open, setOpen] = useState({});
   const q = useQuery(season ? `teamseason:${lg}:${id}:${season}` : null, () => getTeamStatsFor(lg, id, season), () => 600000);
+  // Hoops: plus-minus slots in as the fifth leader once it has loaded (it takes a few reads more than the rest).
+  const pmq = useQuery(season && hasPlusMinus(lg) ? `teampm:${lg}:${id}:${season}` : null, () => getTeamPlusMinus(lg, id, season), () => 1800000);
   if (!season || (q.loading && !q.data)) return <div style={{ marginTop: 12 }}><Loading rows={5} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
-  const { groups, leaders } = q.data;
+  const { groups } = q.data;
+  const leaders = pmq.data ? [...q.data.leaders.slice(0, 4), pmq.data, ...q.data.leaders.slice(4)] : q.data.leaders;
   if (!groups.length && !leaders.length) return <Empty>No stats for this season yet.</Empty>;
   return (
     <>

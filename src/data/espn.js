@@ -694,33 +694,79 @@ export function plusMinusFromSummary(d) {
 // plus one small read per game for the game log). College works it out from each game's play-by-play.
 export const hasPlusMinus = (lg) => LEAGUE[lg]?.sport === 'basketball';
 export const signed = (n) => (n > 0 ? `+${n}` : String(n));
-// A finished game's plus-minus never changes, so keep it on the phone: the next player page from that game is instant.
+// A finished game's plus-minus never changes, so keep it on the phone: the next page from that game is instant.
 const pmCache = {
-  get(k) { try { const v = localStorage.getItem('fr.pm.' + k); return v ? JSON.parse(v) : null; } catch { return null; } },
-  set(k, v) { try { localStorage.setItem('fr.pm.' + k, JSON.stringify(v)); } catch { /* storage full or blocked: just refetch next time */ } },
+  get(k) { try { const v = localStorage.getItem('fr.pm2.' + k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('fr.pm2.' + k, JSON.stringify(v)); } catch { /* storage full or blocked: just refetch next time */ } },
 };
+// One game's plus-minus from its play-by-play, plus who each player is: { pm: {id: n}, who: {id: [name, pos, jersey, teamId]} }.
+async function gamePlusMinus(lg, eid) {
+  const hit = pmCache.get(`${lg}.${eid}`);
+  if (hit) return hit;
+  const d = await get(url(SITE, lg, '/summary', { event: eid }));
+  const pm = plusMinusFromSummary(d);
+  if (!pm) return null;
+  const who = {};
+  (d.boxscore?.players || []).forEach((t) => (t.statistics?.[0]?.athletes || []).forEach((a) => {
+    const x = a.athlete || {};
+    if (x.id != null && !a.didNotPlay) who[String(x.id)] = [cleanText(x.displayName || x.shortName || ''), x.position?.abbreviation || '', x.jersey != null ? String(x.jersey) : '', String(t.team?.id ?? '')];
+  }));
+  const out = { pm, who };
+  if (d.header?.competitions?.[0]?.status?.type?.completed) pmCache.set(`${lg}.${eid}`, out);
+  return out;
+}
+// Run jobs a few at a time.
+async function inBatches(list, n, fn) {
+  const queue = [...list];
+  await Promise.all(Array.from({ length: n }, async () => { for (let x = queue.shift(); x !== undefined; x = queue.shift()) { try { await fn(x); } catch { /* skip that one */ } } }));
+}
 // College: work it out from each game's play-by-play, for every game in this season's log.
 async function collegePlusMinus(lg, id) {
   const pid = encodeURIComponent(id);
   const log = await get(url(COMMON, lg, `/athletes/${pid}/gamelog`));
   const ids = [...new Set((log.seasonTypes || []).flatMap((st) => (st.categories || []).flatMap((c) => (c.events || []).map((e) => String(e.eventId ?? '')))).filter(Boolean))];
   const games = {};
-  const queue = [...ids];
-  await Promise.all(Array.from({ length: 6 }, async () => {
-    for (let eid = queue.shift(); eid; eid = queue.shift()) {
-      try {
-        let pm = pmCache.get(`${lg}.${eid}`);
-        if (!pm) {
-          const d = await get(url(SITE, lg, '/summary', { event: eid }));
-          pm = plusMinusFromSummary(d);
-          if (pm && d.header?.competitions?.[0]?.status?.type?.completed) pmCache.set(`${lg}.${eid}`, pm);
-        }
-        if (pm) games[eid] = pm[String(id)] ?? 0;
-      } catch { /* that game stays blank */ }
-    }
-  }));
+  await inBatches(ids, 6, async (eid) => { const g = await gamePlusMinus(lg, eid); if (g && g.who[String(id)]) games[eid] = g.pm[String(id)] ?? 0; });
   const vals = Object.values(games);
   return { year: null, total: vals.length ? vals.reduce((n, v) => n + v, 0) : null, games, n: vals.length };
+}
+// A team's plus-minus leaders for a season, per game, as a Team Leaders category. Players need half the team's games.
+export async function getTeamPlusMinus(lg, teamId, season) {
+  const L = LEAGUE[lg];
+  const tid = String(teamId);
+  const tally = new Map(); // id -> { total, gp, name, pos, jersey }
+  let teamGames = 0;
+  if (L.college) {
+    const sched = await get(url(SITE, lg, `/teams/${encodeURIComponent(tid)}/schedule`, season ? { season: String(season) } : {}));
+    const ids = (sched.events || []).filter((e) => e.competitions?.[0]?.status?.type?.completed).map((e) => String(e.id));
+    await inBatches(ids, 6, async (eid) => {
+      const g = await gamePlusMinus(lg, eid);
+      if (!g) return;
+      teamGames++;
+      Object.entries(g.who).forEach(([pid, [name, pos, jersey, t]]) => {
+        if (t !== tid) return;
+        const r = tally.get(pid) || { total: 0, gp: 0, name, pos, jersey };
+        r.total += g.pm[pid] ?? 0; r.gp++; tally.set(pid, r);
+      });
+    });
+  } else {
+    const base = `https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}`;
+    const yr = Number(season) || null;
+    if (!yr) return null;
+    const roster = await getRoster(lg, tid);
+    const players = roster.groups.flatMap((g) => g.players);
+    await inBatches(players, 8, async (p) => {
+      const d = await get(`${base}/seasons/${yr}/types/2/athletes/${encodeURIComponent(p.id)}/statistics?lang=en&region=us`);
+      let pm = null, gp = 0;
+      for (const c of d?.splits?.categories || []) for (const x of c.stats || []) { if (x.name === 'plusMinus') pm = Number(x.value); if (x.name === 'gamesPlayed') gp = Number(x.value) || gp; }
+      if (Number.isFinite(pm) && gp) { tally.set(p.id, { total: pm, gp, name: p.name, pos: p.pos, jersey: p.jersey }); teamGames = Math.max(teamGames, gp); }
+    });
+  }
+  const need = Math.max(1, Math.ceil(teamGames / 2));
+  const rows = [...tally.entries()].filter(([, r]) => r.gp >= need && r.name).map(([pid, r]) => ({ id: pid, name: r.name, pos: r.pos, jersey: r.jersey, avg: r.total / r.gp, total: r.total }))
+    .sort((a, b) => b.avg - a.avg || b.total - a.total).slice(0, 3)
+    .map((r) => ({ id: r.id, name: r.name, pos: r.pos, jersey: r.jersey, value: signed(Math.round(r.avg * 10) / 10), detail: `${signed(r.total)} total` }));
+  return rows.length ? { key: 'plusMinus', title: 'Plus/Minus Per Game', rows } : null;
 }
 export async function getPlusMinus(lg, id) {
   const L = LEAGUE[lg];
