@@ -392,3 +392,46 @@ test('drive spots: a play measured from the wrong goal line is flipped back', as
   const { fixSpot } = await import('../src/data/espn.js');
   assert.equal(fixSpot(1, 99, 0), 1); assert.equal(fixSpot(22, 78, 0), 22); assert.equal(fixSpot(17, 1, 16), 1); assert.equal(fixSpot(40, 41, -1), 41); assert.equal(fixSpot(50, 60, -10), 60);
 });
+
+test('fieldMoment reads the newest football play', async () => {
+  const { fieldMoment } = await import('../src/data/espn.js');
+  const fg = (text, type = 'Field Goal Missed') => fieldMoment({ type, text });
+  assert.deepEqual([fg('N.Folk 38 yard field goal is No Good, Wide Left, Center-L.M.').miss, fg('H.Butker 51 yard field goal is No Good, Wide Right.').miss, fg('H.Butker 58 yard field goal is No Good, Short, Center.').miss,
+    fg('T.Loop 34 yard field goal is No Good, Hit Left Upright, Center.').miss, fg('W.Reichard 59 yard field goal is BLOCKED (G.Stewart)', 'Blocked Field Goal').miss,
+    fg('(05:54) #35 S.Porath field goal attempt from 53 yards NO GOOD (H: #96 J.Vinci)').miss], ['left', 'right', 'short', 'leftpost', 'blocked', 'wide']);
+  const good = fg('(03:57) #31 B.Stidham field goal attempt from 25 yards GOOD (H: #34 P.Stainton), clock 03:55', 'Field Goal Good');
+  assert.equal(good.good, true); assert.equal(good.yards, 25);
+  assert.equal(fieldMoment({ type: 'Rushing Touchdown', text: 'S.Barkley left tackle for 3 yards, TOUCHDOWN. TWO-POINT CONVERSION ATTEMPT. J.Milton rushes up the middle. ATTEMPT SUCCEEDS' }).two, 'good');
+  assert.equal(fieldMoment({ type: 'Passing Touchdown', text: 'Nate Roberts 15 Yd pass from Luke Fahey (Two-Point Pass Conversion Failed)' }).two, 'failed');
+  assert.equal(fieldMoment({ type: 'Passing Touchdown', text: 'pass short right to H.Fannin for 39 yards, TOUCHDOWN.' }).two, '');
+  assert.equal(fieldMoment({ type: 'Pass Interception Return', text: 'pass intercepted by #28 L.Talich at Irish49' }).how, 'Interception');
+  assert.equal(fieldMoment({ type: 'Sack Opp Fumble Recovery', text: 'sacked at DAL 16. FUMBLES, RECOVERED by IND' }).kind, 'turnover');
+  assert.equal(fieldMoment({ type: 'Fumble Recovery (Own)', text: 'fumbled, recovered' }).kind, '');
+  assert.deepEqual(fieldMoment({ type: 'Punt', text: '(01:46) #39 J.Scaife punt 45 yards to the Canes03' }), { kind: 'punt', yards: 45, touchback: false, blocked: false });
+  assert.equal(fieldMoment({ type: 'Kickoff', text: '#22 J.Weinberg kickoff 65 yards to the Irish00, Touchback' }).touchback, true);
+  assert.equal(fieldMoment({ type: 'Pass Reception', text: 'pass complete for 33 yards', yards: 33, kept: true }).kind, 'big');
+  assert.equal(fieldMoment({ type: 'Rush', text: 'rush for 4 yards', yards: 4, kept: true }).kind, '');
+});
+
+test('rinkState finds the power play and an empty net', async () => {
+  const { rinkState } = await import('../src/data/espn.js');
+  const pl = (period, clock, team, extra = {}) => ({ period: { number: period }, clock: { displayValue: clock }, team: { id: team }, type: { text: 'Shot' }, ...extra });
+  const pen = (period, clock, team, mins = '2') => pl(period, clock, team, { type: { text: 'Hooking', penaltyMinutes: mins } });
+  const box = { players: [{ team: { id: 'A' }, statistics: [{ name: 'goalies', athletes: [{ athlete: { id: 'ga' } }] }] }, { team: { id: 'H' }, statistics: [{ name: 'goalies', athletes: [{ athlete: { id: 'gh' } }] }] }] };
+  const on = (a, h) => [{ teamId: 'A', entries: a.map((x) => ({ athleteid: x })) }, { teamId: 'H', entries: h.map((x) => ({ athleteid: x })) }];
+  const full = on(['ga', 1, 2, 3, 4, 5], ['gh', 6, 7, 8, 9, 10]);
+  // away penalized at 7:05 of the 2nd, newest play at 7:45: home on the power play with 1:20 left
+  let r = rinkState({ plays: [pen(2, '7:05', 'A'), pl(2, '7:45', 'H', { strength: { text: 'Power Play' } })], boxscore: box, onIce: full }, 'A', 'H');
+  assert.deepEqual(r.pp, { side: 'home', left: 80, skaters: '5 on 4' }); assert.deepEqual(r.emptyNet, []);
+  // it runs out
+  assert.equal(rinkState({ plays: [pen(2, '7:05', 'A'), pl(2, '9:10', 'H')], boxscore: box, onIce: full }, 'A', 'H').pp, null);
+  // a power-play goal ends a minor early
+  assert.equal(rinkState({ plays: [pen(2, '7:05', 'A'), pl(2, '7:30', 'H', { scoringPlay: true, strength: { text: 'Power Play' } }), pl(2, '7:40', 'A')], boxscore: box, onIce: full }, 'A', 'H').pp, null);
+  // matching minors: four on four, no power play
+  assert.equal(rinkState({ plays: [pen(1, '3:00', 'A'), pen(1, '3:00', 'H'), pl(1, '3:30', 'A')], boxscore: box, onIce: full }, 'A', 'H').pp, null);
+  // carries across the period break, and a second penalty makes it 5 on 3
+  r = rinkState({ plays: [pen(1, '19:30', 'H'), pen(2, '0:20', 'H'), pl(2, '0:40', 'A', { strength: { text: 'Power Play' } })], boxscore: box, onIce: full }, 'A', 'H');
+  assert.deepEqual(r.pp, { side: 'away', left: 50, skaters: '5 on 3' });
+  // home pulls its goalie
+  assert.deepEqual(rinkState({ plays: [pl(3, '18:30', 'A')], boxscore: box, onIce: on(['ga', 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11]) }, 'A', 'H').emptyNet, ['home']);
+});

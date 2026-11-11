@@ -1378,6 +1378,39 @@ export function fixSpot(from, to, yards) {
   const want = from - yards;
   return Math.abs(100 - to - want) + 3 < Math.abs(to - want) ? 100 - to : to;
 }
+// What the newest football play is, for the live field's little shows. Pure text and numbers in, a plain description out.
+// kind: 'fg' | 'td' | 'safety' | 'turnover' | 'punt' | 'kickoff' | 'big' | ''.
+export function fieldMoment(p) {
+  if (!p) return { kind: '' };
+  const type = String(p.type || ''), text = String(p.text || ''), both = `${type} ${text}`;
+  if (/field goal/i.test(type) && !/fake/i.test(both)) {
+    const blocked = /block/i.test(both);
+    const good = !blocked && /good/i.test(both) && !/no good|missed/i.test(both);
+    // Where a miss went, when the feed says (the NFL does; college only says NO GOOD).
+    const miss = good ? '' : blocked ? 'blocked' : /hit (the )?left upright/i.test(text) ? 'leftpost' : /hit (the )?right upright/i.test(text) ? 'rightpost'
+      : /wide left/i.test(text) ? 'left' : /wide right/i.test(text) ? 'right' : /short/i.test(text.replace(/short (left|right|middle)/gi, '')) ? 'short' : 'wide';
+    const label = { blocked: 'Blocked', leftpost: 'Off the left upright', rightpost: 'Off the right upright', left: 'Wide left', right: 'Wide right', short: 'Short', wide: '' }[miss] || '';
+    return { kind: 'fg', good, miss, label, yards: Number((/(\d+)[ -]yards?/i.exec(text) || [])[1]) || null };
+  }
+  if (/touchdown/i.test(both) || /\bfor a TD\b/i.test(text)) {
+    const two = /two-point|2-pt|2 pt/i.test(text) ? (/fail|incomplete|no good/i.test(text.slice(text.search(/two-point|2-pt|2 pt/i))) ? 'failed' : 'good') : '';
+    return { kind: 'td', two, turnover: /intercept|fumble/i.test(both), ret: /return|recover|block/i.test(type) };
+  }
+  if (/safety/i.test(type)) return { kind: 'safety' };
+  if (/intercept/i.test(type)) return { kind: 'turnover', how: 'Interception' };
+  if (/fumble recovery \(opponent\)|opp fumble recovery|muffed punt recovery \(opponent\)/i.test(type)) return { kind: 'turnover', how: 'Fumble' };
+  if (/^punt|blocked punt/i.test(type)) {
+    const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]);
+    return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: /touchback/i.test(text), blocked: /block/i.test(both) };
+  }
+  if (/^kickoff/i.test(type)) {
+    const n = Number((/kick(?:s|off)? (\d+) yards?/i.exec(text) || [])[1]);
+    return { kind: 'kickoff', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: /touchback/i.test(text) };
+  }
+  if (p.kept !== false && Number(p.yards) >= 20 && /rush|pass|reception|sack/i.test(type)) return { kind: 'big', yards: Number(p.yards) };
+  return { kind: '' };
+}
+
 export function normDrives(drives, awayId, homeId, live) {
   const list = [...(drives?.previous || [])];
   const cur = drives?.current;
@@ -1392,6 +1425,8 @@ export function normDrives(drives, awayId, homeId, live) {
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
       // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
       type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: fixSpot(num(p.start?.yardsToEndzone), num(p.end?.yardsToEndzone), num(p.statYardage)),
+      // endRaw is the feed's own end spot (after a kick it is counted from the receiving team's side); mine = the drive's team ran the play.
+      endRaw: num(p.end?.yardsToEndzone), mine: String(p.start?.team?.id ?? teamId) === teamId,
       kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
       next: cleanText(p.end?.downDistanceText || ''), nextShort: cleanText(p.end?.shortDownDistanceText || ''), spot: cleanText(p.end?.possessionText || ''),
     })).filter((p) => p.text);
@@ -1471,6 +1506,44 @@ export function normPitch(data, game) {
 }
 
 /* ---------- hockey shots on the rink ---------- */
+// Hockey, right now: who is on the power play and for how much longer, and whose net is empty.
+// pp: { side: 'away' | 'home' (the team with the extra skater), left: seconds as of the newest play, skaters: '5 on 4' } or null.
+// emptyNet: sides whose goalie is off the ice. Clocks in the feed count up through each 20-minute period.
+export function rinkState(data, awayId, homeId) {
+  const plays = data?.plays || [];
+  const side = (id) => (String(id) === String(awayId) ? 'away' : String(id) === String(homeId) ? 'home' : null);
+  const secs = (p) => { const m = /^(\d+):(\d+)/.exec(p.clock?.displayValue || ''); return ((p.period?.number || 1) - 1) * 1200 + (m ? Number(m[1]) * 60 + Number(m[2]) : 0); };
+  const now = plays.length ? secs(plays[plays.length - 1]) : 0;
+  const pens = [];
+  plays.forEach((p, i) => {
+    const mins = Number(p.type?.penaltyMinutes), sd = side(p.team?.id);
+    if (!sd || !(mins === 2 || mins === 4 || mins === 5)) return;
+    const start = secs(p);
+    let end = start + mins * 60;
+    // A minor ends early when the other team scores on the power play.
+    if (mins === 2) { const g = plays.slice(i + 1).find((q) => q.scoringPlay === true && side(q.team?.id) && side(q.team?.id) !== sd && /power play/i.test(q.strength?.text || '')); if (g) end = Math.min(end, secs(g)); }
+    pens.push({ sd, start, end, i });
+  });
+  const live = pens.filter((x) => x.end > now);
+  const n = { away: live.filter((x) => x.sd === 'away').length, home: live.filter((x) => x.sd === 'home').length };
+  let pp = null;
+  if (n.away !== n.home) {
+    const short = n.away > n.home ? 'away' : 'home';
+    const mine = live.filter((x) => x.sd === short);
+    // The feed's own word wins: if a play after the newest penalty is tagged even strength, the advantage is over.
+    const since = plays.slice(Math.max(...mine.map((x) => x.i)) + 1).filter((q) => q.strength?.text && secs(q) > Math.max(...mine.map((x) => x.start)));
+    const lastTag = since.length ? since[since.length - 1].strength.text : '';
+    if (!/even/i.test(lastTag)) {
+      const sk = (k) => 5 - Math.min(2, n[k]);
+      pp = { side: short === 'away' ? 'home' : 'away', left: Math.max(0, Math.min(...mine.map((x) => x.end)) - now), skaters: `${sk(short === 'away' ? 'home' : 'away')} on ${sk(short)}` };
+    }
+  }
+  // Empty net: a team with skaters on the ice and no goalie among them.
+  const goalies = new Set((data?.boxscore?.players || []).flatMap((t) => (t.statistics || []).filter((g) => /goal/i.test(g.name || '')).flatMap((g) => (g.athletes || []).map((a) => String(a.athlete?.id ?? '')))));
+  const emptyNet = goalies.size ? (data?.onIce || []).filter((o) => side(o.teamId) && (o.entries || []).length >= 4 && !(o.entries || []).some((e) => goalies.has(String(e.athleteid)))).map((o) => side(o.teamId)) : [];
+  return { pp, emptyNet };
+}
+
 // Rink in feet, measured from center ice: x -100..100 (goal to goal), y -42.5..42.5.
 // Teams swap ends every period, so each team's shots are turned to face one goal: away shoots right, home shoots left.
 export function normIce(rawPlays, awayId, homeId) {
@@ -1617,6 +1690,7 @@ export async function getGame(lg, id) {
     drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
     shots: L.sport === 'basketball' ? normShots(data.plays) : [],
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
+    rink: L.sport === 'hockey' && game.state === 'live' ? rinkState(data, game.away.id, game.home.id) : null,
     pitch: L.sport === 'soccer' ? normPitch(data, game) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
     venue: [data.gameInfo?.venue?.fullName, [data.gameInfo?.venue?.address?.city, data.gameInfo?.venue?.address?.state || data.gameInfo?.venue?.address?.country].filter(Boolean).join(', ')].filter(Boolean).map(cleanText).join(' · '),

@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
-import { chartColors, inkOn } from './data/colors.js';
+import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
 
 /* ---------- router ---------- */
@@ -1059,31 +1059,119 @@ export function fbHead(p) {
 }
 function LiveField({ drives, game, onAll }) {
   const d = drives.find((x) => x.live) || drives[drives.length - 1];
+  const last = d ? d.plays[d.plays.length - 1] : null;
+  const lastKey = d ? `${d.id}:${d.plays.length}` : '';
+  // The banner calls out a score, a turnover or a kick for a few seconds, then settles back to who has the ball.
+  const [flash, setFlash] = useState(true);
+  useEffect(() => { setFlash(true); const h = setTimeout(() => setFlash(false), 7000); return () => clearTimeout(h); }, [lastKey]);
   if (!d) return null;
   const t = d.side === 'away' ? game.away : game.home;
+  const opp = d.side === 'away' ? game.home : game.away;
   const cc = chartColors(game.away, game.home, true);
   // Field units: yards. Goal lines at 10 and 110, end zones outside. Away drives left to right, home right to left.
   const K = 3, FW = 120 * K, FH = 132, top = 14;
-  const X = (toEnd) => (10 + (d.side === 'away' ? 100 - toEnd : toEnd)) * K;
+  const Xs = (side, toEnd) => (10 + (side === 'away' ? 100 - toEnd : toEnd)) * K;
+  const X = (toEnd) => Xs(d.side, toEnd);
+  const other = d.side === 'away' ? 'home' : 'away';
   const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
-  const last = d.plays[d.plays.length - 1];
   const start = steps[0]?.from ?? null;
   const lastKept = [...steps].reverse()[0];
   const at = d.kind === 'td' ? 0 : lastKept ? lastKept.to : start;
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
-  // A field goal try as the latest play gets its own little show.
-  const fg = !!last && /field goal/i.test(`${last.type}`) && !/fake/i.test(last.type);
-  const fgGood = fg && /good/i.test(`${last.type} ${last.text}`) && !/no good|miss|block/i.test(`${last.type} ${last.text}`);
   const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
   const recent = [...d.plays].reverse().slice(0, 3);
   const mid = top + (FH - top) / 2;
   const ly = mid + 24; // the drive runs along a lane below midfield, clear of the home team's mark
+  const m = fieldMoment(last);
+  // Points on the newest play: the score now against the play before it, across the whole game.
+  const all = drives.flatMap((x) => x.plays);
+  const prev = all[all.length - 2];
+  const gain = last && prev && Number.isFinite(last.away) && Number.isFinite(prev.away) ? { away: last.away - prev.away, home: last.home - prev.home } : null;
+  const scorer = gain && gain.away > 0 ? 'away' : gain && gain.home > 0 ? 'home' : null;
+  const pts = scorer ? gain[scorer] : 0;
+  const scoreT = scorer ? game[scorer] : t;
+  const call = !last ? null
+    : m.kind === 'td' ? { text: `${scoreT.abbr} ${pts ? `+${pts} · ` : ''}Touchdown`, team: scoreT, hot: true }
+      : m.kind === 'fg' && m.good ? { text: `${t.abbr} +3 · Field Goal`, team: t, hot: true }
+        : m.kind === 'fg' ? { text: m.miss === 'blocked' ? 'Field Goal Blocked' : `No Good${m.label ? ` · ${m.label}` : ''}`, team: t, bad: true }
+          : m.kind === 'safety' ? { text: `${scoreT.abbr} +2 · Safety`, team: scoreT, hot: true }
+            : m.kind === 'turnover' ? { text: `Turnover · ${m.how}`, team: opp, bad: true }
+              : m.kind === 'big' ? { text: `${t.abbr} · ${m.yards}-Yard Gain`, team: t }
+                : m.kind === 'punt' ? { text: m.blocked ? 'Punt Blocked' : `Punt${m.yards ? ` · ${m.yards} Yards` : ''}`, team: last.mine ? t : opp }
+                  : m.kind === 'kickoff' ? { text: m.touchback ? 'Kickoff · Touchback' : 'Kickoff', team: last.mine ? t : opp } : null;
+  const banner = flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
+
+  // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
+  const post = (s) => { // s: 1 = right end, -1 = left end
+    const x = s > 0 ? FW - 9 : 9, cy = mid - 14;
+    const N = [x - s * 8, cy + 8], F = [x + s * 7, cy - 8], H = 36;
+    return { s, x, base: [x, mid + 8], c: [x, cy], N, F, H, gap: [x, cy - 17] };
+  };
+  const posts = [post(-1), post(1)];
+  const GOLD = '#FFBE2E', INK = '#0C1124';
+  const bar = (d2, w) => <><path d={d2} fill="none" stroke={INK} strokeWidth={w + 2.2} strokeLinecap="round" strokeLinejoin="round" /><path d={d2} fill="none" stroke={GOLD} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" /></>;
+  const ball = (r = 8) => <><ellipse rx={r} ry={r * 0.62} fill="#9A5A2B" stroke={INK} strokeWidth="1.5" /><path d={`M${-r * 0.42} 0 H${r * 0.42} M${-r * 0.22} ${-r * 0.22} V${r * 0.22} M0 ${-r * 0.22} V${r * 0.22} M${r * 0.22} ${-r * 0.22} V${r * 0.22}`} stroke="#fff" strokeWidth="1" strokeLinecap="round" /></>;
+  // A ball flying an arc: x runs straight, y rises to a peak and drops. after: an optional bounce.
+  const flight = (key, x0, y0, x1, y1, peak, opts = {}) => (
+    <g key={key} className={'kfly' + (opts.fade ? ' fade' : '')}>
+      <path className="karc" d={`M${x0} ${y0} Q${(x0 + x1) / 2} ${2 * peak - (y0 + y1) / 2} ${x1} ${y1}`} fill="none" stroke="#fff" strokeWidth="2" strokeDasharray="1.5 4" strokeLinecap="round" style={{ '--from': x1 < x0 ? '0 0 0 100%' : '0 100% 0 0' }} />
+      <g className={opts.bounce ? 'kbounce' : undefined} style={opts.bounce ? { '--bx': `${opts.bounce[0]}px`, '--by': `${opts.bounce[1]}px` } : undefined}>
+        <g className="kx" style={{ '--x0': `${x0}px`, '--x1': `${x1}px` }}><g className="ky" style={{ '--y0': `${y0}px`, '--yt': `${peak}px`, '--y1': `${y1}px` }}>{ball(opts.r || 7)}</g></g>
+      </g>
+    </g>);
+
+  let show = null, glowSide = null, turned = false;
+  if (last && m.kind === 'fg') {
+    // The kick flies at the posts it is aimed at. A make splits the uprights; a miss goes where the feed says it went.
+    const P = posts[dirn > 0 ? 1 : 0], s = P.s;
+    const x0 = X(Math.min(99, (last.from ?? at ?? 20) + 7));
+    // The kicker's left is the far (top) upright going right, the near (bottom) one going left.
+    const far = (side) => (side === 'left') === (s > 0);
+    const out = (pt, from) => [pt[0] + (pt[0] - from[0]) * 0.75, pt[1] + (pt[1] - from[1]) * 0.75 - 17];
+    let end = [P.gap[0] + s * 5, P.gap[1] - 2], opts = { fade: true }, peak = Math.min(ly, P.gap[1]) - 26;
+    const drop = { bounce: [s * 5, 30] }; // a miss sails by and drops behind the posts
+    if (m.miss === 'left' || m.miss === 'right') { end = far(m.miss) ? out(P.F, P.N) : out(P.N, P.F); opts = drop; }
+    else if (m.miss === 'wide') { end = out(P.N, P.F); opts = drop; }
+    else if (m.miss === 'leftpost' || m.miss === 'rightpost') { const u = far(m.miss.replace('post', '')) ? P.F : P.N; end = [u[0], u[1] - 16]; opts = { bounce: [-s * 30, 34] }; }
+    else if (m.miss === 'short') { end = [P.x - s * 30, mid + 2]; peak = ly - 26; opts = {}; }
+    else if (m.miss === 'blocked') { end = [x0 + s * 16, ly - 4]; peak = ly - 20; opts = { bounce: [-s * 10, 6] }; }
+    show = <g key={'fg' + lastKey} className="fshow">{flight('k', x0, ly, end[0], end[1], peak, opts)}</g>;
+  } else if (last && (m.kind === 'punt' || m.kind === 'kickoff') && last.from != null && (m.yards || m.touchback)) {
+    // Punts and kickoffs: a high arc to where the ball came down, then the return as a line back.
+    const side = last.mine ? d.side : other, sgn = side === 'away' ? 1 : -1;
+    const land = m.touchback && !m.yards ? -4 : last.from - (m.yards || 0);
+    const x0 = Xs(side, last.from), x1 = Xs(side, Math.max(-6, land));
+    const fin = !m.touchback && last.endRaw != null ? 100 - last.endRaw : null;
+    const ret = fin != null && Math.abs(fin - land) >= 3 && Math.abs(fin - land) < 100 ? Xs(side, Math.max(0, Math.min(100, fin))) : null;
+    show = (
+      <g key={'kick' + lastKey} className="fshow">
+        {flight('k', x0, ly, x1, ly, ly - Math.min(58, 18 + Math.abs(x1 - x0) * 0.22), {})}
+        {ret != null ? [['#fff', 5.5], [cc[side === 'away' ? 'home' : 'away'].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${x1} ${ly} H${ret}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': ret < x1 ? '0 0 0 100%' : '0 100% 0 0' }} />) : null}
+        {m.touchback ? <text className="ktag" x={x1 + sgn * 2} y={ly - 12} textAnchor="middle">TB</text> : null}
+      </g>);
+  } else if (last && m.kind === 'big' && last.from != null && last.to != null) {
+    // A big gain: the ball leaves the mascot's three speed lines behind it.
+    const a = X(last.from), b = X(last.to);
+    show = <g key={'big' + lastKey} className="fshow quick">{[['#2ED9D9', -6], ['#FFFFFF', 0], ['#8B5CF6', 6]].map(([c, dy], i) => <path key={i} className="kstreak" d={`M${a} ${ly + dy - 22} H${b - dirn * 12}`} stroke={c} strokeWidth="3" strokeLinecap="round" fill="none" style={{ '--from': b < a ? '0 0 0 100%' : '0 100% 0 0', animationDelay: `${i * 0.08}s` }} />)}</g>;
+  }
+  // Stamps: touchdown, turnover, safety. They slam in, sit a few seconds, and clear.
+  let stamp = null;
+  if (last && m.kind === 'td') {
+    const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
+    stamp = { text: 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
+    if (m.two === 'good') glowSide = zone; // a two-point try that works lights the end zone
+  } else if (last && m.kind === 'turnover') { stamp = { text: 'TURNOVER', color: brighten(cc[other].main, 0.25), x: 60 * K }; turned = true; }
+  else if (last && m.kind === 'safety') stamp = { text: 'SAFETY', color: GOLD, x: 60 * K };
+  const arrow = turned ? -dirn : dirn;
   return (
     <>
       <section className="sec">
         <div className="card livefield">
+          <div className={'lcall' + (banner === call && call.hot ? ' hot' : banner === call && call.bad ? ' bad' : '')} key={banner === call ? 'c' + lastKey : 'poss' + t.id} role="status">
+            {banner.team ? <Blob team={banner.team} size={22} /> : null}<b>{banner.text}</b>
+          </div>
           <div className="lfhead">
             <Blob team={t} size={30} />
             <span className="tx"><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></span>
@@ -1099,54 +1187,56 @@ function LiveField({ drives, game, onAll }) {
             {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
             <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
             <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
-            <text className="ez" transform={`translate(${5 * K} ${mid}) rotate(-90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
-            <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
+            <text className="ez" transform={`translate(${5 * K + 3} ${FH - 5}) rotate(-90)`} textAnchor="start" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
+            <text className="ez" transform={`translate(${115 * K - 3} ${FH - 5}) rotate(-90)`} textAnchor="start" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
             {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
             {game.neutral ? null : <text className="ez mid" x={60 * K} y={mid - 8} textAnchor="middle" dominantBaseline="central" fill={game.home.color || cc.home.main}>{game.home.abbr}</text>}
             <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
-            {[[0, -1], [FW, 1]].map(([x, s]) => <path key={x} d={`M${x - s * 2} ${mid} H${x - s * 9} M${x - s * 9} ${mid - 16} V${mid + 16} M${x - s * 9} ${mid - 16} H${x - s * 15} M${x - s * 9} ${mid + 16} H${x - s * 15}`} transform={`translate(${s * 12} 0)`} stroke="#FFBE2E" strokeWidth="2.6" fill="none" strokeLinecap="round" />)}
-            {d.kind === 'td' ? <rect key={'td' + d.id} className="tdglow" x={d.side === 'away' ? 110 * K : 0} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
-            {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="3" /> : null}
+            {glowSide != null ? <rect key={'two' + lastKey} className="tdglow" x={glowSide} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
+            {/* posts, back half: shadow, stem, crossbar, far upright */}
+            {posts.map((P) => (
+              <g key={P.s}>
+                <ellipse cx={P.base[0]} cy={P.base[1] + 1} rx="9" ry="3" fill="#0C1124" opacity="0.3" />
+                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1]}`, 3.4)}
+                {bar(`M${P.F[0]} ${P.F[1]} V${P.F[1] - P.H}`, 2.6)}
+                {bar(`M${P.N[0]} ${P.N[1]} L${P.F[0]} ${P.F[1]}`, 3.2)}
+              </g>))}
+            {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="2.4" /> : null}
             {start != null && at != null ? (
               <>
-                <rect className="lfmove" x="0" y={ly - 3.5} width="100" height="7" rx="3.5" fill="#fff" stroke="#0C1124" strokeWidth="1.2" vectorEffect="non-scaling-stroke"
+                <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
-                <circle cx={X(start)} cy={ly} r="4.5" fill="#fff" stroke="#0C1124" strokeWidth="1.6" />
-                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="2.2" fill="#0C1124" />)}
+                <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
+                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
                 <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)` }}>
                   <g className="lfball">
-                    <path d={`M${dirn * 5} -10 L${dirn * 15} 0 L${dirn * 5} 10 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.6" strokeLinejoin="round" />
-                    <ellipse cx="0" cy="-22" rx="11" ry="7" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.8" />
-                    <path d="M-5 -22 H5 M-3 -24.5 V-19.5 M0 -24.5 V-19.5 M3 -24.5 V-19.5" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" />
-                    <path d="M0 -14 V-4" stroke="#0C1124" strokeWidth="1.6" strokeDasharray="2 2" />
+                    <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
+                    {m.kind === 'fg' || m.kind === 'punt' ? null : (
+                      <g key={turned ? 'spin' + lastKey : 'ball'} className={turned ? 'kspin' : undefined} style={{ transformOrigin: '0 -19px' }}>
+                        <ellipse cx="0" cy="-19" rx="9.5" ry="6" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.5" />
+                        <path d="M-4.2 -19 H4.2 M-2.4 -21 V-17 M0 -21 V-17 M2.4 -21 V-17" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+                        <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
+                      </g>)}
                   </g>
                 </g>
               </>
             ) : null}
-            {fg ? (() => {
-              // The kick: a dotted arc from the spot to the posts with the ball riding it, then a view from behind the uprights.
-              const x0 = X(Math.min(99, (last.from ?? at ?? 20) + 7)), x1 = d.side === 'away' ? FW + 4 : -4, h = 46;
-              const px = 60 * K, py = top + 6; // the behind-the-posts panel sits at midfield
-              const yEnd = fgGood ? mid - 6 : mid - 34; // a miss sails wide of the posts
-              return (
-                <g key={'fg' + d.id + d.plays.length} className="fgshow">
-                  <path className="fgarc" pathLength="100" d={`M${x0} ${ly} Q${(x0 + x1) / 2} ${ly - h * 2} ${x1} ${yEnd}`} fill="none" stroke="#fff" strokeWidth="2.4" strokeDasharray="1.5 3.5" strokeLinecap="round" />
-                  <g className="fgx" style={{ '--x0': `${x0}px`, '--x1': `${x1}px` }}><g className="fgy" style={{ '--y0': `${ly}px`, '--yt': `${ly - h}px`, '--y1': `${yEnd}px` }}>
-                    <ellipse rx="8" ry="5" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.6" /><path d="M-3.5 0 H3.5 M-2 -1.8 V1.8 M0 -1.8 V1.8 M2 -1.8 V1.8" stroke="#fff" strokeWidth="1" strokeLinecap="round" />
-                  </g></g>
-                  <g className="fgpanel" transform={`translate(${px} ${py})`}>
-                    <rect x="-62" y="0" width="124" height="88" rx="10" fill="#0C1124" stroke={fgGood ? '#FFBE2E' : '#FF5A6E'} strokeWidth="2.5" />
-                    <rect x="-62" y="62" width="124" height="26" fill="#39B54A" clipPath="inset(0 round 0 0 8px 8px)" />
-                    <path d="M0 74 V50 M-26 50 H26 M-26 50 V12 M26 50 V12" fill="none" stroke="#FFBE2E" strokeWidth="4" strokeLinecap="round" />
-                    <g className={'fgkick' + (fgGood ? '' : ' wide')}><ellipse rx="9" ry="6" fill="#9A5A2B" stroke="#fff" strokeWidth="1.4" /><path d="M-4 0 H4 M-2 -2 V2 M0 -2 V2 M2 -2 V2" stroke="#fff" strokeWidth="1" strokeLinecap="round" /></g>
-                    <text className="fgcall" x="0" y="84" textAnchor="middle" fill={fgGood ? '#FFBE2E' : '#FF8FA0'}>{fgGood ? "IT'S GOOD!" : 'NO GOOD'}</text>
-                  </g>
-                </g>);
-            })() : null}
+            {show}
+            {/* posts, front half: the near upright goes on last so a kick passes behind it */}
+            {posts.map((P) => <g key={'n' + P.s}>{bar(`M${P.N[0]} ${P.N[1]} V${P.N[1] - P.H}`, 3.6)}</g>)}
+            {stamp ? (
+              <g key={'stamp' + lastKey} className="fshow">
+                {stamp.confetti ? Array.from({ length: 18 }, (_, i) => {
+                  const a2 = (i / 18) * Math.PI * 2 + (i % 2) * 0.2, r = 30 + (i % 4) * 14;
+                  return <rect key={i} className="kconf" x="-3.5" y="-3.5" width="7" height="7" rx="1.5" fill={[stamp.confetti[1], GOLD, '#fff', '#2ED9D9'][i % 4]} stroke={INK} strokeWidth="0.6"
+                    style={{ '--cx': `${stamp.confetti[0]}px`, '--cy': `${mid}px`, '--dx': `${Math.cos(a2) * r}px`, '--dy': `${Math.sin(a2) * r * 0.9}px`, animationDelay: `${(i % 5) * 0.05}s` }} />;
+                }) : null}
+                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color}>{stamp.text}</text></g>
+              </g>) : null}
           </svg>
           {last ? (
-            <div className="lflast" key={d.id + d.plays.length}>
+            <div className="lflast" key={lastKey}>
               <span className="hd"><b style={last.scoring ? { color: 'var(--yellow)' } : undefined}>{fbHead(last)}</b><small>Last play{last.clock ? ` · ${last.period ? 'Q' + last.period : ''} ${last.clock}` : ''}</small></span>
               <span className="tx">{last.text}</span>
               {going && last.next ? <span className="nx">{last.next}</span> : null}
@@ -1492,7 +1582,7 @@ function Ice({ game, label, children }) {
 }
 
 /* ---------- hockey, live: bright ice with the latest shot on it, and the newest plays underneath ---------- */
-function LiveRink({ ice, pbp, game, L, onAll }) {
+function LiveRink({ ice, pbp, game, L, onAll, rink }) {
   const cc = chartColors(game.away, game.home, true);
   const K = 3, W = 200 * K, H = 85 * K;
   const X = (v) => (Math.max(-98, Math.min(98, v)) + 100) * K, Y = (v) => (42.5 - Math.max(-40.5, Math.min(40.5, v))) * K;
@@ -1508,6 +1598,12 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
   // The goal light: on while a goal is one of the three newest plays, over the net it went into.
   const g3 = recent.slice(0, 3).find((p) => p.scoring);
   const goalSide = g3 ? sideOf(g3.teamId) : null;
+  // Away defends the left net, home the right one.
+  const netX = (sd) => (sd === 'away' ? 11 : 189) * K;
+  const pp = rink?.pp || null, ppT = pp ? game[pp.side] : null, shortSide = pp ? (pp.side === 'away' ? 'home' : 'away') : null;
+  const mmss = (n) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')}`;
+  // A stop from in tight: the newest shot was saved within about 25 feet of the goal line.
+  const bigSave = last && last.kind === 'save' && Math.abs(last.x) >= 64 && Math.abs(last.y) <= 22 ? (sideOf(last.teamId) === 'away' ? 'home' : 'away') : null;
   return (
     <section className="sec">
       <div className="card livecourt">
@@ -1518,7 +1614,25 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
           <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ▸</small></span>
           <span><small>◂ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
         </div>
-        <Ice game={game} label={last ? `Latest shot: ${last.text}` : 'Rink'}>
+        <Ice game={game} label={`${pp ? `${ppT.name} power play, ${mmss(pp.left)} left. ` : ''}${(rink?.emptyNet || []).map((sd) => `${game[sd].name} net empty. `).join('')}${last ? `Latest shot: ${last.text}` : 'Rink'}`}>
+          {pp ? (
+            <>
+              {/* the short-handed team's end dims while it kills the penalty */}
+              <path d={shortSide === 'away' ? `M${W / 2} 0 H${28 * K} A${28 * K} ${28 * K} 0 0 0 0 ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 0 ${28 * K} ${H} H${W / 2} Z` : `M${W / 2} 0 H${W - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W} ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W - 28 * K} ${H} H${W / 2} Z`} fill="#0C1124" opacity="0.13" />
+              <g className="ppchip" transform={`translate(${W / 2} ${H - 19})`}>
+                <rect x="-112" y="-17" width="224" height="34" rx="9" fill={cc[pp.side].main} stroke="#0C1124" strokeWidth="2.4" />
+                <text x="-100" y="1" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{ppT.abbr} POWER PLAY</text>
+                <text className="t" x="100" y="1" textAnchor="end" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{mmss(pp.left)}</text>
+                <text className="sk" x="0" y="-27" textAnchor="middle" dominantBaseline="central">{pp.skaters}</text>
+              </g>
+            </>
+          ) : null}
+          {(rink?.emptyNet || []).map((sd) => (
+            <g key={'en' + sd} className="emptynet" transform={`translate(${netX(sd)} ${H / 2})`}>
+              <circle r="26" fill="none" stroke="#E0263C" strokeWidth="3" strokeDasharray="6 5" />
+              <g transform={`translate(${sd === 'away' ? 46 : -46} -44)`}><rect x="-50" y="-12" width="100" height="24" rx="7" fill="#E0263C" stroke="#0C1124" strokeWidth="2.2" /><text textAnchor="middle" dominantBaseline="central" y="1" fill="#fff">EMPTY NET</text></g>
+            </g>))}
+          {bigSave ? <g key={'sv' + ice.length} transform={`translate(${netX(bigSave) + (bigSave === 'away' ? 10 : -10)} ${H / 2})`}>{[0, 0.25].map((dl) => <circle key={dl} className="savering" r="14" fill="none" stroke={cc[bigSave].main} strokeWidth="4" style={{ animationDelay: `${dl}s` }} />)}</g> : null}
           {goalSide ? (
             <g key={'gl' + (g3.id || g3.clock)} className="goallamp" transform={`translate(${(goalSide === 'away' ? 189 : 11) * K} ${H / 2 - 62}) scale(1.7)`}>
               <circle r="16" fill="#FF1F3D" className="halo" />
@@ -1734,7 +1848,7 @@ function GamePage({ lg, id }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
-                {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
+                {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} rink={d.rink} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
