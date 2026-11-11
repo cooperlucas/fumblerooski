@@ -1498,6 +1498,8 @@ export function fieldMoment(p) {
   }
   if (/safety/i.test(type)) return { kind: 'safety' };
   const lost = /intercept/i.test(type) ? 'Interception' : /fumble recovery \(opponent\)|opp fumble recovery|muffed punt recovery \(opponent\)/i.test(type) ? 'Fumble' : '';
+  // A fumble the other side recovered on a play the feed files under something else (a strip sack, say).
+  if (!lost && p.kept === false && /fumble/i.test(text) && /recovered by/i.test(text) && !/\bpunts?\b|kickoff|field goal/i.test(both)) return { kind: 'turnover', how: /sack/i.test(type) ? 'Strip Sack' : 'Fumble' };
   if (lost) {
     // On a punt, "opponent" recovery means the kicking team got it back: the drive's team keeps the ball.
     if (p.kept === true && /\bpunts?\b/i.test(text)) { const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]); return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: false, blocked: false, recovered: true }; }

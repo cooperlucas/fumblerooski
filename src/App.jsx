@@ -1082,7 +1082,11 @@ export function fbHead(p) {
   if (/field goal/i.test(p.type)) return /good|made/i.test(t) && !/no good|missed/i.test(t) ? 'Field Goal Good' : 'Field Goal Missed';
   if (/extra point/i.test(p.type)) return /good/i.test(p.type) ? 'Extra Point Good' : 'Extra Point Missed';
   if (/penalty/i.test(p.type)) return 'Penalty';
-  if (/sack/i.test(p.type)) return `Sack${y ? `, ${Math.abs(y)} yds` : ''}`;
+  if (/sack/i.test(p.type)) {
+    if (p.kept === false && /fumble/i.test(p.text) && /recovered by/i.test(p.text)) return 'Strip Sack, Fumble Lost';
+    const loss = Number((/loss of (\d+) y/i.exec(p.text) || [])[1]) || (y ? Math.abs(y) : 0);
+    return `Sack${loss ? `, ${loss} yds` : ''}`;
+  }
   if (/intercept/i.test(p.type)) return 'Interception';
   if (/fumble|muff/i.test(p.type) && /\bpunts?\b/i.test(p.text)) return 'Muffed Punt';
   if (/fumble/i.test(p.type)) return 'Fumble';
@@ -1120,10 +1124,14 @@ function LiveField({ drives, game, onAll }) {
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
   // A defensive or return touchdown (pick six, scoop and score) ends in the drive team's own end zone.
   const defTd = !!last && /touchdown|\bfor a td\b/i.test(`${last.type} ${last.text}`) && !last.kept;
-  const at = defTd ? (last.from ?? 100) : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
   // The return on a pick six or scoop and score: from where the defense got the ball back to the offense's own goal line.
-  const retYds = defTd ? (Number((/return(?:ed)?\s+(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
-  const retFrom = retYds != null ? Math.max(0, Math.min(100, 100 - retYds)) : null;
+  // A turnover the defense ran back without scoring: they took it from the spot of the turnover to where the play ended.
+  const m0 = fieldMoment(last);
+  const tRet = !defTd && m0.kind === 'turnover' && last && last.endRaw != null ? Math.max(0, Math.min(100, 100 - last.endRaw)) : null;
+  const retEnd = defTd ? 100 : tRet;
+  const retYds = defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
+  const retFrom = retYds != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retYds)) : null;
+  const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? retFrom : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
@@ -1260,7 +1268,7 @@ function LiveField({ drives, game, onAll }) {
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
                 <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
                 {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
-                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)`, display: defTd && retFrom != null ? 'none' : undefined }}>
+                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)`, display: retEnd != null && retFrom != null ? 'none' : undefined }}>
                   <g className="lfball">
                     <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
                     {m.kind === 'fg' || m.kind === 'punt' ? null : (
@@ -1274,10 +1282,10 @@ function LiveField({ drives, game, onAll }) {
               </>
             ) : null}
             {show}
-            {defTd && retFrom != null ? (
+            {retEnd != null && retFrom != null ? (
               <g key={'ret' + lastKey} className="fshow">
-                {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(100)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(100) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
-                <g transform={`translate(${X(100)} ${ly - 19})`}>{ball(8)}</g>
+                {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
+                <g transform={`translate(${X(retEnd)} ${ly - 19})`}>{ball(8)}</g>
               </g>) : null}
             {stamp ? (
               <g key={'stamp' + lastKey} className="fshow">
