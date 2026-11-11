@@ -945,6 +945,13 @@ function leaderValue(l) {
   }
   return shown;
 }
+// The feed's PER board is broken (all zeros in college, a copy of FG% in the NBA), so it is left out.
+const LEADER_SKIP = /^PER$/i;
+// Plainer names than the feed's ("3 points field goal percentage").
+const LEADER_TITLE = {
+  fieldGoalPercentage: 'Field Goal %', FreeThrowPct: 'Free Throw %', '3PointPct': '3-Point %', '3PointsMadePerGame': '3-Pointers Made Per Game',
+  doubleDouble: 'Double-Doubles', tripleDouble: 'Triple-Doubles', foulsPerGame: 'Fouls Per Game',
+};
 export async function getLeaders(lg) {
   const tries = [[SITE3, '/leaders'], [SITE, '/leaders'], [SITE, '/statistics']];
   let lastErr = null;
@@ -952,15 +959,17 @@ export async function getLeaders(lg) {
     try {
       const d = await get(url(base, lg, path)); // no limit param: the feed errors on it (checked live)
       const raw = d.leaders?.categories || d.categories || d.stats || d.leaders || [];
-      const cats = (Array.isArray(raw) ? raw : []).map((c) => ({
+      const cats = (Array.isArray(raw) ? raw : []).filter((c) => !LEADER_SKIP.test(String(c.name || ''))).map((c) => ({
         key: String(c.name || c.abbreviation || c.displayName || ''),
-        title: cleanText(c.displayName || c.shortDisplayName || c.name || ''),
+        title: LEADER_TITLE[String(c.name || '')] || cleanText(c.displayName || c.shortDisplayName || c.name || ''),
         abbr: cleanText(c.abbreviation || c.shortDisplayName || ''),
         rows: (c.leaders || []).map((l) => {
           const a = l.athlete || null, t = l.team || a?.team || null;
-          const n = Number(l.value);
+          const n = Number(l.value), nm = String(c.name || '');
+          // Some percentage boards come as fractions (0.778); show them like the rest (77.8).
+          const pct = /pct|percent/i.test(nm) && Number.isFinite(n) && n <= 1 && /^-?\d*\.?\d+$/.test(String(l.displayValue ?? '').trim()) && Number(l.displayValue) <= 1;
           return {
-            value: /double|triple/i.test(String(c.name || '')) && Number.isFinite(n) ? String(Math.round(n)) : leaderValue(l),
+            value: /double|triple/i.test(nm) && Number.isFinite(n) ? String(Math.round(n)) : pct ? (n * 100).toFixed(1) : leaderValue(l),
             player: a ? { id: String(a.id ?? ''), name: cleanText(a.displayName || a.fullName || a.shortName || ''), pos: a.position?.abbreviation || '' } : null,
             team: t?.id ? normTeam(t, lg) : null,
           };
