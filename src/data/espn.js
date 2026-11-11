@@ -1506,6 +1506,28 @@ export function normPitch(data, game) {
 }
 
 /* ---------- hockey shots on the rink ---------- */
+// A scoring run: points one team has scored in a row with the other team held to zero, counted back from the newest play.
+// plays: in order, each with away/home running scores. Returns { side, pts } or null.
+export function scoringRun(plays, min = 10) {
+  let side = null, pts = 0;
+  let after = null;
+  for (let i = (plays || []).length - 1; i >= 0; i--) {
+    const p = plays[i];
+    const a = Number(p.away), h = Number(p.home);
+    if (!Number.isFinite(a) || !Number.isFinite(h)) continue;
+    if (after) {
+      const da = after.a - a, dh = after.h - h;
+      if (da > 0 || dh > 0) {
+        const sd = da > 0 && dh === 0 ? 'away' : dh > 0 && da === 0 ? 'home' : 'both';
+        if (sd === 'both' || (side && sd !== side)) break;
+        side = sd; pts += sd === 'away' ? da : dh;
+      }
+    }
+    after = { a, h };
+  }
+  return side && pts >= min ? { side, pts } : null;
+}
+
 // Hockey, right now: who is on the power play and for how much longer, and whose net is empty.
 // pp: { side: 'away' | 'home' (the team with the extra skater), left: seconds as of the newest play, skaters: '5 on 4' } or null.
 // emptyNet: sides whose goalie is off the ice. Clocks in the feed count up through each 20-minute period.
@@ -1660,8 +1682,68 @@ function normPreview(data, game, lg) {
 }
 
 export async function getGame(lg, id) {
+  return gameFromSummary(lg, id, await get(url(SITE, lg, '/summary', { event: id })));
+}
+export async function getSummary(lg, id) {
+  return get(url(SITE, lg, '/summary', { event: id }));
+}
+
+/* ---------- replay: step through a finished game as if it were live, one play at a time ---------- */
+// Every play in order. Football keeps them inside drives, so each step remembers which drive it is in.
+export function replaySteps(data, sport) {
+  if (sport === 'football') return (data?.drives?.previous || []).flatMap((d, k) => (d.plays || []).map((p, j) => ({ k, j, p })));
+  return (Array.isArray(data?.plays) ? data.plays : []).map((p, j) => ({ j, p }));
+}
+// The steps worth jumping to: scores, turnovers, kicks, penalties, big gains.
+export function replayMoments(steps, sport) {
+  const re = sport === 'football' ? /field goal|intercept|fumble recovery \(opp|opp fumble|punt|kickoff|safety|touchdown/i
+    : sport === 'hockey' ? /goal|hooking|tripping|slashing|high-sticking|interference|holding|roughing|penalty|cross-checking|delay of game/i : /^$/;
+  return steps.map((x, i) => {
+    const t = `${x.p.type?.text || ''}`;
+    const hit = x.p.scoringPlay === true || re.test(t) || (sport === 'hockey' && x.p.type?.penaltyMinutes) || (sport === 'football' && Number(x.p.statYardage) >= 20);
+    return hit ? i : -1;
+  }).filter((i) => i >= 0);
+}
+// The summary as it stood after step i: later plays gone, score and clock from that play, the game marked live.
+export function replayCut(data, sport, i) {
+  const steps = replaySteps(data, sport);
+  const at = steps[Math.max(0, Math.min(i, steps.length - 1))];
+  if (!at) return data;
+  const d = { ...data };
+  let kept;
+  if (sport === 'football') {
+    const prev = data.drives.previous;
+    const cur = { ...prev[at.k], plays: prev[at.k].plays.slice(0, at.j + 1) };
+    if (at.j < prev[at.k].plays.length - 1) Object.assign(cur, { isScore: false, displayResult: '', result: '', shortDisplayResult: '', yards: undefined, description: `${at.j + 1} plays` });
+    d.drives = { previous: [...prev.slice(0, at.k), cur], current: cur };
+    kept = new Set(d.drives.previous.flatMap((x) => x.plays.map((p) => String(p.id))));
+  } else {
+    d.plays = data.plays.slice(0, at.j + 1);
+    kept = new Set(d.plays.map((p) => String(p.id)));
+  }
+  d.scoringPlays = (data.scoringPlays || []).filter((p) => kept.has(String(p.id)));
+  delete d.onIce; // who is on the ice is only known for right now
+  // Score and line score as of this play.
+  const flat = steps.slice(0, i + 1).map((x) => x.p).filter((p) => Number.isFinite(Number(p.awayScore)));
+  const lastP = at.p, per = lastP.period?.number || 1;
+  const endOf = (n) => { const q = flat.filter((p) => (p.period?.number || 0) <= n); return q.length ? q[q.length - 1] : { awayScore: 0, homeScore: 0 }; };
+  const comp = { ...data.header.competitions[0] };
+  comp.competitors = comp.competitors.map((c) => {
+    const k = c.homeAway === 'home' ? 'homeScore' : 'awayScore';
+    const lines = Array.from({ length: per }, (_, n) => { const v = Number(endOf(n + 1)[k]) - Number(n ? endOf(n)[k] : 0); return { value: v, displayValue: String(v) }; });
+    return { ...c, score: String(Number(endOf(per)[k]) || 0), linescores: lines, winner: undefined };
+  });
+  const clock = lastP.clock?.displayValue || '';
+  const nth = (n) => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) || n % 10 > 3 ? 0 : n % 10]}`;
+  const detail = `${clock} - ${nth(per)}`;
+  comp.status = { ...comp.status, period: per, displayClock: clock, type: { ...(comp.status?.type || {}), state: 'in', completed: false, name: 'STATUS_IN_PROGRESS', description: 'In Progress', detail, shortDetail: detail } };
+  comp.situation = undefined;
+  d.header = { ...data.header, competitions: [comp] };
+  return d;
+}
+
+export function gameFromSummary(lg, id, data) {
   const L = LEAGUE[lg];
-  const data = await get(url(SITE, lg, '/summary', { event: id }));
   const comp = data.header?.competitions?.[0];
   if (!comp) throw new FeedError('That game is not in the feed.', 404);
   const game = normEvent({ id: data.header.id || id, date: comp.date, competitions: [comp] }, lg);

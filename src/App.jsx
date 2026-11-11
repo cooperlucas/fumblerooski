@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
@@ -40,12 +40,13 @@ export default function App() {
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
+  else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
   else if (name === 'about') { title = 'About'; tab = 'leagues'; body = <About />; }
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
 
   // Team, game and search screens draw their own header (they know the title or own the search box).
-  const ownHeader = name === 'team' || name === 'game' || name === 'search' || name === 'player';
+  const ownHeader = name === 'team' || name === 'game' || name === 'replay' || name === 'search' || name === 'player';
   return (
     <div className="app">
       <DemoBar />
@@ -1455,7 +1456,11 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   const possT = poss === 'away' ? game.away : poss === 'home' ? game.home : null;
   const lt = last ? place(last.xy, side(last.teamId)) : null;
   const head = now ? playHead(now, L) : '';
-  const call = flash && now ? { text: head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : null;
+  // A 10-0 run (or better) gets called out while it lasts.
+  const run = scoringRun(plays);
+  const runT = run ? game[run.side] : null;
+  const runTxt = run ? `${run.pts}-0` : '';
+  const call = flash && now ? { text: now.scoring && run && side(now.teamId) === run.side ? `${head} · ${runTxt} Run` : head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : null;
   // Chevrons march toward the basket the team with the ball is attacking.
   const dir = poss === 'away' ? -1 : 1, pc = poss ? cc[poss].main : null;
   const shown = recent.slice(0, 4);
@@ -1472,6 +1477,11 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
               under: pc ? <rect x={poss === 'away' ? 0 : W / 2} y="0" width={W / 2} height={H} fill="url(#lcposs)" /> : null,
               over: <>
                 {pc ? [0, 1, 2].map((n) => { const x = W / 2 + dir * (48 + n * 18); return <path key={poss + n} className="chev" style={{ animationDelay: `${n * 0.36}s` }} d={`M${x - dir * 7} ${H / 2 - 16} L${x + dir * 7} ${H / 2} L${x - dir * 7} ${H / 2 + 16}`} fill="none" stroke={pc} strokeWidth="5" />; }) : null}
+                {run ? (
+                  <g key={'run' + run.side} transform={`translate(${W / 2} 22)`}><g className="runchip">
+                    <rect x="-74" y="-15" width="148" height="30" rx="9" fill={dk[run.side].main} stroke="#0C1124" strokeWidth="2.4" />
+                    <text y="1" textAnchor="middle" dominantBaseline="central" fill={inkOn(dk[run.side].main)}>{runT.abbr} {runTxt} RUN</text>
+                  </g></g>) : null}
                 {lt ? <g key={last.id} className="pop">{last.scoring
                   ? <><circle cx={lt.x} cy={lt.y} r="9" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" /><circle cx={lt.x} cy={lt.y} r="3.6" fill="#0C1124" /></>
                   : missed(lt.x, lt.y, '#0C1124', 6, 3.2)}</g> : null}
@@ -1601,7 +1611,6 @@ function LiveRink({ ice, pbp, game, L, onAll, rink }) {
   // Away defends the left net, home the right one.
   const netX = (sd) => (sd === 'away' ? 11 : 189) * K;
   const pp = rink?.pp || null, ppT = pp ? game[pp.side] : null, shortSide = pp ? (pp.side === 'away' ? 'home' : 'away') : null;
-  const mmss = (n) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')}`;
   // A stop from in tight: the newest shot was saved within about 25 feet of the goal line.
   const bigSave = last && last.kind === 'save' && Math.abs(last.x) >= 64 && Math.abs(last.y) <= 22 ? (sideOf(last.teamId) === 'away' ? 'home' : 'away') : null;
   return (
@@ -1614,15 +1623,14 @@ function LiveRink({ ice, pbp, game, L, onAll, rink }) {
           <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ▸</small></span>
           <span><small>◂ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
         </div>
-        <Ice game={game} label={`${pp ? `${ppT.name} power play, ${mmss(pp.left)} left. ` : ''}${(rink?.emptyNet || []).map((sd) => `${game[sd].name} net empty. `).join('')}${last ? `Latest shot: ${last.text}` : 'Rink'}`}>
+        <Ice game={game} label={`${pp ? `${ppT.name} power play, ${pp.skaters}. ` : ''}${(rink?.emptyNet || []).map((sd) => `${game[sd].name} net empty. `).join('')}${last ? `Latest shot: ${last.text}` : 'Rink'}`}>
           {pp ? (
             <>
               {/* the short-handed team's end dims while it kills the penalty */}
               <path d={shortSide === 'away' ? `M${W / 2} 0 H${28 * K} A${28 * K} ${28 * K} 0 0 0 0 ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 0 ${28 * K} ${H} H${W / 2} Z` : `M${W / 2} 0 H${W - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W} ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W - 28 * K} ${H} H${W / 2} Z`} fill="#0C1124" opacity="0.13" />
               <g className="ppchip" transform={`translate(${W / 2} ${H - 19})`}>
-                <rect x="-112" y="-17" width="224" height="34" rx="9" fill={cc[pp.side].main} stroke="#0C1124" strokeWidth="2.4" />
-                <text x="-100" y="1" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{ppT.abbr} POWER PLAY</text>
-                <text className="t" x="100" y="1" textAnchor="end" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{mmss(pp.left)}</text>
+                <rect x="-84" y="-17" width="168" height="34" rx="9" fill={cc[pp.side].main} stroke="#0C1124" strokeWidth="2.4" />
+                <text x="0" y="1" textAnchor="middle" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{ppT.abbr} POWER PLAY</text>
                 <text className="sk" x="0" y="-27" textAnchor="middle" dominantBaseline="central">{pp.skaters}</text>
               </g>
             </>
@@ -1787,11 +1795,52 @@ function BoxScore({ box, game, sport }) {
   );
 }
 
-function GamePage({ lg, id }) {
+// Replay: a finished game played back as if live, one play at a time, so every live view and animation can be watched.
+const REPLAY_SPORTS = new Set(['football', 'basketball', 'hockey']);
+function ReplayPage({ lg, id, start = 0 }) {
   const L = LEAGUE[lg];
-  const q = useQuery(`game:${lg}:${id}`, () => getGame(lg, id), (d) => (d?.game?.state === 'live' ? 20000 : d?.game?.state === 'pre' ? 120000 : 0));
+  const q = useQuery(`summary:${lg}:${id}`, () => getSummary(lg, id), () => 0);
+  const steps = useMemo(() => (q.data ? replaySteps(q.data, L.sport) : []), [q.data]);
+  const moments = useMemo(() => replayMoments(steps, L.sport), [steps]);
+  const [i, setI] = useState(start);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const n = steps.length;
+  useEffect(() => {
+    if (!playing || !n) return undefined;
+    const h = setInterval(() => setI((x) => { if (x >= n - 1) { setPlaying(false); return x; } return x + 1; }), (L.sport === 'football' ? 3000 : 1800) / speed);
+    return () => clearInterval(h);
+  }, [playing, speed, n]);
+  const feed = useMemo(() => (q.data && n ? gameFromSummary(lg, id, replayCut(q.data, L.sport, i)) : null), [q.data, i, n]);
+  const nextMoment = moments.find((m) => m > i);
+  const prevMoment = [...moments].reverse().find((m) => m < i);
+  const bar = n ? (
+    <div className="replaybar" role="group" aria-label="Replay controls">
+      <div className="rbtop"><b>Replay</b><span>Play {i + 1} of {n}</span></div>
+      <input type="range" min="0" max={n - 1} value={i} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }} aria-label="Jump to a play" />
+      <div className="rbrow">
+        <button onClick={() => { setPlaying(false); setI(prevMoment ?? 0); }} disabled={i === 0} aria-label="Previous big moment">⏮</button>
+        <button onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Back one play">◀</button>
+        <button className="go" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? '❚❚' : '▶'}</button>
+        <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play">▶</button>
+        <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment">⏭</button>
+        <button className="spd" onClick={() => setSpeed((x) => (x === 1 ? 3 : x === 3 ? 6 : 1))} aria-label="Playback speed">{speed}x</button>
+      </div>
+    </div>
+  ) : null;
+  if (!REPLAY_SPORTS.has(L.sport)) return <GamePage lg={lg} id={id} />;
+  if (q.loading && !q.data) return <><SubHeader title="Replay" /><Page><Loading rows={5} /></Page></>;
+  if (q.error && !q.data) return <><SubHeader title="Replay" /><Page><Problem error={q.error} retry={q.reload} /></Page></>;
+  if (!n) return <><SubHeader title="Replay" /><Page><Empty>This game has no play-by-play to replay.</Empty></Page></>;
+  return <GamePage lg={lg} id={id} feed={feed} replayBar={bar} />;
+}
+
+function GamePage({ lg, id, feed, replayBar }) {
+  const L = LEAGUE[lg];
+  const q0 = useQuery(feed ? null : `game:${lg}:${id}`, () => getGame(lg, id), (d) => (d?.game?.state === 'live' ? 20000 : d?.game?.state === 'pre' ? 120000 : 0));
+  const q = feed ? { data: feed, loading: false, error: null } : q0;
   const d = q.data, g = d?.game;
-  const title = g ? `${g.away.abbr} at ${g.home.abbr}` : L.name;
+  const title = g ? `${replayBar ? 'Replay: ' : ''}${g.away.abbr} at ${g.home.abbr}` : L.name;
   const started = g && (g.state === 'live' || g.state === 'final');
   const periods = g ? Math.max(g.home.lines.length, g.away.lines.length, g.state === 'live' ? (L.periods || 4) : 0) : 0;
   const [picked, setTab] = useSticky('tab', 'summary');
@@ -1841,9 +1890,12 @@ function GamePage({ lg, id }) {
             </div>
 
             {tabs.length > 1 ? (
-              <div className="gtabs" role="tablist" aria-label="Game sections">
-                {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
-              </div>
+              <>
+                <div className="gtabs" role="tablist" aria-label="Game sections">
+                  {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
+                  {!replayBar && g.state === 'final' && REPLAY_SPORTS.has(L.sport) ? <button className="chipb replaybtn" onClick={() => go(`replay/${lg}/${id}`)}>▶ Replay</button> : null}
+                </div>
+              </>
             ) : null}
 
             {tab === 'summary' ? (
@@ -1902,6 +1954,7 @@ function GamePage({ lg, id }) {
             <Stamp at={q.updatedAt} live={g.state === 'live'} />
           </>
         )}
+        {replayBar}
       </Page>
     </>
   );

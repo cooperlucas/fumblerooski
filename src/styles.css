@@ -599,7 +599,6 @@ button.pick.date { cursor: pointer; }
 
 /* live hockey: power play chip, empty net tag, save pulse */
 .court .ppchip text { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.05em; }
-.court .ppchip .t { font-stretch: 112%; font-size: 19px; font-variant-numeric: tabular-nums; }
 .court .ppchip .sk { font-size: 12px; fill: #1B2350; stroke: #F4FAFF; stroke-width: 3px; paint-order: stroke; }
 .court .ppchip { animation: lcin 0.35s ease-out; }
 .court .emptynet text { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 13px; letter-spacing: 0.06em; }
@@ -608,3 +607,24 @@ button.pick.date { cursor: pointer; }
 .court .savering { transform-box: fill-box; transform-origin: center; opacity: 0; animation: savering 0.9s ease-out 2; }
 @keyframes savering { from { transform: scale(0.5); opacity: 0.95; } to { transform: scale(3.2); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .court .emptynet circle, .court .savering, .court .ppchip { animation: none; } .court .savering { opacity: 0; } }
+
+/* live hoops: a 10-0 run, called out at the top of the floor while it lasts */
+.court .runchip text { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.05em; }
+.court .runchip { animation: runin 0.5s cubic-bezier(.2, 1.5, .4, 1) both; }
+.court .runchip rect { animation: runbeat 1.4s ease-in-out 0.5s 4; transform-box: fill-box; transform-origin: center; }
+@keyframes runin { from { transform: scale(0); } }
+@keyframes runbeat { 50% { transform: scale(1.07); } }
+@media (prefers-reduced-motion: reduce) { .court .runchip, .court .runchip rect { animation: none; } }
+
+/* replay: a finished game played back as if live */
+.replaybar { margin-top: 14px; padding: 8px 10px 10px; border-radius: 16px; background: var(--panel); border: 2px solid var(--yellow); display: flex; flex-direction: column; gap: 6px; position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
+.replaybar .rbtop { display: flex; justify-content: space-between; align-items: baseline; }
+.replaybar .rbtop b { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); }
+.replaybar .rbtop span { font-size: 12px; font-weight: 800; color: var(--mute); font-variant-numeric: tabular-nums; }
+.replaybar input[type=range] { width: 100%; accent-color: var(--yellow); }
+.replaybar .rbrow { display: flex; gap: 6px; }
+.replaybar .rbrow button { flex: 1; min-height: 38px; border-radius: 10px; border: 1px solid var(--rule); background: var(--panel2); color: var(--ink); font: inherit; font-weight: 900; font-size: 15px; cursor: pointer; }
+.replaybar .rbrow button:disabled { opacity: 0.35; cursor: default; }
+.replaybar .rbrow .go { background: var(--yellow); color: #0C1124; border-color: var(--yellow); }
+.replaybar .rbrow .spd { flex: 0.8; font-size: 13px; }
+.gtabs .replaybtn { margin-left: auto; color: var(--yellow); }

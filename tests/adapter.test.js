@@ -435,3 +435,12 @@ test('rinkState finds the power play and an empty net', async () => {
   // home pulls its goalie
   assert.deepEqual(rinkState({ plays: [pl(3, '18:30', 'A')], boxscore: box, onIce: on(['ga', 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11]) }, 'A', 'H').emptyNet, ['home']);
 });
+
+test('scoringRun counts unanswered points back from the newest play', async () => {
+  const { scoringRun } = await import('../src/data/espn.js');
+  const sc = (pairs) => pairs.map(([away, home]) => ({ away, home }));
+  assert.deepEqual(scoringRun(sc([[20, 22], [20, 25], [22, 25], [24, 25], [27, 25], [29, 25], [29, 25], [32, 25]])), { side: 'away', pts: 12 });
+  assert.equal(scoringRun(sc([[20, 22], [22, 22], [24, 22], [27, 22], [29, 22]])), null); // 9-0 is not 10
+  assert.equal(scoringRun(sc([[0, 0], [3, 0], [6, 0], [9, 0], [9, 2]])), null); // broken by the other team
+  assert.deepEqual(scoringRun(sc([[0, 0], [0, 3], [0, 6], [0, 9], [0, 12]]), 10), { side: 'home', pts: 12 });
+});
