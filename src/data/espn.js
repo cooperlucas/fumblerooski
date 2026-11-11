@@ -953,6 +953,33 @@ const LEADER_TITLE = {
   fieldGoalPercentage: 'Field Goal %', FreeThrowPct: 'Free Throw %', '3PointPct': '3-Point %', '3PointsMadePerGame': '3-Pointers Made Per Game',
   doubleDouble: 'Double-Doubles', tripleDouble: 'Triple-Doubles', foulsPerGame: 'Fouls Per Game',
 };
+// Qualified shooting leaders. To count, a player needs the attempts per game below and at least half the games
+// of the busiest player. Read from the per-player board sorted by minutes, which holds every rotation player.
+const SHOOT_MIN = [['fieldGoalPercentage', 'fieldGoalPct', 'avgFieldGoalsAttempted', 5], ['3PointPct', 'threePointFieldGoalPct', 'avgThreePointFieldGoalsAttempted', 2], ['FreeThrowPct', 'freeThrowPct', 'avgFreeThrowsAttempted', 2]];
+async function qualifiedShooting(lg) {
+  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500' }));
+  const names = (g) => (d.categories || []).find((c) => c.name === g)?.names || [];
+  const gen = names('general'), off = names('offensive');
+  const val = (x, g, list, n) => { const i = list.indexOf(n); return i < 0 ? NaN : Number((x.categories || []).find((c) => c.name === g)?.totals?.[i]); };
+  const athletes = d.athletes || [];
+  const most = Math.max(0, ...athletes.map((x) => val(x, 'general', gen, 'gamesPlayed')).filter(Number.isFinite));
+  const out = {};
+  for (const [key, pct, att, min] of SHOOT_MIN) {
+    if (off.indexOf(pct) < 0 || off.indexOf(att) < 0) continue;
+    out[key] = athletes.filter((x) => val(x, 'offensive', off, att) >= min && val(x, 'general', gen, 'gamesPlayed') >= Math.ceil(most / 2))
+      .map((x) => ({ x, v: val(x, 'offensive', off, pct) })).filter((r) => Number.isFinite(r.v))
+      .sort((a, b) => b.v - a.v).slice(0, 100)
+      .map(({ x, v }) => {
+        const a = x.athlete || {};
+        return {
+          value: (v <= 1 ? v * 100 : v).toFixed(1),
+          player: { id: String(a.id ?? ''), name: cleanText(a.displayName || ''), pos: a.position?.abbreviation || '' },
+          team: a.teamId ? normTeam({ id: a.teamId, abbreviation: a.teamShortName, displayName: a.teamName, shortDisplayName: a.teamShortName }, lg) : null,
+        };
+      }).filter((r) => r.player.name);
+  }
+  return out;
+}
 export async function getLeaders(lg) {
   const tries = [[SITE3, '/leaders'], [SITE, '/leaders'], [SITE, '/statistics']];
   let lastErr = null;
@@ -979,6 +1006,13 @@ export async function getLeaders(lg) {
       // Kickoff yards is noise: drop it. Other special-teams lists go to the bottom.
       const niche = (c) => /punt|return|kick|field goal/i.test(c.title + ' ' + c.key);
       const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key));
+      if (kept.length && LEAGUE[lg]?.sport === 'basketball') {
+        // Shooting percentages: the feed's board has no minimum, so a 1-for-1 shooter leads. Rebuild those lists from qualified shooters.
+        try {
+          const q = await qualifiedShooting(lg);
+          kept.forEach((c) => { if (q[c.key]?.length) c.rows = q[c.key]; });
+        } catch { /* keep the feed's lists */ }
+      }
       if (kept.length) return { lg, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche)] };
     } catch (e) { lastErr = e; }
   }
