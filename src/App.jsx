@@ -717,7 +717,7 @@ function TeamPage({ lg, id, season }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
                 <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{topRank ? <b>No. {topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{topRank ? <b>{topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div className="teambar">
@@ -835,7 +835,11 @@ function PlayerPage({ lg, id }) {
     const gp = Number(career.find((x) => x.key === 'averages')?.rows.at(-1)?.stats[0]) || Object.keys(pm.games).length;
     const v = c.key === 'totals' ? signed(pm.total) : gp ? signed(Math.round((pm.total / gp) * 10) / 10) : '';
     return { ...c, labels: [...c.labels, '+/-'], row: { ...row, stats: [...row.stats, v] } };
-  }).filter((c) => c.row);
+  }).filter((c) => c.row).filter((c, _, all) => {
+    // Only this season's tables: a QB's one tackle from 2023 is not part of his 2026.
+    const top = Math.max(...all.map((x) => x.row.year || 0));
+    return !top || !c.row.year || c.row.year === top;
+  });
   const log0 = d?.gamelog;
   const pmOn = pm && Object.keys(pm.games).length && log0?.labels.length;
   const log = !pmOn ? log0 : {
@@ -1620,7 +1624,7 @@ function GamePage({ lg, id }) {
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
                     <span className="nm" style={t.name.length > 12 ? { fontStretch: '87.5%', fontSize: 12 } : t.name.length > 9 ? { fontStretch: '100%', fontSize: 13 } : undefined}>{t.name}</span>
-                    <span className="rc">{t.rank ? <b className="brk">No. {t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
+                    <span className="rc">{t.rank ? <b className="brk">{t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
