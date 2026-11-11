@@ -124,6 +124,17 @@ export function shortEvent(note) {
 }
 
 /* ---------- building blocks ---------- */
+// A team chip with its poll rank in a gold tag on the top-left corner, the way the team page shows it.
+export function RankBlob({ team, rank, size = 28, radius }) {
+  if (!rank) return <Blob team={team} size={size} radius={radius} />;
+  const h = Math.max(15, Math.round(size * 0.42)), off = -Math.round(Math.min(8, size * 0.16));
+  return (
+    <span className="rblob" style={{ position: 'relative', display: 'inline-flex', flex: 'none' }}>
+      <Blob team={team} size={size} radius={radius} />
+      <b className="rtag" aria-label={`Ranked ${rank}`} style={{ top: off, left: off, minWidth: h, height: h, fontSize: Math.max(9, Math.round(h * 0.54)), borderRadius: Math.round(h * 0.3), boxShadow: `${size > 40 ? 2 : 1.5}px ${size > 40 ? 2 : 1.5}px 0 #0C1124` }}>{rank}</b>
+    </span>
+  );
+}
 // Teams are a colored chip with their abbreviation. No logos: those need a license.
 export function Blob({ team, size = 28, radius }) {
   const bg = liveColor(team);

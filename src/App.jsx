@@ -3,7 +3,7 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
-import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows } from './ui.jsx';
+import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
@@ -743,8 +743,8 @@ function TeamPage({ lg, id, season }) {
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
     return (
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
-        <Blob team={them} />
-        <span className="nm">{g.note ? <GameNote text={shortEvent(g.note)} /> : null}{home ? 'vs' : 'at'} {them.rank ? <span className="orank">{them.rank}</span> : null}{them.name}{oppRec ? <small className="orec"> {oppRec}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
+        <RankBlob team={them} rank={them.rank} />
+        <span className="nm">{g.note ? <GameNote text={shortEvent(g.note)} /> : null}{home ? 'vs' : 'at'} {them.name}{oppRec ? <small className="orec"> {oppRec}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span className="livesc"><b>{me.score !== '' && me.score != null ? `${me.score}-${them.score}` : 'LIVE'}</b><small>{g.statusText || 'Live'}</small></span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
@@ -1943,9 +1943,9 @@ function GamePage({ lg, id, feed, replayBar }) {
               <div className="grid">
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}${g.season ? '/' + g.season : ''}`)} aria-label={`Open ${t.full}`}>
-                    <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
+                    <span style={{ position: 'relative' }}><span style={{ display: 'inline-flex', borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>{t.rank ? <b className="rtag brd" aria-label={`Ranked ${t.rank}`}>{t.rank}</b> : null}</span>
                     <span ref={i === 0 ? pair.a : pair.b} className="nm" style={pair.style}>{t.name}</span>
-                    <span className="rc">{t.rank ? <b className="brk">{t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
+                    <span className="rc">{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}

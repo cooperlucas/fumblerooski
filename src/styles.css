@@ -644,3 +644,6 @@ button.pick.date { cursor: pointer; }
 .lrow .orank { font-size: 0.72em; font-weight: 800; color: var(--gold); margin-right: 4px; }
 /* upcoming games: date a touch smaller than a live clock or a final */
 .grow .meta .stat.pre { font-size: 13px; }
+
+.rblob .rtag { position: absolute; z-index: 1; padding: 0 3px; display: grid; place-items: center; background: #FFBE2E; color: #0C1124; font-stretch: 112%; font-style: italic; font-weight: 900; line-height: 1; }
+.board .tm .rtag.brd { position: absolute; z-index: 1; top: -10px; left: -10px; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 8px; display: grid; place-items: center; background: #FFBE2E; color: #0C1124; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 14px; box-shadow: 2px 2px 0 #0C1124; }
