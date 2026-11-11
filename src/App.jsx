@@ -736,11 +736,15 @@ function TeamPage({ lg, id, season }) {
     const lv = g0.id === liveId && lq.data?.game;
     const g = lv ? { ...g0, state: lv.state, statusText: lv.statusText, away: { ...g0.away, score: lv.away.score }, home: { ...g0.home, score: lv.home.score } } : g0;
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
+    // A finished game shows the opponent's record going into it: the feed's record already counts this game, so take it back out.
+    const before = (rec, won) => { const m = /^(\d+)-(\d+)(.*)$/.exec(rec || ''); return m ? `${Number(m[1]) - (won ? 1 : 0)}-${Number(m[2]) - (won ? 0 : 1)}${m[3]}` : rec; };
+    const decided = g.state === 'final' && them.record && me.score !== '' && them.score !== '' && Number(me.score) !== Number(them.score);
+    const oppRec = decided ? before(them.record, Number(them.score) > Number(me.score)) : isPast ? them.record : recs[them.id] || them.record;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
     return (
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
         <Blob team={them} />
-        <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.rank ? <span className="orank">{them.rank}</span> : null}{them.name}{(isPast ? them.record : recs[them.id] || them.record) ? <small className="orec"> {isPast ? them.record : recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
+        <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.rank ? <span className="orank">{them.rank}</span> : null}{them.name}{oppRec ? <small className="orec"> {oppRec}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span className="livesc"><b>{me.score !== '' && me.score != null ? `${me.score}-${them.score}` : 'LIVE'}</b><small>{g.statusText || 'Live'}</small></span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
@@ -1921,7 +1925,7 @@ function GamePage({ lg, id, feed, replayBar }) {
               </div>
               <div className="grid">
                 {[g.away, null, g.home].map((t, i) => t ? (
-                  <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
+                  <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}${g.season ? '/' + g.season : ''}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
                     <FitName text={t.name} />
                     <span className="rc">{t.rank ? <b className="brk">{t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>

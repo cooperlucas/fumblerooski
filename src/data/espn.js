@@ -1851,6 +1851,7 @@ export function gameFromSummary(lg, id, data) {
   const comp = data.header?.competitions?.[0];
   if (!comp) throw new FeedError('That game is not in the feed.', 404);
   const game = normEvent({ id: data.header.id || id, date: comp.date, competitions: [comp] }, lg);
+  game.season = Number(data.header?.season?.year) || null; // the season this game belongs to, for links to that season's team pages
   const started = game.state === 'live' || game.state === 'final';
   const plays = (data.scoringPlays || []).map((p) => ({
     text: cleanText(p.text),
