@@ -174,6 +174,7 @@ h1, h2, h3, p { margin: 0; }
 .bar .track { height: 10px; border-radius: 5px; background: var(--rule); overflow: hidden; }
 .bar .fill { height: 100%; border-radius: 5px; transform-origin: left center; animation: frGrow 800ms cubic-bezier(.2, .8, .2, 1) both; }
 .bar .val { text-align: right; font-variant-numeric: tabular-nums; }
+.bar .det { grid-column: 2 / -1; margin-top: -5px; font-size: 11px; font-weight: 700; color: var(--dim); font-variant-numeric: tabular-nums; }
 .tip { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 190, 46, 0.1); color: var(--tip-ink); font-size: 13px; font-weight: 600; line-height: 1.45; }
 .flow { display: block; width: 100%; height: auto; animation: frReveal 1.4s cubic-bezier(.4, 0, .2, 1) 150ms both; }
 .flowlab { font-stretch: 125%; font-size: 11px; font-weight: 900; font-style: italic; }

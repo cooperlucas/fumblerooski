@@ -884,7 +884,7 @@ export function pctOf(v, digits = 1) {
   return `${(100 * +m[1] / +m[2]).toFixed(digits)}%`;
 }
 // Only these are made-of-attempted. Things like sacks ("1-7") and penalties ("5-45") look the same but are not.
-const PCT_STATS = new Set(['Field goals', '3-pointers', 'Free throws', '3rd down', '4th down', '3rd down eff.', '4th down eff.', 'Comp/Att', 'Red zone']);
+const PCT_STATS = new Set(['Field goals', '3-pointers', 'Free throws', '3rd down', '4th down', '3rd down eff.', '4th down eff.', 'Comp/Att', 'Red zone TDs']);
 export const PCT_COLS = new Set(['FG', '3PT', 'FT', 'C/ATT']);
 function statRows(box, awayId, homeId, sport, drives) {
   const teams = box?.teams || [];
@@ -941,28 +941,36 @@ function footballRows(box, drives, awayId, homeId, a, h, row) {
   };
   const A = side(a, awayId), H = side(h, homeId);
   const pick = (name, label) => row(name, label);
+  // Related numbers ride along under the main bar as a small line per team, so one tile tells the whole story.
+  const with_ = (r, parts) => {
+    if (!r) return null;
+    const line = (k) => parts.map(([v, fmt]) => { const x = String(v[k] ?? '').trim(); return x === '' ? '' : fmt(x); }).filter(Boolean).join(' · ');
+    const da = line(0), dh = line(1);
+    return da || dh ? { ...r, awayDet: da, homeDet: dh } : r;
+  };
+  const both = (fn) => [fn(a, A), fn(h, H)];
+  const per = (n, word) => `${n} ${word}${n === '1' ? '' : 's'}`;
   return [
-    pick('totalYards', 'Total yards'),
-    make('Total plays', A.plays, H.plays),
-    make('Yards per play', A.ypp, H.ypp),
+    with_(pick('totalYards', 'Total yards'), [[[A.plays, H.plays], (v) => per(v, 'play')], [[A.ypp, H.ypp], (v) => `${v} per play`]]),
     pick('firstDowns', 'First downs'),
-    pick('netPassingYards', 'Passing yards'),
-    pick('completionAttempts', 'Comp/Att'),
-    pick('yardsPerPass', 'Yards per pass'),
-    make('Passing TDs', A.passTd, H.passTd),
-    pick('rushingYards', 'Rushing yards'),
-    pick('yardsPerRushAttempt', 'Yards per rush'),
-    make('Rushing TDs', A.rushTd, H.rushTd),
-    pick('turnovers', 'Turnovers'),
-    pick('interceptions', 'Interceptions thrown'),
-    pick('fumblesLost', 'Fumbles lost'),
-    make('Sacked', A.sacked, H.sacked),
-    make('Sack yards lost', A.sackYds, H.sackYds),
-    make('Red zone', A.rz, H.rz, true),
-    make('3rd down eff.', A.third, H.third, true),
-    make('4th down eff.', A.fourth, H.fourth, true),
-    make('Penalties', A.pen, H.pen),
-    make('Penalty yards', A.penYds, H.penYds),
+    with_(pick('netPassingYards', 'Passing yards'), [
+      [both((l) => raw(l, 'completionAttempts').replace('-', '/')), (v) => v],
+      [both((l) => raw(l, 'yardsPerPass')), (v) => `${v} per att`],
+      [[A.passTd, H.passTd], (v) => `${v} TD`],
+    ]),
+    with_(pick('rushingYards', 'Rushing yards'), [
+      [both((l) => raw(l, 'rushingAttempts')), (v) => per(v, 'carry').replace('carrys', 'carries')],
+      [both((l) => raw(l, 'yardsPerRushAttempt')), (v) => `${v} per carry`],
+      [[A.rushTd, H.rushTd], (v) => `${v} TD`],
+    ]),
+    with_(pick('turnovers', 'Turnovers'), [
+      [both((l) => raw(l, 'interceptions')), (v) => `${v} INT`],
+      [both((l) => raw(l, 'fumblesLost')), (v) => `${v} fumbles lost`.replace(/^1 fumbles/, '1 fumble')],
+    ]),
+    with_(make('Sacked', A.sacked, H.sacked), [[[A.sackYds, H.sackYds], (v) => `${v} yds lost`]]),
+    make('Red zone TDs', A.rz, H.rz, true),
+    with_(make('3rd down eff.', A.third, H.third, true), [[[A.fourth, H.fourth], (v) => `4th down ${v}`]]),
+    with_(make('Penalties', A.pen, H.pen), [[[A.penYds, H.penYds], (v) => `${v} yds`]]),
     pick('possessionTime', 'Time of possession'),
   ].filter(Boolean);
 }

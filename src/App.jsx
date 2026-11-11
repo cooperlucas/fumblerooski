@@ -1657,8 +1657,8 @@ function GamePage({ lg, id }) {
                     {d.stats.map((s, i) => { const barC = chartColors(g.away, g.home); const max = Math.max(s.awayN, s.homeN) || 1; return (
                       <div className="statrow" key={s.label}>
                         <div className="lab"><span>{s.label}</span></div>
-                        {[[g.away, s.away, s.awayN, barC.away.main, s.awayPct], [g.home, s.home, s.homeN, barC.home.main, s.homePct]].map(([t, v, n, c, pc]) => (
-                          <div className="bar" key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{pct1(s.label, v)}{pc ? <small> {pc}</small> : null}</span></div>
+                        {[[g.away, s.away, s.awayN, barC.away.main, s.awayPct, s.awayDet], [g.home, s.home, s.homeN, barC.home.main, s.homePct, s.homeDet]].map(([t, v, n, c, pc, det]) => (
+                          <div className={det ? 'bar hasdet' : 'bar'} key={t.id}><span>{t.abbr}</span><span className="track"><span className="fill" style={{ display: 'block', width: `${Math.round((n / max) * 100)}%`, background: c, animationDelay: `${120 + i * 70}ms` }} /></span><span className="val">{pct1(s.label, v)}{pc ? <small> {pc}</small> : null}</span>{det ? <span className="det">{det}</span> : null}</div>
                         ))}
                       </div>); })}
                   </div>
