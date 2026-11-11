@@ -1124,7 +1124,9 @@ export async function getLeaders(lg) {
       })).filter((c) => c.title && c.rows.length);
       // Kickoff yards is noise: drop it. Other special-teams lists go to the bottom.
       const niche = (c) => /punt|return|kick|field goal/i.test(c.title + ' ' + c.key);
-      const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key));
+      // Hoops: total points just repeats the points-per-game list, so it goes.
+      const hoops = LEAGUE[lg]?.sport === 'basketball';
+      const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key) && !(hoops && c.key === 'points'));
       if (kept.length && LEAGUE[lg]?.sport === 'basketball') {
         // Shooting percentages: the feed's board has no minimum, so a 1-for-1 shooter leads. Rebuild those lists from qualified shooters.
         try {
@@ -1137,6 +1139,39 @@ export async function getLeaders(lg) {
   }
   if (lastErr) throw lastErr;
   return { lg, cats: [] };
+}
+
+// League plus-minus leaders, per game (pro hoops). The feed has no +/- board, so read each rotation player's season line:
+// 15+ minutes a game and at least half the games of the busiest player. About 260 small reads, done 12 at a time.
+export const hasLeaguePlusMinus = (lg) => hasPlusMinus(lg) && !LEAGUE[lg]?.college;
+export async function getLeaguePlusMinus(lg) {
+  if (!hasLeaguePlusMinus(lg)) return null;
+  const L = LEAGUE[lg];
+  const base = `https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}`;
+  const [lgInfo, d] = await Promise.all([get(`${base}?lang=en&region=us`), get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500' }))]);
+  const yr = Number(lgInfo?.season?.year);
+  if (!yr) return null;
+  const gen = (d.categories || []).find((c) => c.name === 'general')?.names || [];
+  const val = (x, n) => { const i = gen.indexOf(n); return i < 0 ? NaN : Number((x.categories || []).find((c) => c.name === 'general')?.totals?.[i]); };
+  const athletes = d.athletes || [];
+  const most = Math.max(0, ...athletes.map((x) => val(x, 'gamesPlayed')).filter(Number.isFinite));
+  const pool = athletes.filter((x) => val(x, 'avgMinutes') >= 15 && val(x, 'gamesPlayed') >= Math.ceil(most / 2) && x.athlete?.id);
+  const out = [];
+  await inBatches(pool, 12, async (x) => {
+    const a = x.athlete;
+    const s = await get(`${base}/seasons/${yr}/types/2/athletes/${encodeURIComponent(a.id)}/statistics?lang=en&region=us`);
+    let pm = null, gp = 0;
+    for (const c of s?.splits?.categories || []) for (const st of c.stats || []) { if (st.name === 'plusMinus') pm = Number(st.value); if (st.name === 'gamesPlayed') gp = Number(st.value) || gp; }
+    if (!Number.isFinite(pm) || !gp) return;
+    out.push({
+      avg: pm / gp, total: pm,
+      player: { id: String(a.id), name: cleanText(a.displayName || ''), pos: a.position?.abbreviation || '' },
+      team: a.teamId ? normTeam({ id: a.teamId, abbreviation: a.teamShortName, displayName: a.teamName, shortDisplayName: a.teamShortName }, lg) : null,
+    });
+  });
+  const rows = out.filter((r) => r.player.name).sort((a, b) => b.avg - a.avg || b.total - a.total).slice(0, 100)
+    .map((r) => ({ value: signed(Math.round(r.avg * 10) / 10), player: r.player, team: r.team }));
+  return rows.length ? { key: 'plusMinus', title: '+/- Per Game', abbr: '+/-', rows } : null;
 }
 
 // Every team's season numbers, one table per stat group (passing, rushing, defense...).

@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
@@ -587,11 +587,19 @@ function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   const filters = useLeaderFilters(lg);
   const [fid, setFid] = useSticky('filter:' + lg, 'all');
+  // Pro hoops: +/- has no feed board, so it is built separately and slots in after blocks once it lands.
+  const pmq = useQuery(hasLeaguePlusMinus(lg) ? `leaguepm:${lg}` : null, () => getLeaguePlusMinus(lg), () => 1800000);
   if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
   if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
   const f = filters.find((x) => x.id === fid);
   const pickFilter = (v) => setFid(v);
+  let cats = q.data.cats;
+  if (pmq.data) {
+    const at = cats.findIndex((c) => c.key === 'blocksPerGame');
+    const i = at < 0 ? Math.min(6, cats.length) : at + 1;
+    cats = [...cats.slice(0, i), pmq.data, ...cats.slice(i)];
+  }
   return (
     <>
       {filters.length ? (
@@ -603,7 +611,7 @@ function Leaders({ lg }) {
           </Picker>
         </div>
       ) : null}
-      {q.data.cats.map((c) => <LeaderCard key={c.key} lg={lg} c={c} f={f} />)}
+      {cats.map((c) => <LeaderCard key={c.key} lg={lg} c={c} f={f} />)}
       <Stamp at={q.updatedAt} />
     </>
   );
