@@ -37,7 +37,7 @@ export default function App() {
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
-  else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b} lg={a} id={b} />; }
+  else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
@@ -422,7 +422,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
                   <React.Fragment key={sub.name || 'all'}>
                     {sub.name ? <div className="subhead">{sub.name}</div> : null}
                     {sub.rows.map((r, j) => (
-                      <button key={r.team.id} className={'srow' + (focus && r.team.id === String(focus) ? ' me' : '')} aria-current={focus && r.team.id === String(focus) ? 'true' : undefined} onClick={() => go(`team/${lg}/${r.team.id}`)}>
+                      <button key={r.team.id} className={'srow' + (focus && r.team.id === String(focus) ? ' me' : '')} aria-current={focus && r.team.id === String(focus) ? 'true' : undefined} onClick={() => go(`team/${lg}/${r.team.id}${yr ? '/' + yr : ''}`)}>
                         <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}</span>
                         <span className="v">{r.overall}</span><span className="v2">{r.col2}</span>
                       </button>
@@ -659,8 +659,8 @@ function TeamStats({ lg }) {
 }
 
 /* ---------- Team ---------- */
-function TeamPage({ lg, id }) {
-  const [yr, setYr] = useSticky('yr', null); // null = this season
+function TeamPage({ lg, id, season }) {
+  const [yr, setYr] = useSticky('yr', season || null); // null = this season
   const q = useQuery(`team:${lg}:${id}${yr ? ':' + yr : ''}`, () => getTeam(lg, id, yr), () => 300000);
   const cur = q.data?.currentSeason || null;
   const isPast = !!yr && yr !== cur;
