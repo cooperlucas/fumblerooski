@@ -1657,7 +1657,7 @@ function GamePage({ lg, id }) {
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
-                    <span className="nm" style={t.name.length > 12 ? { fontStretch: '87.5%', fontSize: 12 } : t.name.length > 9 ? { fontStretch: '100%', fontSize: 13 } : undefined}>{t.name}</span>
+                    <FitName text={t.name} />
                     <span className="rc">{t.rank ? <b className="brk">{t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
@@ -1737,6 +1737,28 @@ function GamePage({ lg, id }) {
       </Page>
     </>
   );
+}
+
+// A team name under the scoreboard logo: narrows, then shrinks, until the whole name fits ("Kentucky", not "Kentuc...").
+function FitName({ text }) {
+  const ref = useRef(null);
+  const steps = [[14, '112%'], [13, '100%'], [12, '100%'], [12, '87.5%'], [11, '87.5%'], [12, '100%', true]]; // last resort: two lines
+  const [i, setI] = useState(0);
+  const [, redo] = useState(0);
+  useLayoutEffect(() => { setI(0); }, [text]);
+  // The web font can land after the first check and make the name wider: check again then, and on rotate.
+  useEffect(() => {
+    const again = () => { setI(0); redo((n) => n + 1); };
+    let live = true;
+    document.fonts?.ready?.then(() => { if (live) again(); });
+    window.addEventListener('resize', again);
+    return () => { live = false; window.removeEventListener('resize', again); };
+  }, []);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && el.scrollWidth > el.clientWidth + 1 && i < steps.length - 1) setI(i + 1);
+  });
+  return <span ref={ref} className="nm" style={{ fontSize: steps[i][0], fontStretch: steps[i][1], ...(steps[i][2] ? { whiteSpace: 'normal', lineHeight: 1.1 } : {}) }}>{text}</span>;
 }
 
 /* ---------- Before the game: how the two teams stack up ---------- */
