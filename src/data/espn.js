@@ -536,8 +536,9 @@ export async function getTeamStatsFor(lg, id, season) {
         const top = (c.leaders || []).slice(0, 3).map((l) => {
           const pid = /athletes\/(\d+)/.exec(String(l.athlete?.$ref || ''))?.[1] || '';
           const p = who.get(pid);
-          const n = Number(l.value); const dv = String(l.displayValue || ''); const v = /^-?[\d.,]+$/.test(dv) ? dv : Number.isFinite(n) ? (Number.isInteger(n) ? n.toLocaleString('en-US') : (Math.round(n * 10) / 10).toString()) : dv;
-          return { id: pid, name: p?.name || '', pos: p?.pos || '', jersey: p?.jersey || '', value: v, detail: cleanText(l.displayValue || '') };
+          const n = Number(l.value); const dv = String(l.displayValue || ''); const whole = /double|triple/i.test(c.name) && Number.isFinite(n); // counts, not averages
+          const v = whole ? String(Math.round(n)) : /^-?[\d.,]+$/.test(dv) ? dv : Number.isFinite(n) ? (Number.isInteger(n) ? n.toLocaleString('en-US') : (Math.round(n * 10) / 10).toString()) : dv;
+          return { id: pid, name: p?.name || '', pos: p?.pos || '', jersey: p?.jersey || '', value: v, detail: whole ? '' : cleanText(l.displayValue || '') };
         }).filter((x) => x.name);
         const title = cleanText(c.displayName || c.name).replace(/^Average\s+/i, '').replace(/3-Point Field Goals Made/i, '3-pointers').replace(/Field Goal Percentage/i, 'FG %').replace(/Free Throw Percentage/i, 'FT %').replace(/^Double Double$/i, 'Double-doubles');
         return { key: c.name, title, rows: top };
@@ -766,7 +767,7 @@ export async function getTeamPlusMinus(lg, teamId, season) {
   const rows = [...tally.entries()].filter(([, r]) => r.gp >= need && r.name).map(([pid, r]) => ({ id: pid, name: r.name, pos: r.pos, jersey: r.jersey, avg: r.total / r.gp, total: r.total }))
     .sort((a, b) => b.avg - a.avg || b.total - a.total).slice(0, 3)
     .map((r) => ({ id: r.id, name: r.name, pos: r.pos, jersey: r.jersey, value: signed(Math.round(r.avg * 10) / 10), detail: `${signed(r.total)} total` }));
-  return rows.length ? { key: 'plusMinus', title: 'Plus/Minus Per Game', rows } : null;
+  return rows.length ? { key: 'plusMinus', title: '+/- Per Game', rows } : null;
 }
 export async function getPlusMinus(lg, id) {
   const L = LEAGUE[lg];
@@ -957,8 +958,9 @@ export async function getLeaders(lg) {
         abbr: cleanText(c.abbreviation || c.shortDisplayName || ''),
         rows: (c.leaders || []).map((l) => {
           const a = l.athlete || null, t = l.team || a?.team || null;
+          const n = Number(l.value);
           return {
-            value: leaderValue(l),
+            value: /double|triple/i.test(String(c.name || '')) && Number.isFinite(n) ? String(Math.round(n)) : leaderValue(l),
             player: a ? { id: String(a.id ?? ''), name: cleanText(a.displayName || a.fullName || a.shortName || ''), pos: a.position?.abbreviation || '' } : null,
             team: t?.id ? normTeam(t, lg) : null,
           };
