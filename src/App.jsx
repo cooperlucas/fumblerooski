@@ -132,7 +132,7 @@ function Board({ games, pick, favSet, title }) {
       {mine.length ? (
         <div className="card">
           <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
-          {mine.map((g) => <GameRow key={g.lg + g.id} g={g} />)}
+          {mine.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={false} />)}
         </div>
       ) : null}
       {leagues.map((l) => {
