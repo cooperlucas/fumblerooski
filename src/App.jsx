@@ -1035,6 +1035,7 @@ function LiveField({ drives, game, onAll }) {
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
             <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
             {[[0, -1], [FW, 1]].map(([x, s]) => <path key={x} d={`M${x - s * 2} ${mid} H${x - s * 9} M${x - s * 9} ${mid - 16} V${mid + 16} M${x - s * 9} ${mid - 16} H${x - s * 15} M${x - s * 9} ${mid + 16} H${x - s * 15}`} transform={`translate(${s * 12} 0)`} stroke="#FFBE2E" strokeWidth="2.6" fill="none" strokeLinecap="round" />)}
+            {d.kind === 'td' ? <rect className="tdglow" x={d.side === 'away' ? 110 * K : 0} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
             {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="3" /> : null}
             {start != null && at != null ? (
               <>
@@ -1372,6 +1373,9 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
   const nowT = now && sideOf(now.teamId) ? game[sideOf(now.teamId)] : null;
   const head = now ? playHead(now, L) : '';
   const lc = last ? cc[sideOf(last.teamId)].main : null;
+  // The goal light: on while a goal is one of the three newest plays, over the net it went into.
+  const g3 = recent.slice(0, 3).find((p) => p.scoring);
+  const goalSide = g3 ? sideOf(g3.teamId) : null;
   const dots = [31, 169].flatMap((x) => [20.5, 64.5].map((y) => [x * K, y * K]));
   return (
     <section className="sec">
@@ -1394,6 +1398,13 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
           <text x={100 * K} y={H / 2 + 7} textAnchor="middle" className="ccode" style={{ fontSize: 20 }} fill={cc.home.main}>{game.neutral ? '' : game.home.abbr}</text>
           {dots.map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r={15 * K} fill="none" stroke="#E0263C" strokeWidth="1.6" opacity="0.7" /><circle cx={x} cy={y} r="3" fill="#E0263C" /></g>)}
           <path d={`M${11 * K - 9} ${H / 2 - 9} H${11 * K} V${H / 2 + 9} H${11 * K - 9} Z M${189 * K + 9} ${H / 2 - 9} H${189 * K} V${H / 2 + 9} H${189 * K + 9} Z`} fill="none" stroke="#1B2350" strokeWidth="2" />
+          {goalSide ? (
+            <g className="goallamp" transform={`translate(${(goalSide === 'away' ? 189 : 11) * K} ${H / 2 - 62}) scale(1.7)`}>
+              <circle r="16" fill="#FF1F3D" className="halo" />
+              <path d="M-7 5 V-1 A7 7 0 0 1 7 -1 V5 Z" fill="#FF1F3D" stroke="#0C1124" strokeWidth="1.8" />
+              <rect x="-9" y="5" width="18" height="4" rx="1.5" fill="#0C1124" />
+            </g>
+          ) : null}
           {last ? (
             <g key={ice.length} className="pop">
               {last.kind === 'goal'
