@@ -687,7 +687,12 @@ function TeamPage({ lg, id, season }) {
   const lower = pollRanks.find((x) => x.level !== 'top');
   const mainPoll = lower ? lower.poll : polls[0];
   const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || null);
-  const row = (g) => {
+  // The schedule feed leaves the score blank while a game is on, so read that one game live.
+  const liveId = sched.find((g) => g.state === 'live')?.id;
+  const lq = useQuery(liveId ? `game:${lg}:${liveId}` : null, () => getGame(lg, liveId), () => 30000);
+  const row = (g0) => {
+    const lv = g0.id === liveId && lq.data?.game;
+    const g = lv ? { ...g0, state: lv.state, statusText: lv.statusText, away: { ...g0.away, score: lv.away.score }, home: { ...g0.home, score: lv.home.score } } : g0;
     const home = g.home.id === String(id), me = home ? g.home : g.away, them = home ? g.away : g.home;
     const fin = g.state === 'final', w = +me.score > +them.score, tie = +me.score === +them.score;
     return (
@@ -695,7 +700,7 @@ function TeamPage({ lg, id, season }) {
         <Blob team={them} />
         <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.name}{(isPast ? them.record : recs[them.id] || them.record) ? <small className="orec"> {isPast ? them.record : recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
-          : g.state === 'live' ? <span style={{ color: 'var(--pink)' }}>LIVE {me.score}-{them.score}</span>
+          : g.state === 'live' ? <span className="livesc"><b>{me.score !== '' && me.score != null ? `${me.score}-${them.score}` : 'LIVE'}</b><small>{g.statusText || 'Live'}</small></span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
               : <span style={{ color: 'var(--teal)' }}>{g.tbd ? 'TBD' : fmtTime(g.date)}</span>}</span>
       </button>

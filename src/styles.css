@@ -537,3 +537,8 @@ button.pick.date { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .field .tdglow, .court .goallamp .halo, .court .goallamp path { animation: none; } .field .tdglow { animation: glowoff 0.5s 10s forwards; } .court .goallamp { animation: glowoff 0.5s 5s forwards; } }
 
 .field .ez.mid { font-size: 24px; stroke: #fff; stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; }
+
+/* team schedule: a game in progress shows its score and clock */
+.lrow .res .livesc { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: var(--pink); }
+.lrow .res .livesc b { background: none; color: var(--ink); padding: 0; margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+.lrow .res .livesc small { font-size: 11px; font-weight: 800; letter-spacing: .02em; }
