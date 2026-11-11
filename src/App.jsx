@@ -172,6 +172,7 @@ function Scores() {
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
   const leagues = LEAGUES.filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
   const q = pickL ? sb : day;
+  const gf = useGameFilter(pickL || 'top');
   return (
     <>
       <div className="chips" role="group" aria-label="League">
@@ -205,13 +206,14 @@ function Scores() {
             <H2>{LEAGUE[pickL].name}</H2>
             <button className="link" onClick={() => go(`league/${pickL}`)}>Standings ›</button>
           </div>
+          {gf.el ? <div className="filters" style={{ margin: '0 0 10px' }}>{gf.el}</div> : null}
           {baseDay && !sb.data.weeks && baseDay !== todayKey ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{baseDay < todayKey ? 'Last played' : 'Next up'}: {dateOf(baseDay).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p> : null}
           {sb.data.weeks && sb.data.current.week ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</p> : null}
-          {sb.data.games.length ? <Board games={sb.data.games} pick="all" favSet={favSet} /> : <Empty>No {LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
+          {gf.apply(sb.data.games).length ? <Board games={gf.apply(sb.data.games)} pick="all" favSet={favSet} /> : gf.on && sb.data.games.length ? <Empty>No {gf.label} games on this slate.</Empty> : <Empty>No {LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
           {nextDay && sbNext.data?.games?.length ? (
             <>
               <div className="sechead" style={{ marginTop: 22 }}><H2>{nextDay === todayKey ? 'Today' : `Next: ${dateOf(nextDay).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`}</H2></div>
-              <Board games={sbNext.data.games} pick="all" favSet={favSet} />
+              <Board games={gf.apply(sbNext.data.games)} pick="all" favSet={favSet} />
             </>
           ) : nextDay && sbNext.loading ? <Loading rows={2} /> : null}
         </>
@@ -242,6 +244,7 @@ function LeagueScores({ lg, startDay }) {
   const [day, setDay] = useSticky('day', startDay || null); // 'YYYYMMDD'
   const [cal, setCal] = useState(false);
   const [month, setMonth] = useState(null); // first of the month shown in the calendar
+  const gf = useGameFilter(lg);
   const b = base.data;
   const weekMode = !!b?.weeks?.length;
   const curWk = b?.current?.week ? `${b.current.type}:${b.current.week}` : null;
@@ -272,7 +275,7 @@ function LeagueScores({ lg, startDay }) {
     return cells;
   })();
   const shiftMonth = (k) => setMonth(new Date(m0.getFullYear(), m0.getMonth() + k, 1, 12));
-  const games = q.data?.games || [];
+  const games = gf.apply(q.data?.games || []);
   return (
     <>
       {weekMode ? (
@@ -280,6 +283,7 @@ function LeagueScores({ lg, startDay }) {
           <div className="filters">
             <Picker label="Season" value={String(yr || thisYear)} onChange={(v) => { const y = Number(v); if (y === thisYear) { setYr(null); setWk(null); } else { setYr(y); setWk('2:1'); } }}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</Picker>
             <Picker label="Week" value={wkKey || ''} onChange={setWk}>{weekList.map((w) => <option key={`${w.type}:${w.week}`} value={`${w.type}:${w.week}`}>{w.label}</option>)}</Picker>
+            {gf.el}
           </div>
           <p className="stamp" style={{ textAlign: 'right', margin: '6px 2px 0' }}>{(weekList.find((w) => `${w.type}:${w.week}` === wkKey) || {}).detail || ''}</p>
         </>
@@ -299,6 +303,7 @@ function LeagueScores({ lg, startDay }) {
               <span>{dateOf(dayKey).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
             </button>
             {dayKey !== today ? <button className="link" onClick={() => pickDay(today)}>Today</button> : null}
+            {gf.el ? <span style={{ marginLeft: 'auto', minWidth: 0, flex: '0 1 150px', display: 'flex' }}>{gf.el}</span> : null}
           </div>
           {cal ? (
             <div className="card pad calbox">
@@ -323,7 +328,7 @@ function LeagueScores({ lg, startDay }) {
         </>
       )}
       {q.loading && !q.data ? <Loading rows={4} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> :
-        games.length ? <Board games={games} pick="all" favSet={favSet} /> : <Empty>No {L.short} games {weekMode ? 'this week' : 'on this day'}.</Empty>}
+        games.length ? <Board games={games} pick="all" favSet={favSet} /> : <Empty>No {gf.on ? `${gf.label} ` : `${L.short} `}games {weekMode ? 'this week' : 'on this day'}.</Empty>}
       <Stamp at={q.updatedAt} live={games.some((g) => g.state === 'live')} />
     </>
   );
@@ -516,6 +521,34 @@ function useLeaderFilters(lg) {
     groups.forEach((g) => out.push({ id: 'g:' + g.name, label: g.name, ids: ids([g]) }));
     return out;
   }, [lg, st.data]);
+}
+// College slates are huge: one dropdown narrows them to ranked teams, the power leagues, or a single conference.
+function useGameFilter(lg) {
+  const college = !!LEAGUE[lg]?.college;
+  const div = DIVISIONS[lg]?.[0]?.id;
+  const st = useQuery(college ? `standings:${lg}${div ? ':' + div : ''}` : null, () => getStandings(lg, div), () => 600000);
+  const [fid, setFid] = useSticky('gf:' + lg, 'all');
+  const opts = useMemo(() => {
+    const groups = st.data?.groups || [];
+    const ids = (gs) => new Set(gs.flatMap((g) => g.rows.map((r) => r.team.id)));
+    const out = [{ id: 'top25', label: 'Top 25' }];
+    const p = groups.filter((g) => isPower(lg, g.name)), rest = groups.filter((g) => !isPower(lg, g.name) && !/independ/i.test(g.name));
+    if (p.length) out.push({ id: 'power', label: lg === 'cfb' ? 'Power 4' : 'Power conferences', ids: ids(p) });
+    if (rest.length) out.push({ id: 'rest', label: lg === 'cfb' ? 'Group of 6' : 'Mid-majors', ids: ids(rest) });
+    [...groups].sort((a, b) => a.name.localeCompare(b.name)).forEach((g) => out.push({ id: 'g:' + g.name, label: g.name, ids: ids([g]) }));
+    return out;
+  }, [lg, st.data]);
+  if (!college) return { el: null, apply: (g) => g, on: false };
+  const f = opts.find((x) => x.id === fid);
+  const apply = (games) => (!f ? games : f.id === 'top25' ? games.filter((g) => g.home.rank || g.away.rank) : games.filter((g) => f.ids.has(g.home.id) || f.ids.has(g.away.id)));
+  const el = (
+    <Picker label="Games" value={f ? fid : 'all'} onChange={setFid}>
+      <option value="all">All games</option>
+      {opts.slice(0, opts.findIndex((o) => o.id.startsWith('g:')) < 0 ? opts.length : opts.findIndex((o) => o.id.startsWith('g:'))).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      {opts.some((o) => o.id.startsWith('g:')) ? <optgroup label="Conferences">{opts.filter((o) => o.id.startsWith('g:')).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup> : null}
+    </Picker>
+  );
+  return { el, apply, on: !!f, label: f?.label };
 }
 function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
