@@ -83,6 +83,21 @@ const coreBowl = (name) => {
   const hit = BOWLS.find((b) => new RegExp(`(^|\\s)${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+Bowl$`, 'i').test(n));
   return hit ? `${hit} Bowl` : n;
 };
+// Does this text overflow its box? Safari can report a clipped, ellipsized line as fitting, so measure a hidden copy at full width instead.
+// Italics hang past their box a little, so leave a few pixels of slack.
+export function overflows(el, slack = 3) {
+  if (!el || !el.parentElement) return false;
+  const c = el.cloneNode(true);
+  Object.assign(c.style, { position: 'absolute', visibility: 'hidden', left: '-9999px', top: '0', width: 'auto', maxWidth: 'none', overflow: 'visible', whiteSpace: el.style.whiteSpace === 'normal' ? 'normal' : 'nowrap' });
+  // A shrink-wrapped name (a centered flex item, say) is only as wide as its text, so the room it has is its parent's content box.
+  const par = el.parentElement, ps = getComputedStyle(par);
+  const avail = Math.max(el.clientWidth, par.clientWidth - parseFloat(ps.paddingLeft) - parseFloat(ps.paddingRight));
+  if (el.style.whiteSpace === 'normal') c.style.width = `${avail}px`;
+  par.appendChild(c);
+  const over = el.style.whiteSpace === 'normal' ? c.scrollWidth > avail + 1 : c.getBoundingClientRect().width > avail - slack;
+  c.remove();
+  return over || el.scrollWidth > el.clientWidth + 1;
+}
 // An event label (all caps, letter-spaced) that tightens, then shrinks, to fit its line before it ever cuts off.
 export function GameNote({ text }) {
   const ref = useRef(null);
@@ -90,7 +105,7 @@ export function GameNote({ text }) {
   const [i, setI] = useState(0);
   useLayoutEffect(() => { setI(0); }, [text]);
   useEffect(() => { const again = () => setI(0); window.addEventListener('resize', again); document.fonts?.ready?.then(again); return () => window.removeEventListener('resize', again); }, []);
-  useLayoutEffect(() => { const el = ref.current; if (el && el.scrollWidth > el.clientWidth + 1 && i < steps.length - 1) setI(i + 1); });
+  useLayoutEffect(() => { const el = ref.current; if (el && i < steps.length - 1 && overflows(el, 1)) setI(i + 1); });
   return <span ref={ref} className="gnote" style={{ fontSize: steps[i][0], letterSpacing: `${steps[i][1]}em` }}>{text}</span>;
 }
 export function shortEvent(note) {
