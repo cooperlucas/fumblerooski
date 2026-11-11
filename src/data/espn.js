@@ -884,9 +884,9 @@ export function pctOf(v, digits = 1) {
   return `${(100 * +m[1] / +m[2]).toFixed(digits)}%`;
 }
 // Only these are made-of-attempted. Things like sacks ("1-7") and penalties ("5-45") look the same but are not.
-const PCT_STATS = new Set(['Field goals', '3-pointers', 'Free throws', '3rd down', '4th down']);
+const PCT_STATS = new Set(['Field goals', '3-pointers', 'Free throws', '3rd down', '4th down', '3rd down eff.', '4th down eff.', 'Comp/Att', 'Red zone']);
 export const PCT_COLS = new Set(['FG', '3PT', 'FT', 'C/ATT']);
-function statRows(box, awayId, homeId, sport) {
+function statRows(box, awayId, homeId, sport, drives) {
   const teams = box?.teams || [];
   const of = (id) => (teams.find((t) => String(t.team?.id) === String(id))?.statistics) || [];
   const a = of(awayId), h = of(homeId);
@@ -899,10 +899,72 @@ function statRows(box, awayId, homeId, sport) {
     const lab = label || x.label || x.displayName || name, pct = PCT_STATS.has(lab);
     return { label: lab, away: av, home: hv, awayN: statNumber(av), homeN: statNumber(hv), awayPct: pct ? pctOf(av) : '', homePct: pct ? pctOf(hv) : '' };
   };
+  if (sport === 'football') return footballRows(box, drives, awayId, homeId, a, h, row);
   let rows = (STAT_PICKS[sport] || []).map(([n, l]) => row(n, l)).filter(Boolean);
   // The feed names stats differently per sport. If none of ours matched, show the first few it does have.
   if (!rows.length) rows = a.slice(0, 6).map((s) => row(s.name, s.label || s.displayName)).filter(Boolean);
   return rows;
+}
+// Football: the full offensive picture. Plays, per-play, touchdowns, sacks and red zone are not in the team box,
+// so they come from the player box (touchdowns) and the drives (sacks, red zone trips).
+function footballRows(box, drives, awayId, homeId, a, h, row) {
+  const raw = (list, name) => String(list.find((s) => s.name === name)?.displayValue ?? '').trim();
+  const players = box?.players || [];
+  const total = (id, cat, key) => {
+    const c = (players.find((t) => String(t.team?.id) === String(id))?.statistics || []).find((x) => x.name === cat);
+    const i = (c?.keys || []).indexOf(key);
+    return i >= 0 ? Number(c.totals?.[i]) || 0 : null;
+  };
+  const all = [...(drives?.previous || []), ...(drives?.current ? [drives.current] : [])].filter((d, i, arr) => arr.findIndex((x) => x.id === d.id) === i);
+  const sacks = (id) => { let n = 0, y = 0; for (const d of all) if (String(d.team?.id) === String(id)) for (const p of d.plays || []) if (/sack/i.test(p.type?.text || '')) { n++; const m = /loss of (\d+) yards?/i.exec(p.text || ''); y += m ? +m[1] : Math.abs(Number(p.statYardage) || 0); } return [n, y]; };
+  const redzone = (id) => {
+    let trips = 0, tds = 0;
+    for (const d of all) {
+      if (String(d.team?.id) !== String(id)) continue;
+      const deep = (d.plays || []).some((p) => Number(p.start?.yardsToEndzone) <= 20 && String(p.start?.team?.id ?? id) === String(id));
+      if (!deep) continue;
+      trips++;
+      if (d.isScore && /touchdown|\btd\b/i.test(`${d.displayResult || ''} ${d.result || ''}`)) tds++;
+    }
+    return `${tds}/${trips}`;
+  };
+  const num = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : null; };
+  const make = (label, av, hv, pct) => (av === '' && hv === '' ? null : { label, away: String(av), home: String(hv), awayN: statNumber(av), homeN: statNumber(hv), awayPct: pct ? pctOf(String(av)) : '', homePct: pct ? pctOf(String(hv)) : '' });
+  const side = (list, id) => {
+    const att = num((raw(list, 'completionAttempts').split(/[/-]/)[1]) || '') || 0, rush = num(raw(list, 'rushingAttempts')) || 0, yds = num(raw(list, 'totalYards'));
+    const plays = att + rush, [sk, sy] = sacks(id), [pen, peny] = raw(list, 'totalPenaltiesYards').split('-');
+    return {
+      plays: plays || '', ypp: plays && yds != null ? (yds / plays).toFixed(1) : '', passTd: total(id, 'passing', 'passingTouchdowns') ?? '', rushTd: total(id, 'rushing', 'rushingTouchdowns') ?? '',
+      sacked: drives ? sk : '', sackYds: drives ? sy : '', rz: drives ? redzone(id) : '', pen: pen ?? '', penYds: peny ?? '',
+      third: raw(list, 'thirdDownEff').replace('-', '/'), fourth: raw(list, 'fourthDownEff').replace('-', '/'),
+    };
+  };
+  const A = side(a, awayId), H = side(h, homeId);
+  const pick = (name, label) => row(name, label);
+  return [
+    pick('totalYards', 'Total yards'),
+    make('Total plays', A.plays, H.plays),
+    make('Yards per play', A.ypp, H.ypp),
+    pick('firstDowns', 'First downs'),
+    pick('netPassingYards', 'Passing yards'),
+    pick('completionAttempts', 'Comp/Att'),
+    pick('yardsPerPass', 'Yards per pass'),
+    make('Passing TDs', A.passTd, H.passTd),
+    pick('rushingYards', 'Rushing yards'),
+    pick('yardsPerRushAttempt', 'Yards per rush'),
+    make('Rushing TDs', A.rushTd, H.rushTd),
+    pick('turnovers', 'Turnovers'),
+    pick('interceptions', 'Interceptions thrown'),
+    pick('fumblesLost', 'Fumbles lost'),
+    make('Sacked', A.sacked, H.sacked),
+    make('Sack yards lost', A.sackYds, H.sackYds),
+    make('Red zone', A.rz, H.rz, true),
+    make('3rd down eff.', A.third, H.third, true),
+    make('4th down eff.', A.fourth, H.fourth, true),
+    make('Penalties', A.pen, H.pen),
+    make('Penalty yards', A.penYds, H.penYds),
+    pick('possessionTime', 'Time of possession'),
+  ].filter(Boolean);
 }
 /* ---------- player box score ---------- */
 // Column order we want up front per sport. Anything else the feed sends follows after, so nothing is hidden.
@@ -1306,7 +1368,7 @@ export async function getGame(lg, id) {
   }
   return {
     game,
-    stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport),
+    stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport, data.drives),
     box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus, L.sport === 'football' && data.drives ? forcedFumbles(data.drives) : null),
     plays,
     chart: started ? scoreSeries(game, timeline, L) : null,
