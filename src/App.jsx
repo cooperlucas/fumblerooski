@@ -669,6 +669,15 @@ function TeamPage({ lg, id, season }) {
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
   const sched = q.data?.schedule || [];
+  // Long seasons (baseball, hoops, hockey) get split by month so the list is not one endless scroll.
+  const monthKey = (g) => { const d = new Date(g.date); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const months = sched.length > 30 ? [...new Set(sched.map(monthKey).filter(Boolean))] : [];
+  const [mo, setMo] = useSticky('month', '');
+  // Default: the month with a live or next game, else the last month played.
+  const nowKey = monthKey(sched.find((g) => g.state === 'live' || g.state === 'pre') || sched[sched.length - 1] || {});
+  const month = months.includes(mo) ? mo : months.includes(nowKey) ? nowKey : months[months.length - 1] || '';
+  const shownSched = months.length ? sched.filter((g) => monthKey(g) === month) : sched;
+  const monthName = (k) => new Date(Number(k.slice(0, 4)), Number(k.slice(5)) - 1, 1).toLocaleDateString([], { month: 'short' });
   const [viewRaw, setView] = useSticky('view', 'schedule');
   const full = isCovered(useCovered(lg), id);
   const view = full ? viewRaw : 'schedule';
@@ -741,7 +750,13 @@ function TeamPage({ lg, id, season }) {
             ) : <div style={{ marginTop: 14 }}><H2>Schedule</H2></div>}
             {view === 'stats' ? <TeamSeason lg={lg} id={id} season={yr || cur} team={t} /> : view === 'schedule' ? (
               <section className="sec" style={{ marginTop: 12 }}>
-                {sched.length ? <div className="card">{sched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
+                {months.length > 1 ? (
+                  <div className="chips" role="group" aria-label="Month" style={{ marginBottom: 12 }}
+                    ref={(el) => { const on = el?.querySelector('[aria-pressed="true"]'); if (on && (on.offsetLeft + on.offsetWidth > el.scrollLeft + el.clientWidth || on.offsetLeft < el.scrollLeft)) el.scrollLeft = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2; }}>
+                    {months.map((k) => <button key={k} className="chipb" aria-pressed={k === month} onClick={() => setMo(k)}>{monthName(k)}</button>)}
+                  </div>
+                ) : null}
+                {sched.length ? <div className="card">{shownSched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
               </section>
             ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>
               : !ro.data?.groups.length ? <Empty>No roster listed for this team right now.</Empty>
