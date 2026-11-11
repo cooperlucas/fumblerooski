@@ -566,3 +566,7 @@ button.pick.date { cursor: pointer; }
 .skeys button.lg { border: none; cursor: pointer; font-family: inherit; line-height: 1.3; transition: opacity .15s, transform .15s, box-shadow .15s; }
 .skeys button.lg[aria-pressed="false"] { opacity: .35; box-shadow: none; transform: translate(3px, 3px); text-decoration: line-through; }
 .skeys button.lg:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #6E3AB5; }
+
+/* player page: the season picker sits at the end of the tab row */
+.gtabs .tabyr { flex: none; margin-left: auto; display: flex; align-items: center; }
+.gtabs .tabyr .pick select { min-height: 36px; }

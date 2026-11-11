@@ -887,13 +887,11 @@ function PlayerPage({ lg, id }) {
             ) : null}
             <div className="gtabs" role="tablist" aria-label="Player sections">
               {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
+              {(tab === 'season' || tab === 'log') && years.length > 1 ? (
+                <span className="tabyr"><Picker label="Season" value={picked || latest} onChange={(v) => setLogYr(v === latest ? '' : v)}>{years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}</Picker></span>
+              ) : null}
             </div>
 
-            {(tab === 'season' || tab === 'log') && years.length > 1 ? (
-              <div className="filters" style={{ marginTop: 12 }}>
-                <Picker label="Season" value={picked || latest} onChange={(v) => setLogYr(v === latest ? '' : v)}>{years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}</Picker>
-              </div>
-            ) : null}
             {tab === 'season' ? (
               <>
                 {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
