@@ -972,6 +972,113 @@ function DriveField({ d, game }) {
     </svg>
   );
 }
+/* ---------- football, live: the current drive marching down a bright cartoon field ---------- */
+export function fbHead(p) {
+  const t = `${p.type} ${p.text}`, y = p.yards, yd = y != null ? `${Math.abs(y)}-yd ` : '';
+  if (/touchdown/i.test(p.type)) return 'Touchdown!';
+  if (/field goal/i.test(p.type)) return /good|made/i.test(t) && !/no good|missed/i.test(t) ? 'Field Goal Good' : 'Field Goal Missed';
+  if (/extra point/i.test(p.type)) return /good/i.test(p.type) ? 'Extra Point Good' : 'Extra Point Missed';
+  if (/penalty/i.test(p.type)) return 'Penalty';
+  if (/sack/i.test(p.type)) return `Sack${y ? `, ${Math.abs(y)} yds` : ''}`;
+  if (/intercept/i.test(p.type)) return 'Interception';
+  if (/fumble/i.test(p.type)) return 'Fumble';
+  if (/incompl/i.test(p.type)) return 'Incomplete';
+  if (/pass|reception/i.test(p.type)) return y != null && y < 0 ? `Pass, loss of ${-y}` : `${yd}Pass`;
+  if (/rush/i.test(p.type)) return y != null && y < 0 ? `Run, loss of ${-y}` : `${yd}Run`;
+  if (/punt/i.test(p.type)) return 'Punt';
+  if (/kickoff/i.test(p.type)) return 'Kickoff';
+  if (/timeout/i.test(p.type)) return 'Timeout';
+  if (/end (of )?(period|quarter|half|game)/i.test(p.type)) return p.type;
+  return p.type || 'Play';
+}
+function LiveField({ drives, game, onAll }) {
+  const d = drives.find((x) => x.live) || drives[drives.length - 1];
+  if (!d) return null;
+  const t = d.side === 'away' ? game.away : game.home;
+  const cc = chartColors(game.away, game.home, true);
+  // Field units: yards. Goal lines at 10 and 110, end zones outside. Away drives left to right, home right to left.
+  const K = 3, FW = 120 * K, FH = 132, top = 14;
+  const X = (toEnd) => (10 + (d.side === 'away' ? 100 - toEnd : toEnd)) * K;
+  const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
+  const last = d.plays[d.plays.length - 1];
+  const start = steps[0]?.from ?? null;
+  const lastKept = [...steps].reverse()[0];
+  const at = d.kind === 'td' ? 0 : lastKept ? lastKept.to : start;
+  const going = d.live && last?.kept && last.nextDown > 0;
+  const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
+  const dirn = d.side === 'away' ? 1 : -1;
+  const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
+  const recent = [...d.plays].reverse().slice(0, 3);
+  const mid = top + (FH - top) / 2;
+  return (
+    <>
+      <section className="sec">
+        <div className="card livefield">
+          <div className="lfhead">
+            <Blob team={t} size={30} />
+            <span className="tx"><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></span>
+            {d.result && !d.live ? <span className="res">{d.result}</span> : null}
+          </div>
+          {going ? (
+            <div className="lfdown">
+              <span><small>Down</small><b>{ord(last.nextDown)} &amp; {at != null && last.nextDist >= at ? 'Goal' : last.nextDist}</b></span>
+              <span><small>Ball on</small><b>{last.spot || '·'}</b></span>
+            </div>
+          ) : null}
+          <svg viewBox={`0 0 ${FW} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
+            {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
+            <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
+            <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
+            <text className="ez" transform={`translate(${5 * K} ${mid}) rotate(-90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
+            <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
+            {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
+            {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
+            <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
+            {[[0, -1], [FW, 1]].map(([x, s]) => <path key={x} d={`M${x - s * 2} ${mid} H${x - s * 9} M${x - s * 9} ${mid - 16} V${mid + 16} M${x - s * 9} ${mid - 16} H${x - s * 15} M${x - s * 9} ${mid + 16} H${x - s * 15}`} transform={`translate(${s * 12} 0)`} stroke="#FFBE2E" strokeWidth="2.6" fill="none" strokeLinecap="round" />)}
+            {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="3" /> : null}
+            {start != null && at != null ? (
+              <>
+                <rect className="lfmove" x="0" y={mid - 3.5} width="100" height="7" rx="3.5" fill="#fff" stroke="#0C1124" strokeWidth="1.2" vectorEffect="non-scaling-stroke"
+                  style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
+                <circle cx={X(start)} cy={mid} r="4.5" fill="#fff" stroke="#0C1124" strokeWidth="1.6" />
+                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={mid} r="2.2" fill="#0C1124" />)}
+                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${mid}px)` }}>
+                  <g className="lfball">
+                    <path d={`M${dirn * 5} -10 L${dirn * 15} 0 L${dirn * 5} 10 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.6" strokeLinejoin="round" />
+                    <ellipse cx="0" cy="-22" rx="11" ry="7" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.8" />
+                    <path d="M-5 -22 H5 M-3 -24.5 V-19.5 M0 -24.5 V-19.5 M3 -24.5 V-19.5" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" />
+                    <path d="M0 -14 V-4" stroke="#0C1124" strokeWidth="1.6" strokeDasharray="2 2" />
+                  </g>
+                </g>
+              </>
+            ) : null}
+          </svg>
+          {last ? (
+            <div className="lflast" key={d.id + d.plays.length}>
+              <span className="hd"><b style={last.scoring ? { color: 'var(--yellow)' } : undefined}>{fbHead(last)}</b><small>Last play{last.clock ? ` · ${last.period ? 'Q' + last.period : ''} ${last.clock}` : ''}</small></span>
+              <span className="tx">{last.text}</span>
+              {going && last.next ? <span className="nx">{last.next}</span> : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
+      {recent.length > 1 ? (
+        <section className="sec">
+          <H2>This Drive</H2>
+          <div className="card feed">
+            {recent.slice(1).map((p, i) => (
+              <div className={'fitem' + (p.scoring ? ' score' : '')} key={i} style={{ '--tc': cc[d.side].main }}>
+                <Blob team={t} size={26} />
+                <span className="body"><span className="hd"><b>{fbHead(p)}</b><small>{p.down}</small></span><span className="tx">{p.text}</span></span>
+              </div>))}
+            {onAll ? <button className="more" onClick={onAll}>All Drives ›</button> : null}
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
 function Drives({ drives, game }) {
   const live = game.state === 'live';
   const list = live ? [...drives].reverse() : drives; // newest first while the game is on
@@ -1441,6 +1548,7 @@ function GamePage({ lg, id }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
+                {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
                   <section className="card pad linesbox" style={{ marginTop: 12 }}>

@@ -1086,6 +1086,10 @@ export function normDrives(drives, awayId, homeId, live) {
       down: cleanText(p.start?.downDistanceText || p.start?.shortDownDistanceText || ''),
       period: p.period?.number || 0, clock: p.clock?.displayValue || '',
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
+      // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
+      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: num(p.end?.yardsToEndzone),
+      kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
+      next: cleanText(p.end?.downDistanceText || ''), nextShort: cleanText(p.end?.shortDownDistanceText || ''), spot: cleanText(p.end?.possessionText || ''),
     })).filter((p) => p.text);
     const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
     const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
