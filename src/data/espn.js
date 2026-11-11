@@ -541,7 +541,7 @@ export async function getTeamStatsFor(lg, id, season) {
           const v = whole ? String(Math.round(n)) : /^-?[\d.,]+$/.test(dv) ? dv : Number.isFinite(n) ? (Number.isInteger(n) ? n.toLocaleString('en-US') : (Math.round(n * 10) / 10).toString()) : dv;
           return { id: pid, name: p?.name || '', pos: p?.pos || '', jersey: p?.jersey || '', value: v, detail: whole ? '' : cleanText(l.displayValue || '') };
         }).filter((x) => x.name);
-        const title = cleanText(c.displayName || c.name).replace(/^Average\s+/i, '').replace(/3-Point Field Goals Made/i, '3-pointers').replace(/Field Goal Percentage/i, 'FG %').replace(/Free Throw Percentage/i, 'FT %').replace(/^Double Double$/i, 'Double-doubles');
+        const title = cleanText(c.displayName || c.name).replace(/^Average\s+/i, '').replace(/^(Average )?3-Point Field Goals Made( Per Game)?$/i, '3-Pointers Made Per Game').replace(/Field Goal Percentage/i, 'FG %').replace(/Free Throw Percentage/i, 'FT %').replace(/^Double Double$/i, 'Double-doubles');
         return { key: c.name, title, rows: top };
       }).filter((c) => c.rows.length);
     } catch { /* stats only */ }
