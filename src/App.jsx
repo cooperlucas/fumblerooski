@@ -1288,7 +1288,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
             {{
               under: pc ? <rect x={poss === 'away' ? 0 : W / 2} y="0" width={W / 2} height={H} fill="url(#lcposs)" /> : null,
               over: <>
-                {pc ? [0, 1, 2].map((n) => { const x = W / 2 + dir * (48 + n * 18); return <path key={poss + n} className="chev" style={{ animationDelay: `${n * 0.22}s` }} d={`M${x - dir * 7} ${H / 2 - 16} L${x + dir * 7} ${H / 2} L${x - dir * 7} ${H / 2 + 16}`} fill="none" stroke={pc} strokeWidth="5" />; }) : null}
+                {pc ? [0, 1, 2].map((n) => { const x = W / 2 + dir * (48 + n * 18); return <path key={poss + n} className="chev" style={{ animationDelay: `${n * 0.36}s` }} d={`M${x - dir * 7} ${H / 2 - 16} L${x + dir * 7} ${H / 2} L${x - dir * 7} ${H / 2 + 16}`} fill="none" stroke={pc} strokeWidth="5" />; }) : null}
                 {lt ? <g key={last.id} className="pop">{last.scoring
                   ? <><circle cx={lt.x} cy={lt.y} r="9" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" /><circle cx={lt.x} cy={lt.y} r="3.6" fill="#0C1124" /></>
                   : missed(lt.x, lt.y, '#0C1124', 6, 3.2)}</g> : null}
