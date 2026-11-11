@@ -864,7 +864,7 @@ export async function getTeamStats(lg) {
 // Which box-score rows we show, in order, and what we call them. Labels match the plain-English tips.
 const STAT_PICKS = {
   football: [['totalYards', 'Total yards'], ['netPassingYards', 'Passing yards'], ['rushingYards', 'Rushing yards'], ['thirdDownEff', '3rd down'], ['fourthDownEff', '4th down'], ['turnovers', 'Turnovers'], ['possessionTime', 'Time of possession']],
-  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['freeThrowsMade-freeThrowsAttempted', 'Free throws'], ['totalRebounds', 'Rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers']],
+  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['freeThrowsMade-freeThrowsAttempted', 'Free throws'], ['totalRebounds', 'Rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers'], ['fouls', 'Fouls']],
   hockey: [['shotsTotal', 'Shots on goal'], ['powerPlayGoals', 'Power play goals'], ['faceoffsWon', 'Faceoffs won'], ['hits', 'Hits'], ['blockedShots', 'Blocked shots']],
   soccer: [['possessionPct', 'Possession'], ['totalShots', 'Shots'], ['shotsOnTarget', 'Shots on goal'], ['wonCorners', 'Corners'], ['foulsCommitted', 'Fouls']],
   baseball: [['hits', 'Hits'], ['runs', 'Runs'], ['errors', 'Errors'], ['homeRuns', 'Home runs'], ['strikeouts', 'Strikeouts']],
@@ -901,6 +901,13 @@ function statRows(box, awayId, homeId, sport, drives) {
   };
   if (sport === 'football') return footballRows(box, drives, awayId, homeId, a, h, row);
   let rows = (STAT_PICKS[sport] || []).map(([n, l]) => row(n, l)).filter(Boolean);
+  // Basketball fouls: technicals and flagrants ride under the bar, only when there are any.
+  const fl = rows.find((r) => r.label === 'Fouls');
+  if (sport === 'basketball' && fl) {
+    const extra = (list) => [['totalTechnicalFouls', 'tech'], ['flagrantFouls', 'flagrant']].map(([k, w]) => { const n = Number(list.find((x) => x.name === k)?.displayValue) || 0; return n ? `${n} ${w}` : ''; }).filter(Boolean).join(' · ');
+    const da = extra(a), dh = extra(h);
+    if (da || dh) Object.assign(fl, { awayDet: da, homeDet: dh });
+  }
   // The feed names stats differently per sport. If none of ours matched, show the first few it does have.
   if (!rows.length) rows = a.slice(0, 6).map((s) => row(s.name, s.label || s.displayName)).filter(Boolean);
   return rows;
