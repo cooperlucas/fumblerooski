@@ -1136,6 +1136,13 @@ function startersOf(box, ids) {
 
 /* ---------- football drives ---------- */
 // Field position runs 0 to 100 left to right, with the away team driving right and the home team driving left.
+// The feed sometimes measures a play's end spot from the wrong goal line (the 99 instead of the 1).
+// When the flipped reading matches the yards gained far better, use it.
+export function fixSpot(from, to, yards) {
+  if (from == null || to == null || yards == null) return to;
+  const want = from - yards;
+  return Math.abs(100 - to - want) + 3 < Math.abs(to - want) ? 100 - to : to;
+}
 export function normDrives(drives, awayId, homeId, live) {
   const list = [...(drives?.previous || [])];
   const cur = drives?.current;
@@ -1149,7 +1156,7 @@ export function normDrives(drives, awayId, homeId, live) {
       period: p.period?.number || 0, clock: p.clock?.displayValue || '',
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
       // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
-      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: num(p.end?.yardsToEndzone),
+      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: fixSpot(num(p.start?.yardsToEndzone), num(p.end?.yardsToEndzone), num(p.statYardage)),
       kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
       next: cleanText(p.end?.downDistanceText || ''), nextShort: cleanText(p.end?.shortDownDistanceText || ''), spot: cleanText(p.end?.possessionText || ''),
     })).filter((p) => p.text);

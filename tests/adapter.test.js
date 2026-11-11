@@ -382,3 +382,8 @@ test('TV list skips radio and puts national TV first', async () => {
   ] });
   assert.deepEqual(tv, { national: ['ESPN', 'ESPN+'], home: ['MSG'], away: [] });
 });
+
+test('drive spots: a play measured from the wrong goal line is flipped back', async () => {
+  const { fixSpot } = await import('../src/data/espn.js');
+  assert.equal(fixSpot(1, 99, 0), 1); assert.equal(fixSpot(22, 78, 0), 22); assert.equal(fixSpot(17, 1, 16), 1); assert.equal(fixSpot(40, 41, -1), 41); assert.equal(fixSpot(50, 60, -10), 60);
+});
