@@ -650,7 +650,8 @@ export async function getPlayer(lg, id) {
   const a = info.status === 'fulfilled' ? (info.value.athlete || info.value || {}) : {};
   // Name the team for each career season (a transfer's old school). The stats read may list its teams;
   // if not, the league's team list knows every id.
-  const career = stats.status === 'fulfilled' ? normCareer(stats.value) : [];
+  // Football's scoring table only repeats the touchdowns already in passing, rushing and receiving: leave it out.
+  const career = (stats.status === 'fulfilled' ? normCareer(stats.value) : []).filter((c) => !(LEAGUE[lg]?.sport === 'football' && /scoring/i.test(c.key + ' ' + c.title)));
   const need = career.flatMap((c) => c.rows).filter((r) => !r.team && r.teamId);
   if (need.length) {
     const known = new Map();
