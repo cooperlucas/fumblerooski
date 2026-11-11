@@ -542,3 +542,14 @@ button.pick.date { cursor: pointer; }
 .lrow .res .livesc { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: var(--pink); }
 .lrow .res .livesc b { background: none; color: var(--ink); padding: 0; margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
 .lrow .res .livesc small { font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+
+/* live football: who has the ball */
+.possball { display: inline-block; width: 22px; height: 13px; margin-left: 7px; vertical-align: 0; flex: none; }
+.possball ellipse { fill: #A0522D; stroke: #6B3317; stroke-width: 1.2; }
+.possball path { stroke: #fff; stroke-width: 1.3; stroke-linecap: round; fill: none; }
+.possball.rz ellipse { fill: #E8384F; stroke: #9E1B2E; }
+
+/* live football: down and distance, then the ball spot, under the clock */
+.grow .gdd { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; font-weight: 800; color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.25; }
+.grow .gdd span { font-weight: 700; color: var(--mute); }
+.grow .gdd.rz b { color: #FF5A6E; }

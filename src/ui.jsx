@@ -110,6 +110,13 @@ export function LgTag({ lg }) {
 }
 export const H2 = ({ children }) => <h2 className="h2">{children}</h2>;
 
+// A tiny football beside the team with the ball. Red inside the 20.
+export const Ball = ({ red }) => (
+  <svg className={'possball' + (red ? ' rz' : '')} viewBox="0 0 24 14" aria-label={red ? 'Has the ball, red zone' : 'Has the ball'} role="img">
+    <ellipse cx="12" cy="7" rx="11" ry="6.2" />
+    <path d="M7.5 7h9M9.5 5.2v3.6M12 5.2v3.6M14.5 5.2v3.6" />
+  </svg>
+);
 export function GameRow({ g, showLg = true }) {
   const fin = g.state === 'final', pre = g.state === 'pre' || g.state === 'off';
   const h = parseInt(g.home.score, 10), a = parseInt(g.away.score, 10);
@@ -117,7 +124,7 @@ export function GameRow({ g, showLg = true }) {
   const side = (t, mine, theirs) => (
     <span className={'side' + (lose(mine, theirs) ? ' lose' : '')}>
       <Blob team={t} />
-      <span className="nm">{t.rank ? <span className="rk">{t.rank}</span> : null}{t.name} <small>{t.record}</small></span>
+      <span className="nm">{t.rank ? <span className="rk">{t.rank}</span> : null}{t.name} <small>{t.record}</small>{g.poss && g.poss === String(t.id) ? <Ball red={g.redZone} /> : null}</span>
       <span className="sc">{pre ? '' : t.score}</span>
     </span>
   );
@@ -128,6 +135,7 @@ export function GameRow({ g, showLg = true }) {
       <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
+        {g.down ? <span className={'gdd' + (g.redZone ? ' rz' : '')}><b>{g.down}</b>{g.spot ? <span>{g.spot}</span> : null}</span> : null}
         {g.state !== 'final' && g.tv?.national?.length ? <span className="gtv">{g.tv.national[0]}</span> : null}
         {g.state === 'final' && !sameDay(new Date(g.date), new Date()) && !isNaN(new Date(g.date)) ? <span className="gdate">{fmtDate(g.date)}</span> : null}
         {showLg ? <LgTag lg={g.lg} /> : null}

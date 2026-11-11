@@ -216,6 +216,12 @@ export function normEvent(ev, lg) {
     note: cleanText(comp.notes?.[0]?.headline || ''),
     tv: normTv(comp),
     neutral: comp.neutralSite === true,
+    // Live football: which team has the ball, and whether they are inside the 20.
+    poss: state === 'live' && LEAGUE[lg]?.sport === 'football' ? String(comp.situation?.possession ?? '') : '',
+    redZone: state === 'live' && comp.situation?.isRedZone === true,
+    // Down, distance and ball spot ("2nd & 7", "AKR 41"). Blank between plays like kickoffs and extra points.
+    down: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.shortDownDistanceText || '') : '',
+    spot: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.possessionText || '') : '',
   };
 }
 
