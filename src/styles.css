@@ -450,18 +450,23 @@ button.pick.date { cursor: pointer; }
 .htv .tvb { display: inline-block; margin-right: 6px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.18); font-size: 10px; letter-spacing: 0.08em; vertical-align: 1px; }
 
 /* Live courtside view (basketball) */
-.livecourt { padding: 12px 12px 0; }
+.livecourt { padding: 12px; overflow: hidden; }
 .lchead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
 .lchead > span { display: inline-flex; align-items: center; gap: 6px; }
 .lchead b { font-stretch: 112%; font-style: italic; font-weight: 900; }
 .lchead small { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
 .court.full { display: block; width: 100%; height: auto; }
 .court .ccode { font-style: italic; font-weight: 900; font-size: 18px; font-stretch: 125%; letter-spacing: 0.02em; }
-.court .arcglow { animation: arcglow 2.4s ease-in-out infinite; }
-.court .rimglow { animation: rimglow 1.2s ease-in-out infinite alternate; }
-@keyframes arcglow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-@keyframes rimglow { from { opacity: 0.7; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .court .arcglow, .court .rimglow { animation: none; } }
+.lcall { display: flex; align-items: center; justify-content: center; gap: 8px; height: 34px; margin: -12px -12px 10px; background: var(--panel2); border-bottom: 1px solid var(--rule); animation: lcin 0.35s ease-out; }
+.lcall b { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+.lcall.hot { background: var(--yellow); border-color: var(--yellow); } .lcall.hot b { color: #0C1124; }
+.lcall.bad { background: var(--pink); border-color: var(--pink); } .lcall.bad b { color: #0C1124; }
+@keyframes lcin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.court .chev { opacity: 0.15; animation: chev 1.3s ease-in-out infinite; }
+@keyframes chev { 0%, 100% { opacity: 0.15; } 40% { opacity: 0.95; } }
+.court .pop { transform-box: fill-box; transform-origin: center; animation: pop 0.4s ease-out; }
+@keyframes pop { from { transform: scale(2.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .court .chev { animation: none; opacity: 0.7; } .court .pop, .lcall { animation: none; } }
 .lclast { display: flex; align-items: center; gap: 10px; margin: 10px -12px 0; padding: 10px 12px; border-top: 1px solid var(--rule); background: var(--panel2); }
 .lclast .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .lclast .tx b { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; }
@@ -482,3 +487,9 @@ button.pick.date { cursor: pointer; }
 .fitem .rs { flex: none; align-self: center; display: flex; gap: 10px; align-items: center; font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 15px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .fitem .rs .hot { color: var(--ink); }
 .feed .more { display: block; width: 100%; padding: 12px; border: none; border-top: 1px solid var(--rule); background: transparent; color: var(--teal); font-weight: 800; font-size: 13px; }
+
+.shotkey { display: flex; gap: 10px; margin-top: 10px; }
+.shotkey .sk { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--soft); font-variant-numeric: tabular-nums; }
+.shotkey .sk:last-child { align-items: flex-end; }
+.shotkey .who { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.shotkey .who b { font-stretch: 112%; font-style: italic; font-weight: 900; }

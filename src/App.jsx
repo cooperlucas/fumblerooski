@@ -974,54 +974,87 @@ function Drives({ drives, game }) {
 }
 
 /* ---------- basketball: shot chart ---------- */
+// The floor both basketball views share: light hardwood, full court in feet (94 by 50). Away shoots at the left basket, home at the right.
+function courtGeom(lg) {
+  const K = 4, W = 94 * K, H = 50 * K, B = 5.25, pro = lg === 'nba' || lg === 'wnba';
+  const r3 = pro ? 23.75 : 22.15, corner = pro ? 22 : 21.65, cx3 = Math.sqrt(r3 * r3 - corner * corner), lane = pro ? 8 : 6;
+  const lines = (flip) => {
+    const r = (v) => v * K, ax = (v) => (flip ? W - v : v);
+    const e = (x0, y0, x1, y1) => `M${ax(x0)} ${y0} L${ax(x1)} ${y1}`;
+    return [
+      e(0, r(25 - lane), r(19), r(25 - lane)), e(r(19), r(25 - lane), r(19), r(25 + lane)), e(r(19), r(25 + lane), 0, r(25 + lane)),
+      `M${ax(r(19))} ${r(19)} A${r(6)} ${r(6)} 0 0 ${flip ? 0 : 1} ${ax(r(19))} ${r(31)}`,
+      e(0, r(25 - corner), r(B + cx3), r(25 - corner)),
+      `M${ax(r(B + cx3))} ${r(25 - corner)} A${r(r3)} ${r(r3)} 0 0 ${flip ? 0 : 1} ${ax(r(B + cx3))} ${r(25 + corner)}`,
+      e(r(B + cx3), r(25 + corner), 0, r(25 + corner)),
+      e(r(4), r(22), r(4), r(28)),
+    ].join(' ');
+  };
+  // A feed spot (x across 0..50, y out from the basket) placed at one end of the full court.
+  const place = (xy, end) => {
+    const x = Math.max(-1, Math.min(47, xy.y)), y = Math.max(0.8, Math.min(49.2, xy.x));
+    return end === 'away' ? { x: (B + x) * K, y: y * K } : { x: W - (B + x) * K, y: H - y * K };
+  };
+  return { K, W, H, B, lane, court: `M0 0 H${W} V${H} H0 Z M${W / 2} 0 V${H} ${lines(false)} ${lines(true)}`, place };
+}
+const WOOD = '#EBD5AC', WOODLINE = '#1B2350';
+function Hardwood({ lg, game, label, children, defs }) {
+  const { K, W, H, B, lane, court } = courtGeom(lg);
+  const cc = chartColors(game.away, game.home, true);
+  return (
+    <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="court full" role="img" aria-label={label}>
+      {defs ? <defs>{defs}</defs> : null}
+      <rect x="0" y="0" width={W} height={H} fill={WOOD} />
+      {Array.from({ length: 9 }, (_, n) => <line key={n} x1="0" x2={W} y1={(n + 1) * (H / 10)} y2={(n + 1) * (H / 10)} stroke="#C9A974" strokeWidth="0.6" opacity="0.45" />)}
+      <rect x="0" y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.away.main} opacity="0.55" />
+      <rect x={W - 19 * K} y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.home.main} opacity="0.55" />
+      {children?.under}
+      <path d={court} fill="none" stroke={WOODLINE} strokeWidth="2.2" />
+      <circle cx={W / 2} cy={H / 2} r={6 * K} fill={WOOD} stroke={WOODLINE} strokeWidth="2.2" />
+      {/* Neutral floors keep a bare center circle; otherwise it is the home team's. */}
+      {game.neutral ? null : <text x={W / 2} y={H / 2 + 6} textAnchor="middle" className="ccode" fill={cc.home.main}>{game.home.abbr}</text>}
+      {[B * K, W - B * K].map((x) => <circle key={x} cx={x} cy={H / 2} r="4.5" fill="none" stroke="#E2571C" strokeWidth="2.4" />)}
+      {children?.over}
+    </svg>
+  );
+}
+const made = (x, y, c, r = 5) => <><circle cx={x} cy={y} r={r} fill="none" stroke={c} strokeWidth="1.6" /><circle cx={x} cy={y} r={r * 0.5} fill={c} /></>;
+const missed = (x, y, c, r = 3.6, w = 1.8) => <path d={`M${x - r} ${y - r} L${x + r} ${y + r} M${x + r} ${y - r} L${x - r} ${y + r}`} stroke={c} strokeWidth={w} strokeLinecap="round" />;
+
+/* ---------- basketball shot chart: both teams on one floor ---------- */
 function ShotChart({ shots, game, lg }) {
-  const [side, setSide] = useState(0);
   const [per, setPer] = useState(0);
-  const teams = [game.away, game.home];
-  const mine = shots.filter((s) => s.teamId === teams[side].id);
+  const { place } = courtGeom(lg);
+  const cc = chartColors(game.away, game.home, true);
+  const sides = [['away', game.away, cc.away.main], ['home', game.home, cc.home.main]];
   const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
-  const shown = mine.filter((s) => !per || s.period === per);
-  const made = shown.filter((s) => s.made).length, threes = shown.filter((s) => s.three), made3 = threes.filter((s) => s.made).length;
-  // Court in feet: x 0 to 50, basket at (25, 0), baseline 5.25 behind it. Six px per foot.
-  const pro = lg === 'nba', K = 6, top = 5.25, depth = 40;
-  const X = (v) => v * K, Y = (v) => (v + top) * K;
-  const r3 = pro ? 23.75 : 22.15, corner = pro ? 22 : 21.65, yc = Math.sqrt(r3 * r3 - corner * corner), lane = pro ? 8 : 6;
-  const court = [
-    `M0 0 H${X(50)} V${Y(depth)} H0 Z`,
-    `M${X(25 - lane)} 0 V${Y(13.75)} H${X(25 + lane)} V0`,
-    `M${X(19)} ${Y(13.75)} A${6 * K} ${6 * K} 0 0 0 ${X(31)} ${Y(13.75)}`,
-    `M${X(25 - corner)} 0 V${Y(yc)} A${r3 * K} ${r3 * K} 0 0 0 ${X(25 + corner)} ${Y(yc)} V0`,
-    `M${X(22)} ${Y(-1.25)} H${X(28)}`,
-  ].join(' ');
-  const pctTxt = (m, n) => (n ? ` · ${Math.round((100 * m) / n)}%` : '');
+  const shown = shots.filter((s) => !per || s.period === per);
+  const pctTxt = (m, n) => (n ? ` · ${((100 * m) / n).toFixed(1)}%` : '');
   return (
     <section className="sec">
       <H2>Shot Chart</H2>
-      <div className="seg" role="group" aria-label="Team" style={{ marginTop: 10 }}>
-        {teams.map((t, i) => <button key={t.id} aria-pressed={side === i} onClick={() => setSide(i)}>{t.name}</button>)}
-      </div>
       {periods.length > 1 ? (
-        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>
+        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 10 }}>
           <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>All</button>
           {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? perName(LEAGUE[lg], p) : 'OT'}</button>)}
         </div>
       ) : null}
       <div className="card pad shotbox">
-        <div className="legend">
-          <span className="lg" style={{ background: '#FFBE2E' }}>MADE <b>{made}</b></span>
-          <span className="lg" style={{ background: '#FF7AA6' }}>MISSED <b>{shown.length - made}</b></span>
+        <Hardwood lg={lg} game={game} label={`Shot chart: ${game.away.name} on the left, ${game.home.name} on the right.`}>
+          {{ over: sides.flatMap(([sd, t, c]) => {
+            const mine = shown.filter((s) => s.teamId === t.id);
+            return [...mine.filter((s) => !s.made), ...mine.filter((s) => s.made)].map((s, i) => { const q = place(s, sd); return <g key={sd + i}>{s.made ? made(q.x, q.y, c, 4.6) : missed(q.x, q.y, c, 3.2, 1.6)}</g>; });
+          }) }}
+        </Hardwood>
+        <div className="shotkey">
+          {sides.map(([sd, t, c]) => { const mine = shown.filter((s) => s.teamId === t.id), m = mine.filter((s) => s.made).length, th = mine.filter((s) => s.three), m3 = th.filter((s) => s.made).length; return (
+            <div key={sd} className="sk">
+              <span className="who"><Blob team={t} size={22} /><b>{t.abbr}</b></span>
+              <span>FG {m}-{mine.length}{pctTxt(m, mine.length)}</span>
+              <span>3PT {m3}-{th.length}{pctTxt(m3, th.length)}</span>
+            </div>); })}
         </div>
-        <div role="img" aria-label={`${teams[side].name} shots: ${made} made of ${shown.length}.`}>
-          <svg viewBox={`-6 -6 ${X(50) + 12} ${Y(depth) + 12}`} className="court" aria-hidden="true">
-            <rect x="0" y="0" width={X(50)} height={Y(depth)} fill="#10162C" />
-            <path d={court} fill="none" stroke="#6E3AB5" strokeWidth="3" transform="translate(2.5 2.5)" />
-            <path d={court} fill="none" stroke="#22D3D6" strokeWidth="3" strokeLinejoin="miter" />
-            <circle cx={X(25)} cy={Y(0)} r="5" fill="none" stroke="#FF7A1A" strokeWidth="3" />
-            {shown.filter((s) => !s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <path key={'m' + i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke="#FF7AA6" strokeWidth="2.6" strokeLinecap="square" />; })}
-            {shown.filter((s) => s.made).map((s, i) => { const x = X(Math.max(0.6, Math.min(49.4, s.x))), y = Y(Math.max(-4.6, Math.min(depth - 0.6, s.y))); return <g key={'k' + i}><circle cx={x} cy={y} r="6.5" fill="none" stroke="#FFBE2E" strokeWidth="1.8" /><circle cx={x} cy={y} r="3.2" fill="#FFBE2E" /></g>; })}
-          </svg>
-        </div>
-        <p className="stamp" style={{ marginTop: 10 }}>Field goals {made}-{shown.length}{pctTxt(made, shown.length)} · Threes {made3}-{threes.length}{pctTxt(made3, threes.length)}</p>
+        <p className="stamp" style={{ marginTop: 8 }}>◎ made · ✕ missed</p>
       </div>
     </section>
   );
@@ -1046,83 +1079,65 @@ export function playHead(p, L) {
 const isSub = (p) => /substitution|subbing/i.test(`${p.type} ${p.text}`);
 
 function LiveCourt({ pbp, game, L, lg, onAll }) {
-  const cc = chartColors(game.away, game.home);
+  const { K, W, H, place } = courtGeom(lg);
+  const cc = chartColors(game.away, game.home, true), dk = chartColors(game.away, game.home);
   const side = (id) => (id === game.away.id ? 'away' : id === game.home.id ? 'home' : null);
   const teamOf = (id) => (side(id) === 'away' ? game.away : side(id) === 'home' ? game.home : null);
-  const col = (id) => (side(id) === 'away' ? cc.away.main : cc.home.main);
-  // Full court in feet, 94 by 50. Away attacks the left basket, home the right.
-  const K = 4, W = 94 * K, H = 50 * K, B = 5.25, pro = lg === 'nba' || lg === 'wnba';
-  const r3 = pro ? 23.75 : 22.15, corner = pro ? 22 : 21.65, cx3 = Math.sqrt(r3 * r3 - corner * corner), lane = pro ? 8 : 6;
-  // Where on the full court a play happened: shots at the shooter's basket, a rebound at whichever basket the missed shot was at.
-  const spot = (p) => {
-    if (!p.xy || !side(p.teamId)) return null;
-    const reb = /rebound/i.test(p.type), shot = p.shot;
-    if (!shot && !reb) return null;
-    const attacking = shot || /offensive/i.test(p.type) ? side(p.teamId) : side(p.teamId) === 'away' ? 'home' : 'away';
-    const x = Math.max(-1, Math.min(47, p.xy.y)), y = Math.max(0.8, Math.min(49.2, p.xy.x));
-    return attacking === 'away' ? { x: (B + x) * K, y: y * K } : { x: W - (B + x) * K, y: H - y * K };
-  };
   const plays = pbp.filter((p) => !isSub(p));
   const recent = [...plays].reverse();
-  const last = recent.find((p) => spot(p));
-  const trail = recent.filter((p) => p.shot && spot(p) && p !== last).slice(0, 6);
-  const lines = (flip) => {
-    const bx = B * K, r = (v) => v * K, ax = (v) => (flip ? W - v : v);
-    const e = (x0, y0, x1, y1) => `M${ax(x0)} ${y0} L${ax(x1)} ${y1}`;
-    return [
-      e(0, r(25 - lane), r(19), r(25 - lane)), e(r(19), r(25 - lane), r(19), r(25 + lane)), e(r(19), r(25 + lane), 0, r(25 + lane)),
-      `M${ax(r(19))} ${r(19)} A${r(6)} ${r(6)} 0 0 ${flip ? 0 : 1} ${ax(r(19))} ${r(31)}`,
-      e(0, r(25 - corner), r(B + cx3), r(25 - corner)),
-      `M${ax(r(B + cx3))} ${r(25 - corner)} A${r(r3)} ${r(r3)} 0 0 ${flip ? 0 : 1} ${ax(r(B + cx3))} ${r(25 + corner)}`,
-      e(r(B + cx3), r(25 + corner), 0, r(25 + corner)),
-      e(r(4), r(22), r(4), r(28)),
-    ].join(' ');
-  };
-  const court = `M0 0 H${W} V${H} H0 Z M${W / 2} 0 V${H} ${lines(false)} ${lines(true)}`;
-  const lt = last ? spot(last) : null;
-  // The latest play lights up its end of the floor: the three-point arc glows in the team's color, and a make lights the rim gold.
-  const arc3 = (flip) => {
-    const r = (v) => v * K, ax = (v) => (flip ? W - v : v);
-    return `M${ax(0)} ${r(25 - corner)} L${ax(r(B + cx3))} ${r(25 - corner)} A${r(r3)} ${r(r3)} 0 0 ${flip ? 0 : 1} ${ax(r(B + cx3))} ${r(25 + corner)} L${ax(0)} ${r(25 + corner)}`;
-  };
-  const right = lt ? lt.x > W / 2 : false;
-  const made = last?.scoring && last?.shot;
+  // One play at a time: only the latest shot is marked on the floor.
+  const last = recent.find((p) => p.shot && p.xy && side(p.teamId));
+  const now = recent[0];
+  // Who has the ball, worked out by walking the plays in order.
+  const poss = useMemo(() => {
+    const other = (sd) => (sd === 'away' ? 'home' : sd === 'home' ? 'away' : null);
+    let who = null;
+    for (const p of plays) {
+      const sd = side(p.teamId), t = `${p.type} ${p.text}`;
+      if (!sd) continue;
+      if (p.shot && /free throw/i.test(t)) { const m = /(\d) of (\d)/.exec(t); who = p.scoring && (!m || m[1] === m[2]) ? other(sd) : sd; }
+      else if (p.shot) who = p.scoring ? other(sd) : sd;
+      else if (/rebound|steal/i.test(t)) who = sd;
+      else if (/turnover|traveling|bad pass|lost ball|offensive foul/i.test(t)) who = other(sd);
+    }
+    return who;
+  }, [pbp]);
+  // The banner calls out the newest play for a few seconds, then settles back to who has the ball.
+  const [flash, setFlash] = useState(true);
+  useEffect(() => { setFlash(true); const h = setTimeout(() => setFlash(false), 4500); return () => clearTimeout(h); }, [now?.id]);
+  const possT = poss === 'away' ? game.away : poss === 'home' ? game.home : null;
+  const lt = last ? place(last.xy, side(last.teamId)) : null;
+  const head = now ? playHead(now, L) : '';
+  const call = flash && now ? { text: head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : null;
+  // Chevrons march toward the basket the team with the ball is attacking.
+  const dir = poss === 'away' ? -1 : 1, pc = poss ? cc[poss].main : null;
   const shown = recent.slice(0, 4);
   return (
     <>
       <section className="sec">
-        <div className="card livecourt" style={{ paddingBottom: 12 }}>
-          <div className="lchead">
-            <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ◂</small></span>
-            <span><small>▸ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
+        <div className="card livecourt">
+          <div className={'lcall' + (call?.hot ? ' hot' : call?.bad ? ' bad' : '')} key={flash ? now?.id : 'poss' + poss} role="status">
+            {call ? <>{call.team ? <Blob team={call.team} size={22} /> : null}<b>{call.text}</b></> : <b>&nbsp;</b>}
           </div>
-          <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court full" role="img" aria-label={last ? `Latest: ${last.text}` : 'Court'}>
-            <defs><filter id="lcglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
-            <rect x="0" y="0" width={W} height={H} fill="#10162C" />
-            <rect x="0" y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.away.main} opacity="0.16" />
-            <rect x={W - 19 * K} y={(25 - lane) * K} width={19 * K} height={lane * 2 * K} fill={cc.home.main} opacity="0.16" />
-            <path d={court} fill="none" stroke="#6E3AB5" strokeWidth="2.5" transform="translate(2 2)" />
-            <path d={court} fill="none" stroke="#22D3D6" strokeWidth="2.5" />
-            <circle cx={W / 2} cy={H / 2} r={6 * K} fill="#10162C" stroke="#22D3D6" strokeWidth="2.5" />
-            <text x={W / 2} y={H / 2 + 6} textAnchor="middle" className="ccode" fill={cc.home.main}>{game.home.abbr}</text>
-            {[B * K, W - B * K].map((x) => <circle key={x} cx={x} cy={H / 2} r="5" fill="none" stroke="#FF7A1A" strokeWidth="2.5" />)}
-            {trail.map((p, i) => { const s = spot(p); return p.scoring
-              ? <g key={p.id || i} opacity={0.6 - i * 0.07}><circle cx={s.x} cy={s.y} r="5.5" fill="none" stroke={col(p.teamId)} strokeWidth="1.6" /><circle cx={s.x} cy={s.y} r="2.6" fill={col(p.teamId)} /></g>
-              : <path key={p.id || i} d={`M${s.x - 4} ${s.y - 4} L${s.x + 4} ${s.y + 4} M${s.x + 4} ${s.y - 4} L${s.x - 4} ${s.y + 4}`} stroke={col(p.teamId)} strokeWidth="2.2" opacity={0.5 - i * 0.06} />; })}
-            {lt ? (
-              <g key={last.id}>
-                <path d={arc3(right)} fill="none" stroke={col(last.teamId)} strokeWidth="5" strokeLinecap="round" filter="url(#lcglow)" className="arcglow" />
-                {made ? <circle cx={right ? W - B * K : B * K} cy={H / 2} r="6" fill="none" stroke="#FFBE2E" strokeWidth="3.5" filter="url(#lcglow)" className="rimglow" /> : null}
-              </g>
-            ) : null}
-          </svg>
+          <Hardwood lg={lg} game={game} label={now ? `Latest: ${now.text}` : 'Court'}
+            defs={<linearGradient id="lcposs" x1={poss === 'away' ? '0' : '1'} x2={poss === 'away' ? '1' : '0'} y1="0" y2="0"><stop offset="0" stopColor={pc || WOOD} stopOpacity="0.5" /><stop offset="1" stopColor={pc || WOOD} stopOpacity="0" /></linearGradient>}>
+            {{
+              under: pc ? <rect x={poss === 'away' ? 0 : W / 2} y="0" width={W / 2} height={H} fill="url(#lcposs)" /> : null,
+              over: <>
+                {pc ? [0, 1, 2].map((n) => { const x = W / 2 + dir * (48 + n * 18); return <path key={poss + n} className="chev" style={{ animationDelay: `${n * 0.22}s` }} d={`M${x - dir * 7} ${H / 2 - 16} L${x + dir * 7} ${H / 2} L${x - dir * 7} ${H / 2 + 16}`} fill="none" stroke={pc} strokeWidth="5" />; }) : null}
+                {lt ? <g key={last.id} className="pop">{last.scoring
+                  ? <><circle cx={lt.x} cy={lt.y} r="9" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" /><circle cx={lt.x} cy={lt.y} r="3.6" fill="#0C1124" /></>
+                  : missed(lt.x, lt.y, '#0C1124', 6, 3.2)}</g> : null}
+              </>,
+            }}
+          </Hardwood>
         </div>
       </section>
       <section className="sec">
         <H2>Play by Play</H2>
         <div className="card feed">
           {shown.map((p, i) => { const t = teamOf(p.teamId); return (
-            <div className={'fitem' + (p.scoring ? ' score' : '')} key={p.id || i} style={{ '--tc': t ? col(p.teamId) : 'var(--rule)' }}>
+            <div className={'fitem' + (p.scoring ? ' score' : '')} key={p.id || i} style={{ '--tc': t ? dk[side(p.teamId)].main : 'var(--rule)' }}>
               {t ? <Blob team={t} size={26} /> : <span className="noteam" aria-hidden="true" />}
               <span className="body">
                 <span className="hd"><b>{playHead(p, L)}</b><small>{p.period ? perName(L, p.period) : ''} · {p.clock}</small></span>
@@ -1338,11 +1353,11 @@ function GamePage({ lg, id }) {
   const d = q.data, g = d?.game;
   const title = g ? `${g.away.abbr} at ${g.home.abbr}` : L.name;
   const started = g && (g.state === 'live' || g.state === 'final');
-  const periods = g ? Math.max(g.home.lines.length, g.away.lines.length) : 0;
+  const periods = g ? Math.max(g.home.lines.length, g.away.lines.length, g.state === 'live' ? (L.periods || 4) : 0) : 0;
   const [picked, setTab] = useSticky('tab', 'summary');
   // Only offer the sections this game actually has.
   const tabs = !d || !started ? [] : [
-    ['summary', 'Summary'],
+    ['summary', g.state === 'live' ? 'Live' : 'Summary'],
     d.drives.length ? ['drives', 'Drives'] : null,
     d.shots.length ? ['shots', 'Shot Chart'] : null,
     d.ice?.length ? ['ice', 'Ice Chart'] : null,
@@ -1379,7 +1394,7 @@ function GamePage({ lg, id }) {
               {g.state !== 'final' && (g.tv?.national?.length || g.tv?.home?.length || g.tv?.away?.length) ? (
                 <p className="htv">
                   <span className="tvb">TV</span>
-                  {[g.tv.national.join(' · '), g.tv.away.length ? `${g.away.abbr}: ${g.tv.away.join(', ')}` : '', g.tv.home.length ? `${g.home.abbr}: ${g.tv.home.join(', ')}` : ''].filter(Boolean).join('  ·  ')}
+                  {[g.tv.national[0] || '', g.tv.away.length ? `${g.away.abbr}: ${g.tv.away.join(', ')}` : '', g.tv.home.length ? `${g.home.abbr}: ${g.tv.home.join(', ')}` : ''].filter(Boolean).join('  ·  ')}
                 </p>
               ) : null}
               {g.note || d.venue ? <p style={{ marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{[g.note, d.venue].filter(Boolean).join(' · ')}</p> : null}

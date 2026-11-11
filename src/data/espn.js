@@ -215,6 +215,7 @@ export function normEvent(ev, lg) {
     away: normSide(awayC, lg),
     note: cleanText(comp.notes?.[0]?.headline || ''),
     tv: normTv(comp),
+    neutral: comp.neutralSite === true,
   };
 }
 

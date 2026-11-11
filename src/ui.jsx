@@ -128,7 +128,7 @@ export function GameRow({ g, showLg = true }) {
       <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
-        {g.state !== 'final' && g.tv?.national?.length ? <span className="gtv">{g.tv.national.slice(0, 2).join(' · ')}</span> : null}
+        {g.state !== 'final' && g.tv?.national?.length ? <span className="gtv">{g.tv.national[0]}</span> : null}
         {g.state === 'final' && !sameDay(new Date(g.date), new Date()) && !isNaN(new Date(g.date)) ? <span className="gdate">{fmtDate(g.date)}</span> : null}
         {showLg ? <LgTag lg={g.lg} /> : null}
       </span>
