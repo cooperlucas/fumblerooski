@@ -694,16 +694,21 @@ export async function getPlusMinus(lg, id) {
   const items = (log.events?.items || []).filter((x) => x.played && x.statistics?.$ref);
   const pmOf = (d) => { for (const c of d?.splits?.categories || []) for (const x of c.stats || []) if (x.name === 'plusMinus') return Number(x.value); return null; };
   const games = {};
-  // A few at a time, so a full season does not fire 80 reads at once.
-  for (let i = 0; i < items.length; i += 8) {
-    await Promise.allSettled(items.slice(i, i + 8).map(async (x) => {
-      const eid = /events\/(\d+)/.exec(String(x.event?.$ref || ''))?.[1];
-      const v = pmOf(await get(String(x.statistics.$ref).replace(/^http:/, 'https:')));
-      if (eid && Number.isFinite(v)) games[eid] = v;
-    }));
-  }
-  let total = null;
-  if (year) { try { total = pmOf(await get(`${base}/seasons/${year}/types/2/athletes/${pid}/statistics?lang=en&region=us`)); } catch { /* games only */ } }
+  // The season total and the games load side by side; a few games at a time, so a full season does not fire 80 reads at once.
+  const totalP = year ? get(`${base}/seasons/${year}/types/2/athletes/${pid}/statistics?lang=en&region=us`).then(pmOf, () => null) : Promise.resolve(null);
+  const queue = [...items];
+  await Promise.all(Array.from({ length: 8 }, async () => {
+    for (let x = queue.shift(); x; x = queue.shift()) {
+      try {
+        const eid = /events\/(\d+)/.exec(String(x.event?.$ref || ''))?.[1];
+        const v = pmOf(await get(String(x.statistics.$ref).replace(/^http:/, 'https:')));
+        if (eid && Number.isFinite(v)) games[eid] = v;
+      } catch { /* that game stays blank */ }
+    }
+  }));
+  let total = await totalP;
+  // No season read: add up the games instead.
+  if (!Number.isFinite(total) && Object.keys(games).length) total = Object.values(games).reduce((n, v) => n + v, 0);
   return { year, total: Number.isFinite(total) ? total : null, games };
 }
 

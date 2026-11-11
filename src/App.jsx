@@ -1201,10 +1201,10 @@ function ShotChart({ shots, game, lg }) {
   const cc = chartColors(game.away, game.home, true);
   const sides = [['away', game.away, cc.away.main], ['home', game.home, cc.home.main]];
   const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
-  const [res, setRes] = useState('all');
-  const [side, setSide] = useState('both');
+  const [kindOn, flipKind] = useToggles(['made', 'miss']);
+  const [teamOn, flipTeam] = useToggles([game.away.id, game.home.id]);
   const shown = shots.filter((s) => !per || s.period === per);
-  const onFloor = shown.filter((s) => (res === 'all' || (res === 'made') === !!s.made) && (side === 'both' || s.teamId === side));
+  const onFloor = shown.filter((s) => kindOn.has(s.made ? 'made' : 'miss') && teamOn.has(s.teamId));
   const pctTxt = (m, n) => (n ? ` · ${((100 * m) / n).toFixed(1)}%` : '');
   return (
     <section className="sec">
@@ -1215,7 +1215,6 @@ function ShotChart({ shots, game, lg }) {
           {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? perName(LEAGUE[lg], p) : 'OT'}</button>)}
         </div>
       ) : null}
-      <ShotFilter res={res} setRes={setRes} side={side} setSide={setSide} game={game} kinds={[['all', 'All shots'], ['made', 'Makes'], ['miss', 'Misses']]} />
       <div className="card pad shotbox">
         <Hardwood lg={lg} game={game} label={`Shot chart: ${game.away.name} on the left, ${game.home.name} on the right.`}>
           {{ over: sides.flatMap(([sd, t, c]) => {
@@ -1231,7 +1230,8 @@ function ShotChart({ shots, game, lg }) {
               <span>3PT {m3}-{th.length}{pctTxt(m3, th.length)}</span>
             </div>); })}
         </div>
-        <p className="stamp" style={{ marginTop: 8 }}>◎ made · ✕ missed</p>
+        <ShotKey game={game} kindOn={kindOn} flipKind={flipKind} teamOn={teamOn} flipTeam={flipTeam}
+          kinds={[['made', '◎ MADE', '#FFBE2E', shown.filter((s) => s.made && teamOn.has(s.teamId)).length], ['miss', '✕ MISSED', '#CBD2EA', shown.filter((s) => !s.made && teamOn.has(s.teamId)).length]]} />
       </div>
     </section>
   );
@@ -1340,17 +1340,28 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
 }
 
 /* ---------- hockey: every shot on the rink. Away team shoots right, home team shoots left. ---------- */
-// Chips under the chart title: which shots (all, makes, misses...) and whose (both teams or one).
-function ShotFilter({ res, setRes, side, setSide, game, kinds }) {
+// The key under a shot chart doubles as the filter: tap a pill to hide or show those shots.
+// At least one pill in each row stays on, so the floor is never empty by accident.
+function useToggles(all) {
+  const [on, setOn] = useState(() => new Set(all));
+  const flip = (k) => setOn((cur) => { const n = new Set(cur); if (n.has(k)) { if (n.size > 1) n.delete(k); } else n.add(k); return n; });
+  return [on, flip];
+}
+function ShotKey({ kinds, kindOn, flipKind, game, teamOn, flipTeam }) {
+  const dk = chartColors(game.away, game.home);
   return (
-    <>
-      <div className="chips sfilt" role="group" aria-label="Which shots">
-        {kinds.map(([k, l]) => <button key={k} className="chipb" aria-pressed={res === k} onClick={() => setRes(k)}>{l}</button>)}
+    <div className="skeys">
+      <div className="legend" role="group" aria-label="Show shots by result">
+        {kinds.map(([k, label, bg, n]) => (
+          <button key={k} className="lg" aria-pressed={kindOn.has(k)} onClick={() => flipKind(k)} style={{ background: bg }}>{label}{n != null ? <b>{n}</b> : null}</button>
+        ))}
       </div>
-      <div className="chips sfilt" role="group" aria-label="Which team">
-        {[['both', 'Both teams'], [game.away.id, game.away.abbr], [game.home.id, game.home.abbr]].map(([k, l]) => <button key={k} className="chipb" aria-pressed={side === k} onClick={() => setSide(k)}>{l}</button>)}
+      <div className="legend" role="group" aria-label="Show shots by team">
+        {[[game.away, dk.away.main], [game.home, dk.home.main]].map(([t, c]) => (
+          <button key={t.id} className="lg" aria-pressed={teamOn.has(t.id)} onClick={() => flipTeam(t.id)} style={{ background: c, color: inkOn(c) }}>{t.abbr}</button>
+        ))}
       </div>
-    </>
+    </div>
   );
 }
 export function IceChart({ ice, game }) {
@@ -1358,10 +1369,11 @@ export function IceChart({ ice, game }) {
   const cc = chartColors(game.away, game.home, true), dk = chartColors(game.away, game.home);
   const col = (id) => (id === game.away.id ? cc.away.main : cc.home.main);
   const periods = [...new Set(ice.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
-  const [res, setRes] = useState('all');
-  const [side, setSide] = useState('both');
+  const [kindOn, flipKind] = useToggles(['goal', 'save', 'miss']);
+  const [teamOn, flipTeam] = useToggles([game.away.id, game.home.id]);
   const shown = ice.filter((s) => !per || s.period === per);
-  const onIce = shown.filter((s) => (res === 'all' || s.kind === res) && (side === 'both' || s.teamId === side));
+  const onIce = shown.filter((s) => kindOn.has(s.kind) && teamOn.has(s.teamId));
+  const nk = (k) => shown.filter((s) => s.kind === k && teamOn.has(s.teamId)).length;
   const K = 3, W = 200 * K, H = 85 * K;
   const X = (v) => (Math.max(-98, Math.min(98, v)) + 100) * K, Y = (v) => (42.5 - Math.max(-40.5, Math.min(40.5, v))) * K;
   const count = (id, kind) => shown.filter((s) => s.teamId === id && (!kind || s.kind === kind)).length;
@@ -1376,7 +1388,6 @@ export function IceChart({ ice, game }) {
           {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= 3 ? `P${p}` : 'OT'}</button>)}
         </div>
       ) : null}
-      <ShotFilter res={res} setRes={setRes} side={side} setSide={setSide} game={game} kinds={[['all', 'All shots'], ['goal', 'Goals'], ['save', 'Saves'], ['miss', 'Misses']]} />
       <div className="card pad shotbox">
         <div className="icekey">
           {[game.away, game.home].map((t, i) => (
@@ -1391,11 +1402,8 @@ export function IceChart({ ice, game }) {
             return <g key={i}><rect x={x - 8} y={y - 8} width="16" height="16" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" transform={`rotate(45 ${x} ${y})`} /><circle cx={x} cy={y} r="4" fill={c} stroke="#0C1124" strokeWidth="1.2" /></g>;
           })}
         </Ice>
-        <div className="legend" style={{ margin: '12px 0 0', flexWrap: 'wrap' }}>
-          <span className="lg" style={{ background: '#FFBE2E' }}>◆ GOAL</span>
-          <span className="lg" style={{ background: '#CBD2EA' }}>○ SAVED</span>
-          <span className="lg" style={{ background: '#CBD2EA' }}>✕ MISSED</span>
-        </div>
+        <ShotKey game={game} kindOn={kindOn} flipKind={flipKind} teamOn={teamOn} flipTeam={flipTeam}
+          kinds={[['goal', '◆ GOAL', '#FFBE2E', nk('goal')], ['save', '○ SAVED', '#CBD2EA', nk('save')], ['miss', '✕ MISSED', '#CBD2EA', nk('miss')]]} />
         <p className="stamp" style={{ marginTop: 10, textAlign: 'left' }}>Each team's shots are turned to face one goal, so the ends do not flip between periods.</p>
       </div>
     </section>
