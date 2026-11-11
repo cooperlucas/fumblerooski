@@ -112,6 +112,9 @@ h1, h2, h3, p { margin: 0; }
 .grow .sides { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
 .grow .side { display: flex; align-items: center; gap: 10px; }
 .grow .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grow .nm { display: flex; align-items: center; }
+.grow .nm .nmt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.grow .nm .possball { flex: none; }
 .grow .nm small { font-size: 12px; font-weight: 600; color: var(--mute); }
 .grow .rk { font-size: 11px; font-weight: 800; color: var(--gold); margin-right: 4px; }
 .grow .sc { font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 19px; font-variant-numeric: tabular-nums; }
@@ -553,3 +556,6 @@ button.pick.date { cursor: pointer; }
 .grow .gdd { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; font-weight: 800; color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.25; }
 .grow .gdd span { font-weight: 700; color: var(--mute); }
 .grow .gdd.rz b { color: #FF5A6E; }
+
+/* shot and ice charts: filter what shows on the floor */
+.chips.sfilt { margin-top: 8px; }

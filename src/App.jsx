@@ -1201,7 +1201,10 @@ function ShotChart({ shots, game, lg }) {
   const cc = chartColors(game.away, game.home, true);
   const sides = [['away', game.away, cc.away.main], ['home', game.home, cc.home.main]];
   const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const [res, setRes] = useState('all');
+  const [side, setSide] = useState('both');
   const shown = shots.filter((s) => !per || s.period === per);
+  const onFloor = shown.filter((s) => (res === 'all' || (res === 'made') === !!s.made) && (side === 'both' || s.teamId === side));
   const pctTxt = (m, n) => (n ? ` · ${((100 * m) / n).toFixed(1)}%` : '');
   return (
     <section className="sec">
@@ -1212,10 +1215,11 @@ function ShotChart({ shots, game, lg }) {
           {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? perName(LEAGUE[lg], p) : 'OT'}</button>)}
         </div>
       ) : null}
+      <ShotFilter res={res} setRes={setRes} side={side} setSide={setSide} game={game} kinds={[['all', 'All shots'], ['made', 'Makes'], ['miss', 'Misses']]} />
       <div className="card pad shotbox">
         <Hardwood lg={lg} game={game} label={`Shot chart: ${game.away.name} on the left, ${game.home.name} on the right.`}>
           {{ over: sides.flatMap(([sd, t, c]) => {
-            const mine = shown.filter((s) => s.teamId === t.id);
+            const mine = onFloor.filter((s) => s.teamId === t.id);
             return [...mine.filter((s) => !s.made), ...mine.filter((s) => s.made)].map((s, i) => { const q = place(s, sd); return <g key={sd + i}>{s.made ? made(q.x, q.y, c, 4.6) : missed(q.x, q.y, c, 3.2, 1.6)}</g>; });
           }) }}
         </Hardwood>
@@ -1336,12 +1340,28 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
 }
 
 /* ---------- hockey: every shot on the rink. Away team shoots right, home team shoots left. ---------- */
+// Chips under the chart title: which shots (all, makes, misses...) and whose (both teams or one).
+function ShotFilter({ res, setRes, side, setSide, game, kinds }) {
+  return (
+    <>
+      <div className="chips sfilt" role="group" aria-label="Which shots">
+        {kinds.map(([k, l]) => <button key={k} className="chipb" aria-pressed={res === k} onClick={() => setRes(k)}>{l}</button>)}
+      </div>
+      <div className="chips sfilt" role="group" aria-label="Which team">
+        {[['both', 'Both teams'], [game.away.id, game.away.abbr], [game.home.id, game.home.abbr]].map(([k, l]) => <button key={k} className="chipb" aria-pressed={side === k} onClick={() => setSide(k)}>{l}</button>)}
+      </div>
+    </>
+  );
+}
 export function IceChart({ ice, game }) {
   const [per, setPer] = useState(0);
   const cc = chartColors(game.away, game.home, true), dk = chartColors(game.away, game.home);
   const col = (id) => (id === game.away.id ? cc.away.main : cc.home.main);
   const periods = [...new Set(ice.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const [res, setRes] = useState('all');
+  const [side, setSide] = useState('both');
   const shown = ice.filter((s) => !per || s.period === per);
+  const onIce = shown.filter((s) => (res === 'all' || s.kind === res) && (side === 'both' || s.teamId === side));
   const K = 3, W = 200 * K, H = 85 * K;
   const X = (v) => (Math.max(-98, Math.min(98, v)) + 100) * K, Y = (v) => (42.5 - Math.max(-40.5, Math.min(40.5, v))) * K;
   const count = (id, kind) => shown.filter((s) => s.teamId === id && (!kind || s.kind === kind)).length;
@@ -1356,6 +1376,7 @@ export function IceChart({ ice, game }) {
           {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= 3 ? `P${p}` : 'OT'}</button>)}
         </div>
       ) : null}
+      <ShotFilter res={res} setRes={setRes} side={side} setSide={setSide} game={game} kinds={[['all', 'All shots'], ['goal', 'Goals'], ['save', 'Saves'], ['miss', 'Misses']]} />
       <div className="card pad shotbox">
         <div className="icekey">
           {[game.away, game.home].map((t, i) => (
@@ -1363,7 +1384,7 @@ export function IceChart({ ice, game }) {
           ))}
         </div>
         <Ice game={game} label={`Shot locations. ${game.away.name}: ${count(game.away.id, 'goal')} goals on ${count(game.away.id)} shots. ${game.home.name}: ${count(game.home.id, 'goal')} goals on ${count(game.home.id)} shots.`}>
-          {[...shown].sort((a, b) => order[a.kind] - order[b.kind]).map((s, i) => {
+          {[...onIce].sort((a, b) => order[a.kind] - order[b.kind]).map((s, i) => {
             const x = X(s.x), y = Y(s.y), c = col(s.teamId);
             if (s.kind === 'miss') return <path key={i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke={c} strokeWidth="2.4" strokeLinecap="round" />;
             if (s.kind === 'save') return <circle key={i} cx={x} cy={y} r="5" fill="#fff" stroke={c} strokeWidth="2.6" />;

@@ -124,7 +124,7 @@ export function GameRow({ g, showLg = true }) {
   const side = (t, mine, theirs) => (
     <span className={'side' + (lose(mine, theirs) ? ' lose' : '')}>
       <Blob team={t} />
-      <span className="nm">{t.rank ? <span className="rk">{t.rank}</span> : null}{t.name} <small>{t.record}</small>{g.poss && g.poss === String(t.id) ? <Ball red={g.redZone} /> : null}</span>
+      <span className="nm"><span className="nmt">{t.rank ? <span className="rk">{t.rank}</span> : null}{t.name} <small>{t.record}</small></span>{g.poss && g.poss === String(t.id) ? <Ball red={g.redZone} /> : null}</span>
       <span className="sc">{pre ? '' : t.score}</span>
     </span>
   );
