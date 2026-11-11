@@ -1535,8 +1535,16 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
   const cur = drives?.current;
   if (cur && !list.some((d) => String(d.id) === String(cur.id))) list.push(cur);
   const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
+  // Team abbreviations by id, for drives whose team the feed got wrong.
+  const abbrOf = {};
+  for (const d of list) if (d.team?.id) abbrOf[String(d.team.id)] = d.team.abbreviation;
   return list.map((d, i) => {
-    const teamId = String(d.team?.id ?? '');
+    // The feed sometimes credits a drive to the wrong team (after a blocked punt, say, SMU's touchdown drive came in as Tulane's
+    // "Downs Touchdown"). Go by who ran the scrimmage plays when they all agree.
+    const runners = new Set((d.plays || []).filter((p) => !/kickoff|punt|extra point|penalty|timeout|end of/i.test(`${p.type?.text || ''}`) && p.start?.team?.id).map((p) => String(p.start.team.id)));
+    const fedId = String(d.team?.id ?? '');
+    const teamId = runners.size === 1 && !runners.has(fedId) && [String(awayId), String(homeId)].includes([...runners][0]) ? [...runners][0] : fedId;
+    const swapped = teamId !== fedId;
     const plays = (d.plays || []).map((p) => ({
       text: cleanText(p.text),
       down: cleanText(p.start?.downDistanceText || p.start?.shortDownDistanceText || ''),
@@ -1550,14 +1558,17 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       next: cleanText(p.end?.downDistanceText || ''), nextShort: cleanText(p.end?.shortDownDistanceText || ''), spot: cleanText(p.end?.possessionText || ''),
     })).filter((p) => p.text);
     const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
-    const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    let result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    // "Downs Touchdown" and the like: the feed glued the other team's turnover onto this drive's score.
+    if (d.isScore === true && /touchdown|\btd\b/i.test(result)) result = result.replace(/^\s*(downs|punt|blocked punt|fumble|interception)\s+/i, '');
+    if (swapped && /^downs$/i.test(result)) result = '';
     const kind = d.isScore === true && /touchdown|\btd\b/i.test(result) ? 'td' : d.isScore === true && /field goal|\bfg\b/i.test(result) ? 'fg'
       : /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true ? 'turnover' : 'other';
     // A drive that opens on the other team's kick starts where the kick ended. The feed's drive start text says where;
     // the kick play's own spots are the kicking team's.
     const kickOpen = !!first && /kickoff|\bpunts?\b/i.test(`${first.type?.text || ''} ${first.text || ''}`) && String(first.start?.team?.id ?? teamId) !== teamId;
     const tb = kickOpen && /touchback/i.test(first.text || '') ? touchbackSpot(opts.lg, opts.season, /kickoff/i.test(`${first.type?.text || ''} ${first.text || ''}`) ? 'kickoff' : 'punt') : null;
-    const startToEnd = spotToEnd(d.start?.text, d.team?.abbreviation) ?? tb;
+    const startToEnd = spotToEnd(d.start?.text, abbrOf[teamId] || d.team?.abbreviation) ?? tb;
     const from = kickOpen && startToEnd != null ? startToEnd : num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
     // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
     // after a punt or field goal it is where the ball landed, not where the offense got to.
