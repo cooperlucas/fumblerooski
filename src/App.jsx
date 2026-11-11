@@ -1129,9 +1129,13 @@ function LiveField({ drives, game, onAll }) {
   const m0 = fieldMoment(last);
   const tRet = !defTd && m0.kind === 'turnover' && last && last.endRaw != null ? Math.max(0, Math.min(100, 100 - last.endRaw)) : null;
   const retEnd = defTd ? 100 : tRet;
-  const retYds = defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
+  const retYds = (defTd || tRet != null) && /return(?:ed)? for no gain|no return/i.test(last.text) ? 0 : defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
   const retFrom = retYds != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retYds)) : null;
-  const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? retFrom : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
+  // On a pick the offense's line stops at the line of scrimmage; the ball turns over where it was caught.
+  const picked = tRet != null && /intercept/i.test(`${last.type} ${last.text}`);
+  const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? (picked && last.from != null ? last.from : retFrom) : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
+  const noRet = tRet != null && retFrom != null && Math.abs(retFrom - tRet) < 0.5; // picked off and downed right there
+  const ballAt = tRet != null && retFrom != null ? retFrom : at;
   const going = d.live && last?.kept && last.nextDown > 0 && !(m0.kind === 'punt' && m0.blocked && last.mine);
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
@@ -1272,7 +1276,7 @@ function LiveField({ drives, game, onAll }) {
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
                 <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
                 {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
-                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)`, display: retEnd != null && retFrom != null ? 'none' : undefined }}>
+                <g className="lfmove" style={{ transform: `translate(${X(ballAt)}px, ${ly}px)`, display: retEnd != null && retFrom != null && !noRet ? 'none' : undefined }}>
                   <g className="lfball">
                     <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
                     {m.kind === 'fg' || m.kind === 'punt' ? null : (
@@ -1286,7 +1290,7 @@ function LiveField({ drives, game, onAll }) {
               </>
             ) : null}
             {show}
-            {retEnd != null && retFrom != null ? (
+            {retEnd != null && retFrom != null && !noRet ? (
               <g key={'ret' + lastKey} className="fshow">
                 {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
                 <g transform={`translate(${X(retEnd)} ${ly - 19})`}>{ball(8)}</g>
