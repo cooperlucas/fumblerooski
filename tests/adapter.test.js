@@ -147,8 +147,13 @@ test('plus/minus from play-by-play: counted when lineups add up, withheld when t
   const pm = plusMinusFromPlays(plays, { A, H }, 'A', 'H');
   // a1 played all four baskets (+2 -3 +3 -2 = 0), a5 only the first two (-1), a6 only the last two (+1)
   assert.equal(pm.a1, 0); assert.equal(pm.a5, -1); assert.equal(pm.a6, 1); assert.equal(pm.h1, 0);
-  // a sub for a player who is not on the floor means the log is incomplete: no numbers at all
-  assert.equal(plusMinusFromPlays(fix([score(2, 0), sub('A', 'zz', 'out')]), { A, H }, 'A', 'H'), null);
+  // a sub out for a player who is not on the floor (logged twice) is skipped, not the whole game
+  assert.equal(plusMinusFromPlays(fix([score(2, 0), sub('A', 'zz', 'out')]), { A, H }, 'A', 'H').a1, 2);
+  // a sub between free throws counts after the last one: both shots go to the five on the floor at the foul
+  const ft = (a, h, n) => ({ text: `free throw ${n} of 2`, type: { text: 'Free Throw' }, period: { number: 1 }, clock: { displayValue: '5:00' }, awayScore: a, homeScore: h });
+  const late = fix([score(2, 0), ft(3, 0, 1), { ...sub('A', 'a5', 'out'), period: { number: 1 }, clock: { displayValue: '5:00' } }, { ...sub('A', 'a6', 'in'), period: { number: 1 }, clock: { displayValue: '5:00' } }, ft(4, 0, 2)]);
+  const pf = plusMinusFromPlays(late, { A, H }, 'A', 'H');
+  assert.equal(pf.a5, 4); assert.equal(pf.a6 ?? 0, 0);
   // six on the floor when a basket is scored: withheld
   assert.equal(plusMinusFromPlays(fix([sub('A', 'a6', 'in'), score(2, 0)]), { A, H }, 'A', 'H'), null);
   // no substitutions logged at all: withheld

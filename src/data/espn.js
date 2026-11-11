@@ -681,12 +681,50 @@ export async function getPlayer(lg, id) {
   };
 }
 
-// Plus-minus for pro hoops players. The player feeds leave it out, so it comes from the core service:
-// the season total, and one small read per game for the game log. College feeds do not track it at all.
-export const hasPlusMinus = (lg) => LEAGUE[lg]?.sport === 'basketball' && !LEAGUE[lg]?.college;
+// Plus-minus for one whole game from its summary, for feeds that do not send it (college hoops). { athleteId: n } or null.
+export function plusMinusFromSummary(d) {
+  const comp = d?.header?.competitions?.[0];
+  const side = (k) => String((comp?.competitors || []).find((c) => c.homeAway === k)?.team?.id ?? (comp?.competitors || []).find((c) => c.homeAway === k)?.id ?? '');
+  const awayId = side('away'), homeId = side('home');
+  if (!awayId || !homeId) return null;
+  return plusMinusFromPlays(d.plays, startersOf(d.boxscore, [awayId, homeId]), awayId, homeId);
+}
+
+// Plus-minus for hoops players. The player feeds leave it out, so pros get it from the core service (the season total,
+// plus one small read per game for the game log). College works it out from each game's play-by-play.
+export const hasPlusMinus = (lg) => LEAGUE[lg]?.sport === 'basketball';
 export const signed = (n) => (n > 0 ? `+${n}` : String(n));
+// A finished game's plus-minus never changes, so keep it on the phone: the next player page from that game is instant.
+const pmCache = {
+  get(k) { try { const v = localStorage.getItem('fr.pm.' + k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('fr.pm.' + k, JSON.stringify(v)); } catch { /* storage full or blocked: just refetch next time */ } },
+};
+// College: work it out from each game's play-by-play, for every game in this season's log.
+async function collegePlusMinus(lg, id) {
+  const pid = encodeURIComponent(id);
+  const log = await get(url(COMMON, lg, `/athletes/${pid}/gamelog`));
+  const ids = [...new Set((log.seasonTypes || []).flatMap((st) => (st.categories || []).flatMap((c) => (c.events || []).map((e) => String(e.eventId ?? '')))).filter(Boolean))];
+  const games = {};
+  const queue = [...ids];
+  await Promise.all(Array.from({ length: 6 }, async () => {
+    for (let eid = queue.shift(); eid; eid = queue.shift()) {
+      try {
+        let pm = pmCache.get(`${lg}.${eid}`);
+        if (!pm) {
+          const d = await get(url(SITE, lg, '/summary', { event: eid }));
+          pm = plusMinusFromSummary(d);
+          if (pm && d.header?.competitions?.[0]?.status?.type?.completed) pmCache.set(`${lg}.${eid}`, pm);
+        }
+        if (pm) games[eid] = pm[String(id)] ?? 0;
+      } catch { /* that game stays blank */ }
+    }
+  }));
+  const vals = Object.values(games);
+  return { year: null, total: vals.length ? vals.reduce((n, v) => n + v, 0) : null, games, n: vals.length };
+}
 export async function getPlusMinus(lg, id) {
   const L = LEAGUE[lg];
+  if (L.college) return collegePlusMinus(lg, id);
   const base = `https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}`;
   const pid = encodeURIComponent(id);
   const log = await get(`${base}/athletes/${pid}/eventlog?limit=200&lang=en&region=us`);
@@ -1160,7 +1198,25 @@ export function scoreSeries(game, plays, L) {
 // Some leagues (college hoops) do not send +/-. If every substitution is in the play-by-play we can count it:
 // follow who is on the floor, and credit each basket to the ten players out there.
 // If the lineups ever stop adding up to five a side, we return null and show nothing rather than a wrong number.
+// Subs made between free throws count after the last free throw: the shots belong to the five on the floor at the foul.
+function subsAfterFreeThrows(plays) {
+  const isSub = (p) => /substitution/i.test(p.type?.text || '') || /subbing (in|out)|enters the game/i.test(p.text || '');
+  const isFt = (p) => /free ?throw/i.test(`${p.type?.text || ''} ${p.text || ''}`);
+  const at = (p) => `${p.period?.number}|${p.clock?.displayValue}`;
+  const later = new Map(), out = [];
+  plays.forEach((p, i) => {
+    if (isSub(p)) {
+      let last = -1;
+      for (let j = i + 1; j < plays.length && at(plays[j]) === at(p); j++) if (isFt(plays[j])) last = j;
+      if (last > i) { if (!later.has(last)) later.set(last, []); later.get(last).push(p); return; }
+    }
+    out.push(p);
+    (later.get(i) || []).forEach((x) => out.push(x));
+  });
+  return out;
+}
 export function plusMinusFromPlays(rawPlays, starters, awayId, homeId) {
+  rawPlays = subsAfterFreeThrows(rawPlays || []);
   const on = { [awayId]: new Set(starters[awayId] || []), [homeId]: new Set(starters[homeId] || []) };
   if (on[awayId].size !== 5 || on[homeId].size !== 5) return null;
   const pm = {}; let pa = 0, ph = 0, subs = 0;
@@ -1168,17 +1224,18 @@ export function plusMinusFromPlays(rawPlays, starters, awayId, homeId) {
     const text = String(p.text || ''), type = String(p.type?.text || '');
     const tid = String(p.team?.id ?? ''), who = (p.participants || []).map((x) => String(x.athlete?.id ?? '')).filter(Boolean);
     if (/substitution/i.test(type) || /subbing (in|out)|enters the game/i.test(text)) {
-      const set = on[tid]; if (!set || !who.length) return null;
-      if (/enters the game for/i.test(text) && who.length >= 2) { if (set.has(who[0]) || !set.has(who[1])) return null; set.delete(who[1]); set.add(who[0]); }
-      else if (/subbing out/i.test(text)) { if (!set.has(who[0])) return null; set.delete(who[0]); }
-      else if (/subbing in|enters the game/i.test(text)) { if (set.has(who[0])) return null; set.add(who[0]); }
-      else return null;
+      // A sub the feed logs twice or out of order is skipped rather than throwing away the whole game.
+      const set = on[tid]; if (!set || !who.length) continue;
+      if (/enters the game for/i.test(text) && who.length >= 2) { set.delete(who[1]); set.add(who[0]); }
+      else if (/subbing out/i.test(text)) set.delete(who[0]);
+      else if (/subbing in|enters the game/i.test(text)) set.add(who[0]);
+      else continue;
       subs++; continue;
     }
     const a = Number(p.awayScore), h = Number(p.homeScore);
     if (!Number.isFinite(a) || !Number.isFinite(h) || (a === pa && h === ph)) continue;
-    if (a < pa || h < ph) return null;
-    if (on[awayId].size !== 5 || on[homeId].size !== 5) return null;
+    if (a < pa || h < ph) continue; // a corrected score: wait for it to catch back up
+    if (on[awayId].size !== 5 || on[homeId].size !== 5) return null; // the log lost track of who is on the floor
     const d = (a - pa) - (h - ph);
     on[awayId].forEach((id) => { pm[id] = (pm[id] || 0) + d; });
     on[homeId].forEach((id) => { pm[id] = (pm[id] || 0) - d; });

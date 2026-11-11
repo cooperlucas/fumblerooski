@@ -832,7 +832,7 @@ function PlayerPage({ lg, id }) {
   const season = career.map((c) => {
     const row = c.rows[c.rows.length - 1];
     if (!row || !pm || pm.total == null || (pm.year && row.year && row.year !== pm.year) || !/^(averages|totals)$/.test(c.key)) return { ...c, row };
-    const gp = Number(career.find((x) => x.key === 'averages')?.rows.at(-1)?.stats[0]) || Object.keys(pm.games).length;
+    const gp = pm.n || Number(career.find((x) => x.key === 'averages')?.rows.at(-1)?.stats[0]) || Object.keys(pm.games).length;
     const v = c.key === 'totals' ? signed(pm.total) : gp ? signed(Math.round((pm.total / gp) * 10) / 10) : '';
     return { ...c, labels: [...c.labels, '+/-'], row: { ...row, stats: [...row.stats, v] } };
   }).filter((c) => c.row).filter((c, _, all) => {
