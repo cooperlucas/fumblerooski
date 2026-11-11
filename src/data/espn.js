@@ -193,6 +193,15 @@ export function normTv(comp) {
   return { national, home: pick('home', false), away: pick('away', false) };
 }
 
+// Red zone = the team with the ball is inside the other side's 20. The feed's own flag sometimes lingers
+// after a change of possession (Akron at its own 16 flagged red), so read the spot when it is there.
+function redZoneOf(comp) {
+  const st = comp.situation || {};
+  const m = /^(\S+)\s+(\d+)$/.exec(cleanText(st.possessionText || ''));
+  const has = (comp.competitors || []).find((c) => String(c.team?.id) === String(st.possession ?? ''));
+  if (m && has?.team?.abbreviation) return m[1].toUpperCase() !== String(has.team.abbreviation).toUpperCase() && +m[2] <= 20;
+  return st.isRedZone === true;
+}
 export function normEvent(ev, lg) {
   const comp = ev?.competitions?.[0] || ev || {};
   const cs = comp.competitors || [];
@@ -218,7 +227,7 @@ export function normEvent(ev, lg) {
     neutral: comp.neutralSite === true,
     // Live football: which team has the ball, and whether they are inside the 20.
     poss: state === 'live' && LEAGUE[lg]?.sport === 'football' ? String(comp.situation?.possession ?? '') : '',
-    redZone: state === 'live' && comp.situation?.isRedZone === true,
+    redZone: state === 'live' && redZoneOf(comp),
     // Down, distance and ball spot ("2nd & 7", "AKR 41"). Blank between plays like kickoffs and extra points.
     down: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.shortDownDistanceText || '') : '',
     spot: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.possessionText || '') : '',
