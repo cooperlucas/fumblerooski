@@ -1073,6 +1073,9 @@ function LiveField({ drives, game, onAll }) {
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
+  // A field goal try as the latest play gets its own little show.
+  const fg = !!last && /field goal/i.test(`${last.type}`) && !/fake/i.test(last.type);
+  const fgGood = fg && /good/i.test(`${last.type} ${last.text}`) && !/no good|miss|block/i.test(`${last.type} ${last.text}`);
   const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
   const recent = [...d.plays].reverse().slice(0, 3);
   const mid = top + (FH - top) / 2;
@@ -1121,6 +1124,26 @@ function LiveField({ drives, game, onAll }) {
                 </g>
               </>
             ) : null}
+            {fg ? (() => {
+              // The kick: a dotted arc from the spot to the posts with the ball riding it, then a view from behind the uprights.
+              const x0 = X(Math.min(99, (last.from ?? at ?? 20) + 7)), x1 = d.side === 'away' ? FW + 4 : -4, h = 46;
+              const px = 60 * K, py = top + 6; // the behind-the-posts panel sits at midfield
+              const yEnd = fgGood ? mid - 6 : mid - 34; // a miss sails wide of the posts
+              return (
+                <g key={'fg' + d.id + d.plays.length} className="fgshow">
+                  <path className="fgarc" pathLength="100" d={`M${x0} ${ly} Q${(x0 + x1) / 2} ${ly - h * 2} ${x1} ${yEnd}`} fill="none" stroke="#fff" strokeWidth="2.4" strokeDasharray="1.5 3.5" strokeLinecap="round" />
+                  <g className="fgx" style={{ '--x0': `${x0}px`, '--x1': `${x1}px` }}><g className="fgy" style={{ '--y0': `${ly}px`, '--yt': `${ly - h}px`, '--y1': `${yEnd}px` }}>
+                    <ellipse rx="8" ry="5" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.6" /><path d="M-3.5 0 H3.5 M-2 -1.8 V1.8 M0 -1.8 V1.8 M2 -1.8 V1.8" stroke="#fff" strokeWidth="1" strokeLinecap="round" />
+                  </g></g>
+                  <g className="fgpanel" transform={`translate(${px} ${py})`}>
+                    <rect x="-62" y="0" width="124" height="88" rx="10" fill="#0C1124" stroke={fgGood ? '#FFBE2E' : '#FF5A6E'} strokeWidth="2.5" />
+                    <rect x="-62" y="62" width="124" height="26" fill="#39B54A" clipPath="inset(0 round 0 0 8px 8px)" />
+                    <path d="M0 74 V50 M-26 50 H26 M-26 50 V12 M26 50 V12" fill="none" stroke="#FFBE2E" strokeWidth="4" strokeLinecap="round" />
+                    <g className={'fgkick' + (fgGood ? '' : ' wide')}><ellipse rx="9" ry="6" fill="#9A5A2B" stroke="#fff" strokeWidth="1.4" /><path d="M-4 0 H4 M-2 -2 V2 M0 -2 V2 M2 -2 V2" stroke="#fff" strokeWidth="1" strokeLinecap="round" /></g>
+                    <text className="fgcall" x="0" y="84" textAnchor="middle" fill={fgGood ? '#FFBE2E' : '#FF8FA0'}>{fgGood ? "IT'S GOOD!" : 'NO GOOD'}</text>
+                  </g>
+                </g>);
+            })() : null}
           </svg>
           {last ? (
             <div className="lflast" key={d.id + d.plays.length}>

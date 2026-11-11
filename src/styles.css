@@ -570,3 +570,20 @@ button.pick.date { cursor: pointer; }
 /* player page: the season picker sits at the end of the tab row */
 .gtabs .tabyr { flex: none; margin-left: auto; display: flex; align-items: center; }
 .gtabs .tabyr .pick select { min-height: 36px; }
+
+/* live football: a field goal try. The ball rides a dotted arc to the posts, then a view from behind the uprights. Plays once, then clears. */
+.field .fgshow { animation: glowoff 0.6s 8s forwards; }
+.field .fgarc { stroke-dashoffset: 0; animation: fgdraw 1.5s ease-out both; }
+@keyframes fgdraw { from { clip-path: inset(0 100% 0 0); opacity: 0.2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+.field .fgx { animation: fgx 1.5s linear both; }
+.field .fgy { animation: fgy 1.5s both; }
+@keyframes fgx { from { transform: translateX(var(--x0)); } to { transform: translateX(var(--x1)); } }
+@keyframes fgy { 0% { transform: translateY(var(--y0)) rotate(0deg); animation-timing-function: cubic-bezier(.2, .7, .5, 1); } 50% { transform: translateY(var(--yt)) rotate(360deg); animation-timing-function: cubic-bezier(.5, 0, .8, .4); } 100% { transform: translateY(var(--y1)) rotate(720deg); } }
+.field .fgpanel { opacity: 0; animation: fgpanel 0.35s 1.3s ease-out forwards; }
+@keyframes fgpanel { from { opacity: 0; } to { opacity: 1; } }
+.field .fgkick { transform: translate(0, 70px) scale(1.5); animation: fgkick 1.3s 1.6s cubic-bezier(.2, .7, .4, 1) both; }
+.field .fgkick.wide { animation-name: fgwide; }
+@keyframes fgkick { from { transform: translate(0, 70px) scale(1.5) rotate(0deg); } to { transform: translate(4px, 26px) scale(0.55) rotate(540deg); } }
+@keyframes fgwide { from { transform: translate(0, 70px) scale(1.5) rotate(0deg); } to { transform: translate(44px, 22px) scale(0.55) rotate(540deg); } }
+.field .fgcall { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 11px; letter-spacing: 0.06em; opacity: 0; animation: fgpanel 0.3s 2.7s forwards; paint-order: stroke; stroke: #0C1124; stroke-width: 3px; }
+@media (prefers-reduced-motion: reduce) { .field .fgarc, .field .fgx, .field .fgy, .field .fgkick, .field .fgpanel, .field .fgcall { animation-duration: 0.01s; animation-delay: 0s; } }
