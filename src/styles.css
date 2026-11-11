@@ -522,3 +522,5 @@ button.pick.date { cursor: pointer; }
 .lflast .hd small { font-size: 11px; font-weight: 700; color: var(--mute); }
 .lflast .tx { font-size: 13px; font-weight: 600; color: var(--soft); }
 .lflast .nx { font-size: 12px; font-weight: 800; color: var(--teal); }
+
+.feed.inl { margin: 12px -12px -12px; border-top: 1px solid var(--rule); }

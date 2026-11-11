@@ -1203,6 +1203,7 @@ function ShotChart({ shots, game, lg }) {
 /* ---------- basketball, live: the court with the latest play on it, and a running feed underneath ---------- */
 // A short headline for each play, the way a courtside graphic would put it.
 export function playHead(p, L) {
+  if (L.sport !== 'basketball') return p.type || (p.scoring ? 'Score' : 'Play');
   const t = `${p.type} ${p.text}`;
   if (p.scoring && p.pts) return `+${p.pts} Point${p.pts > 1 ? 's' : ''}`;
   if (p.shot) return /free throw/i.test(t) ? 'Missed Free Throw' : /three point/i.test(t) ? 'Missed Three' : 'Missed Shot';
@@ -1218,6 +1219,26 @@ export function playHead(p, L) {
 }
 const isSub = (p) => /substitution|subbing/i.test(`${p.type} ${p.text}`);
 
+// One play in a feed: team tile, headline, clock, the play, and the running score.
+function FeedRow({ p, game, L }) {
+  const sd = p.teamId === game.away.id ? 'away' : p.teamId === game.home.id ? 'home' : null, t = sd ? game[sd] : null;
+  const dk = chartColors(game.away, game.home);
+  return (
+    <div className={'fitem' + (p.scoring ? ' score' : '')} style={{ '--tc': sd ? dk[sd].main : 'var(--rule)' }}>
+      {t ? <Blob team={t} size={26} /> : <span className="noteam" aria-hidden="true" />}
+      <span className="body">
+        <span className="hd"><b>{playHead(p, L)}</b><small>{p.period ? perName(L, p.period) : ''}{p.clock ? ` · ${p.clock}` : ''}</small></span>
+        <span className="tx">{p.text}</span>
+      </span>
+      {Number.isFinite(p.away) && Number.isFinite(p.home) ? (
+        <span className="rs" aria-label={`${game.away.abbr} ${p.away}, ${game.home.abbr} ${p.home}`}>
+          <span className={p.scoring && sd === 'away' ? 'hot' : undefined}>{p.away}</span>
+          <span className={p.scoring && sd === 'home' ? 'hot' : undefined}>{p.home}</span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
 function LiveCourt({ pbp, game, L, lg, onAll }) {
   const { K, W, H, place } = courtGeom(lg);
   const cc = chartColors(game.away, game.home, true), dk = chartColors(game.away, game.home);
@@ -1271,26 +1292,10 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
               </>,
             }}
           </Hardwood>
-        </div>
-      </section>
-      <section className="sec">
-        <H2>Play by Play</H2>
-        <div className="card feed">
-          {shown.map((p, i) => { const t = teamOf(p.teamId); return (
-            <div className={'fitem' + (p.scoring ? ' score' : '')} key={p.id || i} style={{ '--tc': t ? dk[side(p.teamId)].main : 'var(--rule)' }}>
-              {t ? <Blob team={t} size={26} /> : <span className="noteam" aria-hidden="true" />}
-              <span className="body">
-                <span className="hd"><b>{playHead(p, L)}</b><small>{p.period ? perName(L, p.period) : ''} · {p.clock}</small></span>
-                <span className="tx">{p.text}</span>
-              </span>
-              {Number.isFinite(p.away) && Number.isFinite(p.home) ? (
-                <span className="rs" aria-label={`${game.away.abbr} ${p.away}, ${game.home.abbr} ${p.home}`}>
-                  <span className={p.scoring && side(p.teamId) === 'away' ? 'hot' : undefined}>{p.away}</span>
-                  <span className={p.scoring && side(p.teamId) === 'home' ? 'hot' : undefined}>{p.home}</span>
-                </span>
-              ) : null}
-            </div>); })}
-          {onAll ? <button className="more" onClick={onAll}>Full Play by Play ›</button> : null}
+          <div className="feed inl">
+            {shown.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />)}
+            {onAll ? <button className="more" onClick={onAll}>Full Play by Play ›</button> : null}
+          </div>
         </div>
       </section>
     </>
@@ -1435,13 +1440,8 @@ function PlayByPlay({ pbp, game, L }) {
       {show ? (
         <>
           {periods.length > 1 ? <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>{periods.map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{label(p)}</button>)}</div> : null}
-          <div className="card pad">
-            {rows.map((p, i) => { const t = team(p.teamId); return (
-              <div className="prow" key={i}>
-                {t ? <Blob team={t} /> : <span style={{ width: 28, flex: 'none' }} />}
-                <span className="txt" style={p.scoring ? { fontWeight: 800 } : { color: 'var(--soft)' }}>{p.text}</span>
-                <span className="sc">{p.scoring && Number.isFinite(p.away) && Number.isFinite(p.home) ? <span style={{ color: 'var(--yellow)' }}>{p.away}-{p.home}</span> : ''}<small>{p.clock}</small></span>
-              </div>); })}
+          <div className="card feed">
+            {rows.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />)}
           </div>
         </>
       ) : null}
