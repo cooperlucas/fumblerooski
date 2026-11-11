@@ -1515,7 +1515,22 @@ export function fieldMoment(p) {
   return { kind: '' };
 }
 
-export function normDrives(drives, awayId, homeId, live) {
+// Where a touchback puts the ball, as yards to the end zone, by league and season. Only a fallback: the feed's own drive start wins.
+export function touchbackSpot(lg, season, kind) {
+  if (kind === 'punt') return 80; // both levels: the 20
+  if (lg === 'nfl') return season >= 2025 ? 65 : season === 2024 ? 70 : season >= 2016 ? 75 : 80;
+  return season >= 2012 || !season ? 75 : 80; // college: the 25 since 2012
+}
+// A drive's start text ("SMU 25", "50") as yards to the end zone for the drive's team.
+export function spotToEnd(text, abbr) {
+  const m = /^\s*([A-Za-z&.' -]*?)\s*(\d{1,2})\s*$/.exec(String(text || ''));
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (n === 50 || !m[1]) return n === 50 ? 50 : null;
+  return m[1].trim().toUpperCase() === String(abbr || '').toUpperCase() ? 100 - n : n;
+}
+
+export function normDrives(drives, awayId, homeId, live, opts = {}) {
   const list = [...(drives?.previous || [])];
   const cur = drives?.current;
   if (cur && !list.some((d) => String(d.id) === String(cur.id))) list.push(cur);
@@ -1538,7 +1553,12 @@ export function normDrives(drives, awayId, homeId, live) {
     const result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
     const kind = d.isScore === true && /touchdown|\btd\b/i.test(result) ? 'td' : d.isScore === true && /field goal|\bfg\b/i.test(result) ? 'fg'
       : /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true ? 'turnover' : 'other';
-    const from = num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
+    // A drive that opens on the other team's kick starts where the kick ended. The feed's drive start text says where;
+    // the kick play's own spots are the kicking team's.
+    const kickOpen = !!first && /kickoff|\bpunts?\b/i.test(`${first.type?.text || ''} ${first.text || ''}`) && String(first.start?.team?.id ?? teamId) !== teamId;
+    const tb = kickOpen && /touchback/i.test(first.text || '') ? touchbackSpot(opts.lg, opts.season, /kickoff/i.test(`${first.type?.text || ''} ${first.text || ''}`) ? 'kickoff' : 'punt') : null;
+    const startToEnd = spotToEnd(d.start?.text, d.team?.abbreviation) ?? tb;
+    const from = kickOpen && startToEnd != null ? startToEnd : num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
     // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
     // after a punt or field goal it is where the ball landed, not where the offense got to.
     const gained = num(d.yards) ?? num((String(d.description || '').match(/(-?\d+)\s+yards?/i) || [])[1]);
@@ -1550,7 +1570,7 @@ export function normDrives(drives, awayId, homeId, live) {
       result, kind, isScore: d.isScore === true, turnover: kind === 'turnover',
       summary: cleanText(d.description || ''),
       period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
-      startText: cleanText(d.start?.text || ''),
+      startText: cleanText(d.start?.text || ''), startToEnd: kickOpen ? from : null,
       x0: pos(from), x1: pos(to),
       plays,
       live: !!live && !!cur && String(d.id) === String(cur.id),
@@ -1874,7 +1894,7 @@ export function gameFromSummary(lg, id, data) {
     box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus, L.sport === 'football' && data.drives ? forcedFumbles(data.drives) : null),
     plays,
     chart: started ? scoreSeries(game, timeline, L) : null,
-    drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live') : [],
+    drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live', { lg, season: game.season }) : [],
     shots: L.sport === 'basketball' ? normShots(data.plays) : [],
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
     rink: L.sport === 'hockey' && game.state === 'live' ? rinkState(data, game.away.id, game.home.id) : null,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries } from '../src/data/espn.js';
+import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries, touchbackSpot, spotToEnd } from '../src/data/espn.js';
 import { LEAGUE } from '../src/data/leagues.js';
 import { demoFetch } from '../src/data/fixtures.js';
 import { scrub, isBetting, cleanText } from '../src/data/guard.js';
@@ -460,4 +460,15 @@ test('rankCupGroup uses record, then head-to-head, then point differential', asy
   // three-way tie at 1-1 that head-to-head cannot split (each beat one): point differential decides
   const loop = [g('X', 100, 'Y', 90), g('Y', 100, 'Z', 80), g('Z', 101, 'X', 100)];
   assert.deepEqual(rankCupGroup(['X', 'Y', 'Z'], loop).map((x) => x.id), ['Y', 'X', 'Z']);
+});
+
+test('touchback spots by league and year', () => {
+  assert.equal(touchbackSpot('cfb', 2024, 'kickoff') ,75);
+  assert.equal(touchbackSpot('nfl', 2023, 'kickoff') ,75);
+  assert.equal(touchbackSpot('nfl', 2024, 'kickoff') ,70);
+  assert.equal(touchbackSpot('nfl', 2025, 'kickoff') ,65);
+  assert.equal(touchbackSpot('nfl', 2025, 'punt') ,80);
+  assert.equal(spotToEnd('SMU 25', 'SMU') ,75);
+  assert.equal(spotToEnd('LOU 40', 'SMU') ,40);
+  assert.equal(spotToEnd('50', 'SMU') ,50);
 });

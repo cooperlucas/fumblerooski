@@ -1114,7 +1114,7 @@ function LiveField({ drives, game, onAll }) {
   const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
   const puntBack0 = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
   // A muffed punt the kicking team recovers is a new drive: it starts at the recovery spot, with nothing drawn back to the old one.
-  const start = puntBack0 ? last.to : steps[0]?.from ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
+  const start = puntBack0 ? last.to : steps[0]?.from ?? d.startToEnd ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
   const lastKept = [...steps].reverse()[0];
   // A punt the kicking team got back (a muff) moves the ball to where they recovered it.
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
@@ -1232,7 +1232,7 @@ function LiveField({ drives, game, onAll }) {
           {going ? (
             <div className="lfdown">
               <span><small>Down</small><b>{ord(last.nextDown)} &amp; {at != null && last.nextDist >= at ? 'Goal' : last.nextDist}</b></span>
-              <span><small>Ball on</small><b>{last.spot || '·'}</b></span>
+              <span><small>Ball on</small><b>{(!steps.length && d.startToEnd != null && d.startText) || last.spot || '·'}</b></span>
             </div>
           ) : null}
           <svg viewBox={`-18 0 ${FW + 36} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
