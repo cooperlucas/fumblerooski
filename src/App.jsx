@@ -1132,7 +1132,7 @@ function LiveField({ drives, game, onAll }) {
   const retYds = defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
   const retFrom = retYds != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retYds)) : null;
   const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? retFrom : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
-  const going = d.live && last?.kept && last.nextDown > 0;
+  const going = d.live && last?.kept && last.nextDown > 0 && !(m0.kind === 'punt' && m0.blocked && last.mine);
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
   const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
@@ -1194,18 +1194,22 @@ function LiveField({ drives, game, onAll }) {
     else if (m.miss === 'short') { end = [P.x - s * 26, mid + 2]; peak = ly - 26; opts = {}; }
     else if (m.miss === 'blocked') { end = [x0 + s * 16, ly - 4]; peak = ly - 20; opts = { bounce: [-s * 10, 6] }; }
     show = <g key={'fg' + lastKey} className="fshow">{flight('k', x0, ly, end[0], end[1], peak, opts)}</g>;
-  } else if (last && (m.kind === 'punt' || m.kind === 'kickoff') && last.from != null && (m.yards || m.touchback)) {
+  } else if (last && (m.kind === 'punt' || m.kind === 'kickoff') && last.from != null && (m.yards || m.touchback || m.blocked)) {
     // Punts and kickoffs: a high arc to where the ball came down, then the return as a line back.
+    // A blocked punt pops off the block and skitters to where it ended up, forward or back.
     const side = last.mine ? d.side : other, sgn = side === 'away' ? 1 : -1;
-    const land = m.touchback && !m.yards ? -4 : last.from - (m.yards || 0);
+    const bYds = m.blocked ? (Number.isFinite(last.yards) ? last.yards : last.endRaw != null ? last.from - last.endRaw : 0) : 0;
+    const land = m.blocked ? last.from - bYds : m.touchback && !m.yards ? -4 : last.from - (m.yards || 0);
     const x0 = Xs(side, last.from), x1 = Xs(side, Math.max(-6, land));
     // The feed counts the end spot from whoever has the ball after the play: the kicking team on a muff they recover.
     const endIsKicker = last.mine ? last.kept : !last.kept;
-    const fin = !m.touchback && last.endRaw != null ? (endIsKicker ? last.endRaw : 100 - last.endRaw) : null;
+    const fin = !m.touchback && !m.blocked && last.endRaw != null ? (endIsKicker ? last.endRaw : 100 - last.endRaw) : null;
     const ret = fin != null && Math.abs(fin - land) >= 3 && Math.abs(fin - land) < 100 ? Xs(side, Math.max(0, Math.min(100, fin))) : null;
     show = (
       <g key={'kick' + lastKey} className="fshow">
-        {flight('k', x0, ly, x1, ly, ly - Math.min(58, 18 + Math.abs(x1 - x0) * 0.22), {})}
+        {m.blocked
+          ? <>{flight('k', x0, ly, x1, ly, ly - Math.min(26, 10 + Math.abs(x1 - x0) * 0.12), { bounce: [(x1 >= x0 ? 1 : -1) * 6, 0] })}<text className="ktag" x={x0} y={ly - 14} textAnchor="middle">BLOCK</text></>
+          : flight('k', x0, ly, x1, ly, ly - Math.min(58, 18 + Math.abs(x1 - x0) * 0.22), {})}
         {ret != null ? [['#fff', 5.5], [cc[side === 'away' ? 'home' : 'away'].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${x1} ${ly} H${ret}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': ret < x1 ? '0 0 0 100%' : '0 100% 0 0' }} />) : null}
         {m.touchback ? <text className="ktag" x={x1 + sgn * 2} y={ly - 12} textAnchor="middle">TB</text> : null}
       </g>);
