@@ -1,5 +1,5 @@
 // Shared pieces every screen uses: team chips, game rows, headers, loading and error states.
-import React from 'react';
+import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { LEAGUE } from './data/leagues.js';
 import { isDemo, setDemo, demoLocked } from './data/store.js';
 import { liveColor } from './data/espn.js';
@@ -83,10 +83,25 @@ const coreBowl = (name) => {
   const hit = BOWLS.find((b) => new RegExp(`(^|\\s)${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+Bowl$`, 'i').test(n));
   return hit ? `${hit} Bowl` : n;
 };
+// An event label (all caps, letter-spaced) that tightens, then shrinks, to fit its line before it ever cuts off.
+export function GameNote({ text }) {
+  const ref = useRef(null);
+  const steps = [[10, 0.08], [10, 0.04], [9.5, 0.02], [9, 0.02], [8.5, 0.01], [8, 0]];
+  const [i, setI] = useState(0);
+  useLayoutEffect(() => { setI(0); }, [text]);
+  useEffect(() => { const again = () => setI(0); window.addEventListener('resize', again); document.fonts?.ready?.then(again); return () => window.removeEventListener('resize', again); }, []);
+  useLayoutEffect(() => { const el = ref.current; if (el && el.scrollWidth > el.clientWidth + 1 && i < steps.length - 1) setI(i + 1); });
+  return <span ref={ref} className="gnote" style={{ fontSize: steps[i][0], letterSpacing: `${steps[i][1]}em` }}>{text}</span>;
+}
 export function shortEvent(note) {
   let n = String(note || '').replace(/\s+-\s+Rescheduled.*$/i, '').replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '').trim();
   n = n.replace(/College Football Playoff/gi, 'CFP').replace(/NCAA (Men's|Women's) Basketball Championship/i, 'NCAA Tournament')
     .replace(/\bNational Championship\b/i, 'Title Game').replace(/\s+Region\b/i, '').replace(/\bFirst Round\b/i, '1st Round').replace(/\bSecond Round\b/i, '2nd Round');
+  // Conference title games: the short names everyone uses.
+  n = n.replace(/\bAmerican Athletic( Conference)?\b/i, 'AAC').replace(/\bConference USA\b/i, 'CUSA').replace(/\bMid-American( Conference)?\b/i, 'MAC')
+    .replace(/\bMountain West( Conference)?\b/i, 'MW').replace(/\bAtlantic Coast Conference\b/i, 'ACC').replace(/\bSoutheastern Conference\b/i, 'SEC')
+    .replace(/\b(ACC|SEC|AAC|MAC|MW|CUSA|Big Ten|Big 12|Sun Belt|Pac-12) Football Championship( Game)?\b/i, '$1 Championship')
+    .replace(/\b(ACC|SEC|AAC|MAC|MW|CUSA|Big Ten|Big 12|Sun Belt|Pac-12) Championship Game\b/i, '$1 Championship');
   const at = /^(.*?)\s+at the\s+(.+)$/i.exec(n); // "CFP Quarterfinal at the Allstate Sugar Bowl"
   if (at) return `${at[1]} · ${coreBowl(at[2])}`;
   if (/\bBowl(\s+Classic)?$/i.test(n)) return coreBowl(n);
@@ -134,7 +149,7 @@ export function GameRow({ g, showLg = true }) {
   return (
     <button className="grow" onClick={() => go(`game/${g.lg}/${g.id}`)}
       aria-label={`${g.away.name} ${pre ? 'at' : g.away.score + ','} ${g.home.name}${pre ? '' : ' ' + g.home.score}, ${label}`}>
-      <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
+      <span className="sides">{g.note ? <GameNote text={shortEvent(g.note)} /> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className={'stat' + (pre ? ' pre' : '')} style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
         {/* A game on another day shows its date up top; the start time goes under it when it is set. */}
