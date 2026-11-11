@@ -373,7 +373,7 @@ function CupGroups({ cup, lg, focus }) {
           ))}
         </div>
       ))}
-      <p className="cupnote">Ties go to head-to-head, then point differential, then points scored. Group numbers are ours: ESPN's feed does not name the groups.</p>
+      <p className="cupnote">Ties go to head-to-head, then point differential, then points scored.</p>
     </>
   );
 }
@@ -1102,11 +1102,13 @@ function LiveField({ drives, game, onAll }) {
   const X = (toEnd) => Xs(d.side, toEnd);
   const other = d.side === 'away' ? 'home' : 'away';
   const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
-  const start = steps[0]?.from ?? null;
+  const start = steps[0]?.from ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
   const lastKept = [...steps].reverse()[0];
   // A punt the kicking team got back (a muff) moves the ball to where they recovered it.
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
-  const at = d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
+  // A defensive or return touchdown (pick six, scoop and score) ends in the drive team's own end zone.
+  const defTd = !!last && /touchdown|\bfor a td\b/i.test(`${last.type} ${last.text}`) && !last.kept;
+  const at = defTd ? 100 : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
@@ -1123,7 +1125,7 @@ function LiveField({ drives, game, onAll }) {
   const pts = scorer ? gain[scorer] : 0;
   const scoreT = scorer ? game[scorer] : t;
   const call = !last ? null
-    : m.kind === 'td' ? { text: `${scoreT.abbr} ${pts ? `+${pts} · ` : ''}Touchdown`, team: scoreT, hot: true }
+    : m.kind === 'td' ? { text: `${scoreT.abbr} ${pts ? `+${pts} · ` : ''}${m.how || 'Touchdown'}`, team: scoreT, hot: true }
       : m.kind === 'fg' && m.good ? { text: `${t.abbr} +3 · Field Goal`, team: t, hot: true }
         : m.kind === 'fg' ? { text: m.miss === 'blocked' ? 'Field Goal Blocked' : `No Good${m.label ? ` · ${m.label}` : ''}`, team: t, bad: true }
           : m.kind === 'safety' ? { text: `${scoreT.abbr} +2 · Safety`, team: scoreT, hot: true }
@@ -1193,7 +1195,8 @@ function LiveField({ drives, game, onAll }) {
   let stamp = null;
   if (last && m.kind === 'td') {
     const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
-    stamp = { text: 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
+    stamp = { text: m.how === 'Pick Six' ? 'PICK SIX!' : m.how === 'Scoop & Score' ? 'SCOOP & SCORE!' : 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
+    if (defTd) turned = true; // the ball changed hands on the way to the end zone
     if (m.two === 'good') glowSide = zone; // a two-point try that works lights the end zone
   } else if (last && m.kind === 'turnover') { stamp = { text: 'TURNOVER', color: brighten(cc[other].main, 0.25), x: 60 * K }; turned = true; }
   else if (last && m.kind === 'safety') stamp = { text: 'SAFETY', color: GOLD, x: 60 * K };
@@ -1265,7 +1268,7 @@ function LiveField({ drives, game, onAll }) {
                   return <rect key={i} className="kconf" x="-3.5" y="-3.5" width="7" height="7" rx="1.5" fill={[stamp.confetti[1], GOLD, '#fff', '#2ED9D9'][i % 4]} stroke={INK} strokeWidth="0.6"
                     style={{ '--cx': `${stamp.confetti[0]}px`, '--cy': `${mid}px`, '--dx': `${Math.cos(a2) * r}px`, '--dy': `${Math.sin(a2) * r * 0.9}px`, animationDelay: `${(i % 5) * 0.05}s` }} />;
                 }) : null}
-                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color}>{stamp.text}</text></g>
+                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color} style={stamp.text.length > 11 ? { fontSize: 24 } : undefined}>{stamp.text}</text></g>
               </g>) : null}
           </svg>
           {last ? (

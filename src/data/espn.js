@@ -283,6 +283,13 @@ export function rankCupGroup(ids, games) {
     return tied.length < 2 ? tied : [...tied].sort((a, b) => h2h(b.id, ids2) - h2h(a.id, ids2) || b.pd - a.pd || b.pf - a.pf);
   });
 }
+// Official NBA Cup groups by year (from the NBA's announcement); keys are conference + letter.
+const CUP_GROUPS = {
+  2026: {
+    EastA: ['DET', 'TOR', 'ORL', 'MIL', 'BKN'], EastB: ['NY', 'CLE', 'PHI', 'MIA', 'IND'], EastC: ['BOS', 'ATL', 'CHA', 'CHI', 'WSH'],
+    WestA: ['DEN', 'HOU', 'PHX', 'DAL', 'UTAH'], WestB: ['OKC', 'MIN', 'LAC', 'NO', 'MEM'], WestC: ['SA', 'LAL', 'POR', 'GS', 'SAC'],
+  },
+};
 // The whole Cup group stage: six groups of five, from the season's group games. Null when there are none.
 export async function getNbaCup() {
   const lg = 'nba';
@@ -326,8 +333,13 @@ export async function getNbaCup() {
   // Stable order: East then West, groups by their alphabetically first team.
   const first = (g) => [...g.rows.map((r) => r.team.name)].sort()[0];
   out.sort((a, b) => (a.conf === b.conf ? first(a).localeCompare(first(b)) : a.conf === 'East' ? -1 : 1));
+  // The official group letters (the feed does not carry them), by Cup year. A year not listed gets numbers instead.
+  const letters = CUP_GROUPS[y0];
+  const letterOf = (g) => { const abbrs = new Set(g.rows.map((r) => String(r.team.abbr).toUpperCase())); return letters ? Object.keys(letters).find((k) => letters[k].some((a) => abbrs.has(a))) : null; };
+  out.forEach((g) => { g.letter = letterOf(g); });
+  if (out.every((g) => g.letter)) out.sort((a, b) => (a.conf === b.conf ? a.letter.localeCompare(b.letter) : a.conf === 'East' ? -1 : 1));
   const n = {};
-  out.forEach((g) => { n[g.conf] = (n[g.conf] || 0) + 1; g.name = `${g.conf ? g.conf + ' · ' : ''}Group ${n[g.conf]}`; });
+  out.forEach((g) => { n[g.conf] = (n[g.conf] || 0) + 1; g.name = `${g.conf ? g.conf + ' · ' : ''}Group ${g.letter ? g.letter.slice(-1) : n[g.conf]}`; });
   // Who is in line for the knockout round: each group's leader, plus the best second-place team in each conference.
   out.forEach((g) => { if (g.rows[0]?.w + g.rows[0]?.l > 0) g.rows[0].tag = 'lead'; });
   ['East', 'West'].forEach((c) => {
@@ -1477,7 +1489,10 @@ export function fieldMoment(p) {
   }
   if (/touchdown/i.test(both) || /\bfor a TD\b/i.test(text)) {
     const two = /two-point|2-pt|2 pt/i.test(text) ? (/fail|incomplete|no good/i.test(text.slice(text.search(/two-point|2-pt|2 pt/i))) ? 'failed' : 'good') : '';
-    return { kind: 'td', two, turnover: /intercept|fumble/i.test(both), ret: /return|recover|block/i.test(type) };
+    // Touchdowns the other side scored on the play: pick six, scoop and score, return touchdowns.
+    const how = /intercept/i.test(both) ? 'Pick Six' : /fumble/i.test(both) && !/fumble recovery \(own\)/i.test(type) ? 'Scoop & Score'
+      : /blocked/i.test(both) ? 'Blocked Kick TD' : /punt/i.test(both) && /return/i.test(both) ? 'Punt Return TD' : /kickoff/i.test(both) && /return/i.test(both) ? 'Kick Return TD' : '';
+    return { kind: 'td', two, turnover: /intercept|fumble/i.test(both), ret: /return|recover|block/i.test(type), how };
   }
   if (/safety/i.test(type)) return { kind: 'safety' };
   const lost = /intercept/i.test(type) ? 'Interception' : /fumble recovery \(opponent\)|opp fumble recovery|muffed punt recovery \(opponent\)/i.test(type) ? 'Fumble' : '';
