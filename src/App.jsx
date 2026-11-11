@@ -713,11 +713,10 @@ function TeamPage({ lg, id, season }) {
         {q.loading && !q.data ? <Loading rows={6} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : (
           <>
             <div className="teamhero" style={{ background: `linear-gradient(rgba(12,17,36,.3), rgba(12,17,36,.55)), ${t.color}` }}>
-              <Blob team={t} size={58} radius={16} />
+              {/* The rank rides on the logo as a gold tag, so the full name keeps its line to itself. */}
+              <span className="hlogo"><Blob team={t} size={58} radius={16} />{!isPast && topRank ? <b className="hrk" aria-label={`Ranked ${topRank}`}>{topRank}</b> : null}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Colleges read as school, then nickname on its own line ("Illinois" / "Fighting Illini"), with the rank in front. */}
-                {(() => { const rk = !isPast && topRank; const nick = t.full.startsWith(t.name + ' ') ? t.full.slice(t.name.length + 1) : '';
-                  return <h2>{rk ? <span className="hrk">{topRank}</span> : null}{nick ? t.name : t.full}{nick ? <span className="hnick">{nick}</span> : null}</h2>; })()}
+                <h2>{t.full}</h2>
                 <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
                 {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
