@@ -1147,8 +1147,8 @@ function LiveField({ drives, game, onAll }) {
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
   const post = (s) => { // s: 1 = right end, -1 = left end
     // Like a real one: the post stands just behind the end line and the gooseneck leans the uprights out over it.
-    const x = s > 0 ? FW : 0, bx = x + s * 10, cy = mid - 14;
-    const N = [x - s * 4.5, cy + 12], F = [x + s * 4.5, cy - 12], H = 34;
+    const x = s > 0 ? FW : 0, bx = x + s * 5, cy = mid - 14;
+    const N = [x - s * 3.5, cy + 11], F = [x + s * 3.5, cy - 11], H = 34;
     return { s, x, base: [bx, mid + 10], c: [x, cy], N, F, H, gap: [x, cy - 17] };
   };
   const posts = [post(-1), post(1)];
@@ -1229,7 +1229,7 @@ function LiveField({ drives, game, onAll }) {
               <span><small>Ball on</small><b>{last.spot || '·'}</b></span>
             </div>
           ) : null}
-          <svg viewBox={`-16 0 ${FW + 32} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
+          <svg viewBox={`-10 0 ${FW + 20} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
             {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
             <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
             <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
@@ -1244,7 +1244,7 @@ function LiveField({ drives, game, onAll }) {
             {posts.map((P) => (
               <g key={P.s}>
                 <ellipse cx={P.base[0]} cy={P.base[1] + 1} rx="9" ry="3" fill="#0C1124" opacity="0.3" />
-                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1] + 12} Q${P.base[0]} ${P.c[1]} ${P.c[0]} ${P.c[1]}`, 3.4)}
+                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1] + 7} Q${P.base[0]} ${P.c[1]} ${P.c[0]} ${P.c[1]}`, 3.4)}
                 {bar(`M${P.F[0]} ${P.F[1]} V${P.F[1] - P.H}`, 2.6)}
                 {bar(`M${P.N[0]} ${P.N[1]} L${P.F[0]} ${P.F[1]}`, 3.2)}
               </g>))}
