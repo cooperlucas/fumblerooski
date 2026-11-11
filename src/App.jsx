@@ -1910,6 +1910,7 @@ function GamePage({ lg, id, feed, replayBar }) {
   const q = feed ? { data: feed, loading: false, error: null } : q0;
   const d = q.data, g = d?.game;
   const title = g ? `${replayBar ? 'Replay: ' : ''}${g.away.abbr} at ${g.home.abbr}` : L.name;
+  const pair = usePairFit(g ? [g.away.name, g.home.name] : []);
   const started = g && (g.state === 'live' || g.state === 'final');
   const periods = g ? Math.max(g.home.lines.length, g.away.lines.length, g.state === 'live' ? (L.periods || 4) : 0) : 0;
   const [picked, setTab] = useSticky('tab', 'summary');
@@ -1943,7 +1944,7 @@ function GamePage({ lg, id, feed, replayBar }) {
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}${g.season ? '/' + g.season : ''}`)} aria-label={`Open ${t.full}`}>
                     <span style={{ borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>
-                    <FitName text={t.name} />
+                    <span ref={i === 0 ? pair.a : pair.b} className="nm" style={pair.style}>{t.name}</span>
                     <span className="rc">{t.rank ? <b className="brk">{t.rank}</b> : null}{t.rank && t.record ? ' · ' : ''}{t.record}</span>
                   </button>
                 ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
@@ -2030,30 +2031,31 @@ function GamePage({ lg, id, feed, replayBar }) {
 }
 
 // A team name under the scoreboard logo: narrows, then shrinks, until the whole name fits ("Kentucky", not "Kentuc...").
-function FitName({ text }) {
-  const ref = useRef(null);
-  const steps = [[14, '112%'], [13, '100%'], [12, '100%'], [12, '87.5%'], [11, '87.5%'], [12, '100%', true]]; // last resort: two lines
+// Both team names on the game header share one size. They wrap to a second line before anything shrinks,
+// and they shrink together only when a single word is too long for its column (or a name needs a third line).
+function usePairFit(names) {
+  const a = useRef(null), b = useRef(null);
+  const steps = [[14, '112%'], [13, '100%'], [12, '100%'], [11, '87.5%']];
   const [i, setI] = useState(0);
   const [, redo] = useState(0);
-  useLayoutEffect(() => { setI(0); }, [text]);
-  // The web font can land after the first check and make the name wider: check again then, and on rotate.
+  const key = names.join('|');
+  useLayoutEffect(() => { setI(0); }, [key]);
   useEffect(() => {
     const again = () => { setI(0); redo((n) => n + 1); };
-    let live = true;
+    let live = true, w = 0;
     document.fonts?.ready?.then(() => { if (live) again(); });
     window.addEventListener('resize', again);
-    // The room it has changes too: a live score in the middle gets wider and squeezes the team columns.
-    let w = 0;
-    const box = ref.current?.parentElement;
+    const box = a.current?.parentElement;
     const ro = box && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(([e]) => { const nw = Math.round(e.contentRect.width); if (w && nw !== w) again(); w = nw; }) : null;
     if (ro) ro.observe(box);
     return () => { live = false; window.removeEventListener('resize', again); ro?.disconnect(); };
-  }, []);
+  }, [key]);
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (el && i < steps.length - 1 && overflows(el)) setI(i + 1);
+    if (i >= steps.length - 1) return;
+    const tooBig = (el) => el && (overflows(el, 0) || el.getBoundingClientRect().height > steps[i][0] * 1.12 * 2 + 3);
+    if (tooBig(a.current) || tooBig(b.current)) setI(i + 1);
   });
-  return <span ref={ref} className="nm" style={{ fontSize: steps[i][0], fontStretch: steps[i][1], ...(steps[i][2] ? { whiteSpace: 'normal', lineHeight: 1.1 } : {}) }}>{text}</span>;
+  return { a, b, style: { fontSize: steps[i][0], fontStretch: steps[i][1], whiteSpace: 'normal', lineHeight: 1.12, overflowWrap: 'normal', textOverflow: 'clip' } };
 }
 
 /* ---------- Before the game: how the two teams stack up ---------- */
