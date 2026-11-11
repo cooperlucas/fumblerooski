@@ -1358,6 +1358,60 @@ export function IceChart({ ice, game }) {
   );
 }
 
+/* ---------- hockey, live: bright ice with the latest shot on it, and the newest plays underneath ---------- */
+function LiveRink({ ice, pbp, game, L, onAll }) {
+  const cc = chartColors(game.away, game.home, true);
+  const K = 3, W = 200 * K, H = 85 * K;
+  const X = (v) => (Math.max(-98, Math.min(98, v)) + 100) * K, Y = (v) => (42.5 - Math.max(-40.5, Math.min(40.5, v))) * K;
+  const recent = [...pbp].reverse();
+  const now = recent[0], last = ice[ice.length - 1];
+  const sideOf = (id) => (id === game.away.id ? 'away' : id === game.home.id ? 'home' : null);
+  const [flash, setFlash] = useState(true);
+  useEffect(() => { setFlash(true); const h = setTimeout(() => setFlash(false), 6000); return () => clearTimeout(h); }, [now?.id, pbp.length]);
+  const sog = (t) => ice.filter((s) => s.teamId === t.id && s.kind !== 'miss').length;
+  const nowT = now && sideOf(now.teamId) ? game[sideOf(now.teamId)] : null;
+  const head = now ? playHead(now, L) : '';
+  const lc = last ? cc[sideOf(last.teamId)].main : null;
+  const dots = [31, 169].flatMap((x) => [20.5, 64.5].map((y) => [x * K, y * K]));
+  return (
+    <section className="sec">
+      <div className="card livecourt">
+        <div className={'lcall' + (flash && now?.scoring ? ' hot' : flash && /penalty/i.test(head) ? ' bad' : '')} key={flash ? 'p' + pbp.length : 'sog'} role="status">
+          {flash && now ? <>{nowT ? <Blob team={nowT} size={22} /> : null}<b>{head}</b></> : <b>Shots · {game.away.abbr} {sog(game.away)} · {game.home.abbr} {sog(game.home)}</b>}
+        </div>
+        <div className="lchead">
+          <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ▸</small></span>
+          <span><small>◂ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
+        </div>
+        <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="court full" role="img" aria-label={last ? `Latest shot: ${last.text}` : 'Rink'}>
+          <rect x="0" y="0" width={W} height={H} rx={28 * K} fill="#F4FAFF" stroke="#1B2350" strokeWidth="3" />
+          <path d={`M${11 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 1 0 ${8 * K} Z`} fill={cc.home.main} opacity="0.5" />
+          <path d={`M${189 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 0 0 ${8 * K} Z`} fill={cc.away.main} opacity="0.5" />
+          <path d={`M${100 * K} 0 V${H}`} stroke="#E0263C" strokeWidth="4" />
+          <path d={`M${75 * K} 0 V${H} M${125 * K} 0 V${H}`} stroke="#2A5BD7" strokeWidth="5" />
+          <path d={`M${11 * K} ${5 * K} V${H - 5 * K} M${189 * K} ${5 * K} V${H - 5 * K}`} stroke="#E0263C" strokeWidth="1.6" />
+          <circle cx={100 * K} cy={H / 2} r={15 * K} fill="#F4FAFF" stroke="#2A5BD7" strokeWidth="2" />
+          <text x={100 * K} y={H / 2 + 7} textAnchor="middle" className="ccode" style={{ fontSize: 20 }} fill={cc.home.main}>{game.neutral ? '' : game.home.abbr}</text>
+          {dots.map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r={15 * K} fill="none" stroke="#E0263C" strokeWidth="1.6" opacity="0.7" /><circle cx={x} cy={y} r="3" fill="#E0263C" /></g>)}
+          <path d={`M${11 * K - 9} ${H / 2 - 9} H${11 * K} V${H / 2 + 9} H${11 * K - 9} Z M${189 * K + 9} ${H / 2 - 9} H${189 * K} V${H / 2 + 9} H${189 * K + 9} Z`} fill="none" stroke="#1B2350" strokeWidth="2" />
+          {last ? (
+            <g key={ice.length} className="pop">
+              {last.kind === 'goal'
+                ? <><rect x={X(last.x) - 11} y={Y(last.y) - 11} width="22" height="22" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2.4" transform={`rotate(45 ${X(last.x)} ${Y(last.y)})`} /><circle cx={X(last.x)} cy={Y(last.y)} r="5" fill={lc} stroke="#0C1124" strokeWidth="1.6" /></>
+                : last.kind === 'save' ? <><circle cx={X(last.x)} cy={Y(last.y)} r="10" fill="#fff" stroke={lc} strokeWidth="4" /><circle cx={X(last.x)} cy={Y(last.y)} r="3.5" fill="#0C1124" /></>
+                : missed(X(last.x), Y(last.y), lc, 8, 4)}
+            </g>
+          ) : null}
+        </svg>
+        <div className="feed inl">
+          {recent.slice(0, 4).map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />)}
+          {onAll ? <button className="more" onClick={onAll}>Full Play by Play ›</button> : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- soccer: every shot on the pitch. Away attacks right, home attacks left. ---------- */
 const PITCH_KINDS = [['goal', 'Goal'], ['save', 'Saved'], ['miss', 'Off target'], ['block', 'Blocked'], ['post', 'Woodwork']];
 function PitchChart({ shots, game }) {
@@ -1548,6 +1602,7 @@ function GamePage({ lg, id }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
+                {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
