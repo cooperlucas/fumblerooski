@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
@@ -831,21 +831,28 @@ function PlayerPage({ lg, id }) {
   const d = q.data, p = d?.player;
   const color = p?.team?.color || '#2B3352';
   const career = d?.career || [];
+  // One season picker drives both the Season and Game Log tabs. '' = the latest season.
+  const [logYr, setLogYr] = useSticky('logyr', '');
+  const careerYears = [...new Set(career.flatMap((c) => c.rows.map((r) => r.year)).filter(Boolean))].sort((a, b) => b - a);
+  const years = d?.gamelog?.years?.length ? d.gamelog.years : careerYears.map((y) => ({ value: String(y), label: career.flatMap((c) => c.rows).find((r) => r.year === y)?.season || String(y) }));
+  const latest = d?.gamelog?.year || years[0]?.value || '';
+  const picked = logYr && logYr !== latest ? logYr : '';
   // The game log's bottom row is the feed's per-game averages, so plus-minus there is an average too.
-  // This season = each stat group's most recent row. Pro hoops adds plus-minus to the averages and totals.
+  // Season tab: each stat group's row for the picked year (latest by default). Hoops adds plus-minus to this season's averages and totals.
   const season = career.map((c) => {
-    const row = c.rows[c.rows.length - 1];
-    if (!row || !pm || pm.total == null || (pm.year && row.year && row.year !== pm.year) || !/^(averages|totals)$/.test(c.key)) return { ...c, row };
+    const row = picked ? c.rows.find((r) => String(r.year) === picked) : c.rows[c.rows.length - 1];
+    if (picked || !row || !pm || pm.total == null || (pm.year && row.year && row.year !== pm.year) || !/^(averages|totals)$/.test(c.key)) return { ...c, row };
     const gp = pm.n || Number(career.find((x) => x.key === 'averages')?.rows.at(-1)?.stats[0]) || Object.keys(pm.games).length;
     const v = c.key === 'totals' ? signed(pm.total) : gp ? signed(Math.round((pm.total / gp) * 10) / 10) : '';
     return { ...c, labels: [...c.labels, '+/-'], row: { ...row, stats: [...row.stats, v] } };
   }).filter((c) => c.row).filter((c, _, all) => {
-    // Only this season's tables: a QB's one tackle from 2023 is not part of his 2026.
+    // Only one season's tables: a QB's one tackle from 2023 is not part of his 2026.
     const top = Math.max(...all.map((x) => x.row.year || 0));
     return !top || !c.row.year || c.row.year === top;
   });
-  const log0 = d?.gamelog;
-  const pmOn = pm && Object.keys(pm.games).length && log0?.labels.length;
+  const lgq = useQuery(picked ? `gamelog:${lg}:${id}:${picked}` : null, () => getGamelog(lg, id, picked), () => 600000);
+  const log0 = picked ? (lgq.data || { labels: [], spans: [], seasons: [] }) : d?.gamelog;
+  const pmOn = !picked && pm && Object.keys(pm.games).length && log0?.labels.length;
   const log = !pmOn ? log0 : {
     labels: [...log0.labels, '+/-'],
     spans: log0.spans.length ? [...log0.spans, { title: '', count: 1 }] : [],
@@ -882,20 +889,26 @@ function PlayerPage({ lg, id }) {
               {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
             </div>
 
+            {(tab === 'season' || tab === 'log') && years.length > 1 ? (
+              <div className="filters" style={{ marginTop: 12 }}>
+                <Picker label="Season" value={picked || latest} onChange={(v) => setLogYr(v === latest ? '' : v)}>{years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}</Picker>
+              </div>
+            ) : null}
             {tab === 'season' ? (
               <>
-                {d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
+                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
                     <div className="ptitle">{c.row.season} {c.title}</div>
                     <div className="kv">{c.labels.map((l, i) => <div key={i}><span>{l}</span><b>{pct1(l, c.row.stats[i] ?? '')}</b></div>)}</div>
                   </div>
                 ))}
-                {!d.summary.items.length && !season.length ? <Empty>{d.missing.career ? 'Season stats did not load. Try again in a bit.' : 'No stats on record for this season.'}</Empty> : null}
+                {(picked || !d.summary.items.length) && !season.length ? <Empty>{d.missing.career ? 'Season stats did not load. Try again in a bit.' : 'No stats on record for this season.'}</Empty> : null}
               </>
             ) : null}
 
-            {tab === 'log' ? (
+
+            {tab === 'log' && picked && lgq.loading && !lgq.data ? <Loading rows={4} /> : tab === 'log' ? (
               log.seasons.length ? log.seasons.map((sn, si) => (
                 <div className="card pbox" key={sn.title + si} style={{ marginTop: 12 }}>
                   <table>

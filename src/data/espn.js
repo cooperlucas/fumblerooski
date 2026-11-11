@@ -621,7 +621,14 @@ function normGamelog(d) {
     const tot = st.summary?.stats?.find((x) => Array.isArray(x.stats))?.stats;
     return { title: shortTitle(st.displayName || ''), rows, totals: tot ? tot.map((v) => String(v ?? '')) : null };
   }).filter((x) => x.rows.length);
-  return { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons };
+  // The seasons the feed can show this player's games for, newest first (its own season filter).
+  const f = (d?.filters || []).find((x) => x.name === 'season');
+  const years = (f?.options || []).map((o) => ({ value: String(o.value), label: cleanText(o.displayValue || String(o.value)) }));
+  return { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons, years, year: f?.value ? String(f.value) : '' };
+}
+// One season of a player's game log.
+export async function getGamelog(lg, id, season) {
+  return normGamelog(await get(url(COMMON, lg, `/athletes/${encodeURIComponent(id)}/gamelog`, season ? { season: String(season) } : {})));
 }
 function normCareer(d) {
   return (d?.categories || []).map((c) => ({
