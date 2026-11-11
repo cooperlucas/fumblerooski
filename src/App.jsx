@@ -715,9 +715,11 @@ function TeamPage({ lg, id, season }) {
             <div className="teamhero" style={{ background: `linear-gradient(rgba(12,17,36,.3), rgba(12,17,36,.55)), ${t.color}` }}>
               <Blob team={t} size={58} radius={16} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h2>{t.full}</h2>
+                {/* Colleges read as school, then nickname on its own line ("Illinois" / "Fighting Illini"), with the rank in front. */}
+                {(() => { const rk = !isPast && topRank; const nick = t.full.startsWith(t.name + ' ') ? t.full.slice(t.name.length + 1) : '';
+                  return <h2>{rk ? <span className="hrk">{topRank}</span> : null}{nick ? t.name : t.full}{nick ? <span className="hnick">{nick}</span> : null}</h2>; })()}
                 <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{topRank ? <b>{topRank}</b> : null}{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div className="teambar">
