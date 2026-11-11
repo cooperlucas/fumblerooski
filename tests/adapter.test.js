@@ -373,7 +373,7 @@ test('college divisions: FBS by default, other divisions by group, missing ones 
   assert.equal((await getStandings('cfb', 'fcs')).groups[0].rows[0].team.name, 'N Dakota St'); // same conference record, better overall
   assert.equal((await getStandings('cfb', 'd3')).groups[0].name, 'CCIW');
   const lower = await getDivisionTeams('cfb');
-  assert.deepEqual(lower.map((t) => t.div), ['FCS', 'FCS', 'Division II', 'Division III', 'Division III']);
+  assert.deepEqual(lower.map((t) => t.div), ['FCS', 'FCS', 'D-II', 'D-III', 'D-III']);
   assert.equal((await getStandings('ncaam', 'd2')).groups.length >= 0, true); // hoops has no lower divisions: falls back to the default read
 });
 
