@@ -147,7 +147,7 @@ function Board({ games, pick, favSet, title }) {
   );
 }
 
-// The day's best games per league for Top Events: your teams, then live, then ranked matchups, then by start time.
+// The day's best games per league for Headliners: your teams, then live, then ranked matchups, then by start time.
 const RANKED = (g) => (g.away.rank ? 1 : 0) + (g.home.rank ? 1 : 0);
 function topOf(games, favSet, n) {
   const order = { live: 0, pre: 1, final: 2, off: 3 };
@@ -176,7 +176,7 @@ function Scores() {
   return (
     <>
       <div className="chips" role="group" aria-label="League">
-        <button className="chipb" aria-pressed={!pickL} onClick={() => setLg('top')}>Top Events</button>
+        <button className="chipb" aria-pressed={!pickL} onClick={() => setLg('top')}>Headliners</button>
         {LEAGUES.map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
