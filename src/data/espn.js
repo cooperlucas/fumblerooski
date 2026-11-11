@@ -456,6 +456,11 @@ export async function getTeam(lg, id, season) {
     get(url(SITE, lg, `/teams/${tid}/schedule`, { ...yr, seasontype: '3' })),
   ]);
   if (info.status === 'rejected' && sched.status === 'rejected') throw info.reason;
+  // Once a season is over, the feed's default schedule is its postseason, which is empty for a team that missed it
+  // (the Mets in November). Ask for the regular season by name then.
+  if (sched.status === 'fulfilled' && Number(sched.value.season?.type) === 3) {
+    try { const reg = await get(url(SITE, lg, `/teams/${tid}/schedule`, { ...yr, seasontype: '2' })); if (reg.events?.length) sched.value = { ...reg, season: sched.value.season, requestedSeason: sched.value.requestedSeason }; } catch { /* keep what we have */ }
+  }
   const t = info.status === 'fulfilled' ? (info.value.team || {}) : (sched.value.team || {});
   const record = t.record?.items?.[0]?.summary || t.recordSummary || '';
   // The team read has no poll rank, but its next game carries the ranking the feed shows on scoreboards.
@@ -602,7 +607,7 @@ export async function getRoster(lg, teamId) {
 }
 
 // Table titles sit in a narrow first column: "Season Averages" -> "Averages", "2026 Regular Season" -> "2026".
-const shortTitle = (t) => cleanText(t).replace(/^Season\s+/i, '').replace(/\s+(Regular\s+)?Season$/i, '').replace(/^Misc(ellaneous)?\s+Totals$/i, 'Misc').replace(/^Regular Season$/i, 'Season');
+const shortTitle = (t) => cleanText(t).replace(/^(Season|Career)\s+/i, '').replace(/\s+(Regular\s+)?Season$/i, '').replace(/^Misc(ellaneous)?\s+Totals$/i, 'Misc').replace(/^Regular Season$/i, 'Season');
 function normGamelog(d) {
   const labels = (d?.labels || []).map((l) => cleanText(l));
   const evs = d?.events || {};
