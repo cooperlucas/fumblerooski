@@ -1080,6 +1080,7 @@ export function fbHead(p) {
   if (/penalty/i.test(p.type)) return 'Penalty';
   if (/sack/i.test(p.type)) return `Sack${y ? `, ${Math.abs(y)} yds` : ''}`;
   if (/intercept/i.test(p.type)) return 'Interception';
+  if (/fumble|muff/i.test(p.type) && /\bpunts?\b/i.test(p.text)) return 'Muffed Punt';
   if (/fumble/i.test(p.type)) return 'Fumble';
   if (/incompl/i.test(p.type)) return 'Incomplete';
   if (/pass|reception/i.test(p.type)) return y != null && y < 0 ? `Pass, loss of ${-y}` : `${yd}Pass`;
@@ -1107,7 +1108,9 @@ function LiveField({ drives, game, onAll }) {
   const X = (toEnd) => Xs(d.side, toEnd);
   const other = d.side === 'away' ? 'home' : 'away';
   const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
-  const start = steps[0]?.from ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
+  const puntBack0 = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
+  // A muffed punt the kicking team recovers is a new drive: it starts at the recovery spot, with nothing drawn back to the old one.
+  const start = puntBack0 ? last.to : steps[0]?.from ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
   const lastKept = [...steps].reverse()[0];
   // A punt the kicking team got back (a muff) moves the ball to where they recovered it.
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
@@ -1136,16 +1139,17 @@ function LiveField({ drives, game, onAll }) {
           : m.kind === 'safety' ? { text: `${scoreT.abbr} +2 · Safety`, team: scoreT, hot: true }
             : m.kind === 'turnover' ? { text: `Turnover · ${m.how}`, team: opp, bad: true }
               : m.kind === 'big' ? { text: `${t.abbr} · ${m.yards}-Yard Gain`, team: t }
-                : m.kind === 'punt' && m.recovered ? { text: `Muffed Punt · ${t.abbr} Recovers`, team: t, hot: true }
+                : m.kind === 'punt' && m.recovered ? { text: `Turnover · Muffed Punt`, team: t, bad: true }
                 : m.kind === 'punt' ? { text: m.blocked ? 'Punt Blocked' : `Punt${m.yards ? ` · ${m.yards} Yards` : ''}`, team: last.mine ? t : opp }
                   : m.kind === 'kickoff' ? { text: m.touchback ? 'Kickoff · Touchback' : 'Kickoff', team: last.mine ? t : opp } : null;
   const banner = flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
   const post = (s) => { // s: 1 = right end, -1 = left end
-    const x = s > 0 ? FW - 8 : 8, cy = mid - 14;
+    // Like a real one: the post stands just behind the end line and the gooseneck leans the uprights out over it.
+    const x = s > 0 ? FW : 0, bx = x + s * 10, cy = mid - 14;
     const N = [x - s * 4.5, cy + 12], F = [x + s * 4.5, cy - 12], H = 34;
-    return { s, x, base: [x, mid + 8], c: [x, cy], N, F, H, gap: [x, cy - 17] };
+    return { s, x, base: [bx, mid + 10], c: [x, cy], N, F, H, gap: [x, cy - 17] };
   };
   const posts = [post(-1), post(1)];
   const GOLD = '#FFBE2E', INK = '#0C1124';
@@ -1205,6 +1209,7 @@ function LiveField({ drives, game, onAll }) {
     if (m.two === 'good') glowSide = zone; // a two-point try that works lights the end zone
   } else if (last && m.kind === 'turnover') { stamp = { text: 'TURNOVER', color: brighten(cc[other].main, 0.25), x: 60 * K }; turned = true; }
   else if (last && m.kind === 'safety') stamp = { text: 'SAFETY', color: GOLD, x: 60 * K };
+  else if (last && m.kind === 'punt' && m.recovered) stamp = { text: 'TURNOVER', color: brighten(cc[d.side].main, 0.25), x: 60 * K, delay: 2.3 }; // after the punt and return play out
   const arrow = turned ? -dirn : dirn;
   return (
     <>
@@ -1224,7 +1229,7 @@ function LiveField({ drives, game, onAll }) {
               <span><small>Ball on</small><b>{last.spot || '·'}</b></span>
             </div>
           ) : null}
-          <svg viewBox={`0 0 ${FW} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
+          <svg viewBox={`-16 0 ${FW + 32} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
             {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
             <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
             <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
@@ -1239,7 +1244,7 @@ function LiveField({ drives, game, onAll }) {
             {posts.map((P) => (
               <g key={P.s}>
                 <ellipse cx={P.base[0]} cy={P.base[1] + 1} rx="9" ry="3" fill="#0C1124" opacity="0.3" />
-                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1]}`, 3.4)}
+                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1] + 12} Q${P.base[0]} ${P.c[1]} ${P.c[0]} ${P.c[1]}`, 3.4)}
                 {bar(`M${P.F[0]} ${P.F[1]} V${P.F[1] - P.H}`, 2.6)}
                 {bar(`M${P.N[0]} ${P.N[1]} L${P.F[0]} ${P.F[1]}`, 3.2)}
               </g>))}
@@ -1249,7 +1254,7 @@ function LiveField({ drives, game, onAll }) {
                 <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
                 <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
-                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
+                {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
                 <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)` }}>
                   <g className="lfball">
                     <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
@@ -1273,7 +1278,7 @@ function LiveField({ drives, game, onAll }) {
                   return <rect key={i} className="kconf" x="-3.5" y="-3.5" width="7" height="7" rx="1.5" fill={[stamp.confetti[1], GOLD, '#fff', '#2ED9D9'][i % 4]} stroke={INK} strokeWidth="0.6"
                     style={{ '--cx': `${stamp.confetti[0]}px`, '--cy': `${mid}px`, '--dx': `${Math.cos(a2) * r}px`, '--dy': `${Math.sin(a2) * r * 0.9}px`, animationDelay: `${(i % 5) * 0.05}s` }} />;
                 }) : null}
-                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color} style={stamp.text.length > 11 ? { fontSize: 24 } : undefined}>{stamp.text}</text></g>
+                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color} style={{ ...(stamp.text.length > 11 ? { fontSize: 24 } : {}), ...(stamp.delay ? { animationDelay: `${stamp.delay}s` } : {}) }}>{stamp.text}</text></g>
               </g>) : null}
           </svg>
           {last ? (
