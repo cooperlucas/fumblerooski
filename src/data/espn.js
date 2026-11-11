@@ -1502,15 +1502,15 @@ export function fieldMoment(p) {
   if (!lost && p.kept === false && /fumble/i.test(text) && /recovered by/i.test(text) && !/\bpunts?\b|kickoff|field goal/i.test(both)) return { kind: 'turnover', how: /sack/i.test(type) ? 'Strip Sack' : 'Fumble' };
   if (lost) {
     // On a punt, "opponent" recovery means the kicking team got it back: the drive's team keeps the ball.
-    if (p.kept === true && /\bpunts?\b/i.test(text)) { const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]); return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: false, blocked: false, recovered: true }; }
+    if (p.kept === true && /\bpunts?\b/i.test(text)) { const n = Number((/punts?\s+(?:for\s+)?(\d+)\s+(?:yards?|yds?)\b/i.exec(text) || [])[1]); return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: false, blocked: false, recovered: true }; }
     if (p.kept !== true) return { kind: 'turnover', how: lost };
   }
   if (/^punt|blocked punt/i.test(type)) {
-    const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]);
+    const n = Number((/punts?\s+(?:for\s+)?(\d+)\s+(?:yards?|yds?)\b/i.exec(text) || [])[1]);
     return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: /touchback/i.test(text), blocked: /block/i.test(both) };
   }
   if (/^kickoff/i.test(type)) {
-    const n = Number((/kick(?:s|off)? (\d+) yards?/i.exec(text) || [])[1]);
+    const n = Number((/kick(?:s|off)?\s+(?:for\s+)?(\d+)\s+(?:yards?|yds?)\b/i.exec(text) || [])[1]);
     return { kind: 'kickoff', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: /touchback/i.test(text) };
   }
   if (p.kept !== false && Number(p.yards) >= 20 && /rush|pass|reception|sack/i.test(type)) return { kind: 'big', yards: Number(p.yards) };

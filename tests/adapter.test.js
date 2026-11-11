@@ -472,3 +472,9 @@ test('touchback spots by league and year', () => {
   assert.equal(spotToEnd('LOU 40', 'SMU') ,40);
   assert.equal(spotToEnd('50', 'SMU') ,50);
 });
+test('college kick text gives yards', async () => {
+  const { fieldMoment } = await import('../src/data/espn.js');
+  assert.equal(fieldMoment({ type: 'Punt', text: 'Will Karoll punt for 50 yds , Roderick Daniels Jr. returns for no gain to the SMU 19' }).yards, 50);
+  assert.equal(fieldMoment({ type: 'Kickoff', text: 'Brock Travelstead kickoff for 65 yds for a touchback' }).yards, 65);
+  assert.equal(fieldMoment({ type: 'Punt', text: 'J.Araiza punts 45 yards to KC 20' }).yards, 45);
+});
