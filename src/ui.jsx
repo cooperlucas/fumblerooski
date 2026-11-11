@@ -118,7 +118,7 @@ export const Ball = ({ red }) => (
   </svg>
 );
 // Network names short enough for a score row: "ACC Network" reads "ACC Net".
-export const shortTv = (n) => String(n || '').replace(/\bNetwork\b/i, 'Net').replace(/^Big Ten Net$/i, 'BTN');
+export const shortTv = (n) => String(n || '').replace(/\bNetwork\b/i, 'Net').replace(/^Big Ten Net$/i, 'BTN').replace(/^Prime Video$/i, 'Prime');
 export function GameRow({ g, showLg = true }) {
   const fin = g.state === 'final', pre = g.state === 'pre' || g.state === 'off';
   const h = parseInt(g.home.score, 10), a = parseInt(g.away.score, 10);
