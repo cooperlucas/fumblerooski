@@ -136,7 +136,7 @@ export function GameRow({ g, showLg = true }) {
       aria-label={`${g.away.name} ${pre ? 'at' : g.away.score + ','} ${g.home.name}${pre ? '' : ' ' + g.home.score}, ${label}`}>
       <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
-        <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
+        <span className={'stat' + (pre ? ' pre' : '')} style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
         {/* A game on another day shows its date up top; the start time goes under it when it is set. */}
         {g.state === 'pre' && !g.tbd && !isNaN(new Date(g.date)) && !sameDay(new Date(g.date), new Date()) ? <span className="gtime">{fmtTime(g.date)}</span> : null}
         {g.down ? <span className={'gdd' + (g.redZone ? ' rz' : '')}><b>{g.down}</b>{g.spot ? <span>{g.spot}</span> : null}</span> : null}

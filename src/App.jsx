@@ -740,7 +740,7 @@ function TeamPage({ lg, id, season }) {
     return (
       <button key={g.id} className="lrow" onClick={() => go(`game/${lg}/${g.id}`)}>
         <Blob team={them} />
-        <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.name}{(isPast ? them.record : recs[them.id] || them.record) ? <small className="orec"> {isPast ? them.record : recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
+        <span className="nm">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{home ? 'vs' : 'at'} {them.rank ? <span className="orank">{them.rank}</span> : null}{them.name}{(isPast ? them.record : recs[them.id] || them.record) ? <small className="orec"> {isPast ? them.record : recs[them.id] || them.record}</small> : null}<span className="sub">{fmtDate(g.date)}{isPast ? `, ${new Date(g.date).getFullYear()}` : ''}</span></span>
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span className="livesc"><b>{me.score !== '' && me.score != null ? `${me.score}-${them.score}` : 'LIVE'}</b><small>{g.statusText || 'Live'}</small></span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
@@ -1660,8 +1660,8 @@ function LiveRink({ ice, pbp, game, L, onAll, rink }) {
   // Away defends the left net, home the right one.
   const netX = (sd) => (sd === 'away' ? 11 : 189) * K;
   const pp = rink?.pp || null, ppT = pp ? game[pp.side] : null, shortSide = pp ? (pp.side === 'away' ? 'home' : 'away') : null;
-  // A stop from in tight: the newest shot was saved within about 25 feet of the goal line.
-  const bigSave = last && last.kind === 'save' && Math.abs(last.x) >= 64 && Math.abs(last.y) <= 22 ? (sideOf(last.teamId) === 'away' ? 'home' : 'away') : null;
+  // The save pulse: the newest shot was stopped point-blank.
+  const bigSave = last && last.kind === 'save' && Math.hypot(89 - Math.abs(last.x), last.y) <= 15 ? (sideOf(last.teamId) === 'away' ? 'home' : 'away') : null; // a stop from within about 15 feet of the net
   return (
     <section className="sec">
       <div className="card livecourt">
@@ -1679,7 +1679,7 @@ function LiveRink({ ice, pbp, game, L, onAll, rink }) {
               <path d={shortSide === 'away' ? `M${W / 2} 0 H${28 * K} A${28 * K} ${28 * K} 0 0 0 0 ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 0 ${28 * K} ${H} H${W / 2} Z` : `M${W / 2} 0 H${W - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W} ${28 * K} V${H - 28 * K} A${28 * K} ${28 * K} 0 0 1 ${W - 28 * K} ${H} H${W / 2} Z`} fill="#0C1124" opacity="0.13" />
               <g className="ppchip" transform={`translate(${W / 2} ${H - 19})`}>
                 <rect x="-84" y="-17" width="168" height="34" rx="9" fill={cc[pp.side].main} stroke="#0C1124" strokeWidth="2.4" />
-                <text x="0" y="1" textAnchor="middle" dominantBaseline="central" fill={inkOn(cc[pp.side].main)}>{ppT.abbr} POWER PLAY</text>
+                <text x="0" y="1" textAnchor="middle" dominantBaseline="central" fill={inkOn(cc[pp.side].main)} textLength={Math.min(146, (ppT.abbr.length + 11) * 10.5)} lengthAdjust="spacingAndGlyphs">{ppT.abbr} POWER PLAY</text>
                 <text className="sk" x="0" y="-27" textAnchor="middle" dominantBaseline="central">{pp.skaters}</text>
               </g>
             </>

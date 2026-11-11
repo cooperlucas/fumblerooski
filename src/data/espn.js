@@ -359,8 +359,10 @@ const stat = (entry, ...names) => {
   }
   return '';
 };
+// Hockey records come as "13-4-1, 27 PTS"; points have their own column, so keep just the record.
+const recOnly = (r) => String(r || '').replace(/,\s*-?\d+\s*pts?$/i, '');
 function overallOf(entry) {
-  const o = stat(entry, 'overall', 'total');
+  const o = recOnly(stat(entry, 'overall', 'total'));
   if (o) return o;
   const w = stat(entry, 'wins'), l = stat(entry, 'losses');
   if (!w && !l) return '';
@@ -1754,7 +1756,7 @@ function normPreview(data, game, lg) {
       const by = (n) => st.find((x) => x.name === n || x.abbreviation === n || x.type === n || x.shortDisplayName === n);
       if (names[0] === '@rec') {
         const o = by('overall') || by('total');
-        if (o && /^\d+-\d+/.test(String(o.displayValue ?? o.summary ?? ''))) return String(o.displayValue ?? o.summary);
+        if (o && /^\d+-\d+/.test(String(o.displayValue ?? o.summary ?? ''))) return recOnly(o.displayValue ?? o.summary);
         const w = by('wins')?.displayValue, l = by('losses')?.displayValue, t = (by('otLosses') || by('ties'))?.displayValue;
         return w != null && l != null ? [w, l, ...(t != null && (sport === 'hockey' || t !== '0') ? [t] : [])].join('-') : '';
       }
