@@ -1010,6 +1010,7 @@ function LiveField({ drives, game, onAll }) {
   const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
   const recent = [...d.plays].reverse().slice(0, 3);
   const mid = top + (FH - top) / 2;
+  const ly = mid + 24; // the drive runs along a lane below midfield, clear of the home team's mark
   return (
     <>
       <section className="sec">
@@ -1033,17 +1034,18 @@ function LiveField({ drives, game, onAll }) {
             <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
             {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
+            {game.neutral ? null : <g><circle cx={60 * K} cy={mid} r="17" fill={cc.home.main} stroke="#fff" strokeWidth="2.4" /><text className="ez" style={{ fontSize: game.home.abbr.length > 3 ? 9 : 11 }} x={60 * K} y={mid} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text></g>}
             <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
             {[[0, -1], [FW, 1]].map(([x, s]) => <path key={x} d={`M${x - s * 2} ${mid} H${x - s * 9} M${x - s * 9} ${mid - 16} V${mid + 16} M${x - s * 9} ${mid - 16} H${x - s * 15} M${x - s * 9} ${mid + 16} H${x - s * 15}`} transform={`translate(${s * 12} 0)`} stroke="#FFBE2E" strokeWidth="2.6" fill="none" strokeLinecap="round" />)}
             {d.kind === 'td' ? <rect key={'td' + d.id} className="tdglow" x={d.side === 'away' ? 110 * K : 0} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
             {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="3" /> : null}
             {start != null && at != null ? (
               <>
-                <rect className="lfmove" x="0" y={mid - 3.5} width="100" height="7" rx="3.5" fill="#fff" stroke="#0C1124" strokeWidth="1.2" vectorEffect="non-scaling-stroke"
+                <rect className="lfmove" x="0" y={ly - 3.5} width="100" height="7" rx="3.5" fill="#fff" stroke="#0C1124" strokeWidth="1.2" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
-                <circle cx={X(start)} cy={mid} r="4.5" fill="#fff" stroke="#0C1124" strokeWidth="1.6" />
-                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={mid} r="2.2" fill="#0C1124" />)}
-                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${mid}px)` }}>
+                <circle cx={X(start)} cy={ly} r="4.5" fill="#fff" stroke="#0C1124" strokeWidth="1.6" />
+                {steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="2.2" fill="#0C1124" />)}
+                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)` }}>
                   <g className="lfball">
                     <path d={`M${dirn * 5} -10 L${dirn * 15} 0 L${dirn * 5} 10 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.6" strokeLinejoin="round" />
                     <ellipse cx="0" cy="-22" rx="11" ry="7" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.8" />
