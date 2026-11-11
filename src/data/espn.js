@@ -1212,6 +1212,9 @@ export function forcedFumbles(drives) {
 // The feed's display text puts the team in front ("Buffalo Passing"). The plain stat name is cleaner.
 const titleOf = (g, sport) => {
   const t = String(g.name || g.text || g.displayName || '').trim();
+  // Baseball tables only carry a type: batting or pitching.
+  if (!t && /^batting$/i.test(g.type || '')) return 'Hitting';
+  if (!t && /^pitching$/i.test(g.type || '')) return 'Pitching';
   if (!t) return sport === 'basketball' ? 'Players' : 'Stats';
   return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/([a-z])([A-Z])/g, '$1 $2');
 };
@@ -1238,7 +1241,7 @@ export function playerBox(box, awayId, homeId, sport, plusMinus, ff) {
         starter: a.starter === true,
         stats: order.map((i) => (addPm && i === pmIdx ? pmText(a) : String(a.stats[i] ?? ''))),
       })).filter((r) => r.name);
-      return { key: String(g.name || '').toLowerCase(), title: titleOf(g, sport), labels: order.map((i) => labels[i]), rows, totals: Array.isArray(g.totals) && g.totals.length ? order.map((i) => String(g.totals[i] ?? '')) : null };
+      return { key: String(g.name || g.type || '').toLowerCase(), title: titleOf(g, sport), labels: order.map((i) => labels[i]), rows, totals: Array.isArray(g.totals) && g.totals.length ? order.map((i) => String(g.totals[i] ?? '')) : null };
     }).filter((g) => g.rows.length && g.labels.length);
     if (sport === 'football') {
       // Give the defense table the two columns fans look for: forced fumbles and fumble recoveries.

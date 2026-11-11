@@ -1595,7 +1595,7 @@ function PlayByPlay({ pbp, game, L }) {
   let rows = pbp.filter((p) => p.period === cur);
   if (live) rows = [...rows].reverse();
   const reg = L.periods || 4, word = PERIOD_WORD[L.sport] ?? '';
-  const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? (L.sport === 'baseball' ? `Inn ${p}` : perName(L, p)) : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
+  const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? (L.sport === 'baseball' ? String(p) : perName(L, p)) : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
   const team = (id) => (id === game.home.id ? game.home : id === game.away.id ? game.away : null);
   return (
     <section className="sec">
