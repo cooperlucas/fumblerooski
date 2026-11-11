@@ -1116,7 +1116,10 @@ function LiveField({ drives, game, onAll }) {
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
   // A defensive or return touchdown (pick six, scoop and score) ends in the drive team's own end zone.
   const defTd = !!last && /touchdown|\bfor a td\b/i.test(`${last.type} ${last.text}`) && !last.kept;
-  const at = defTd ? 100 : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
+  const at = defTd ? (last.from ?? 100) : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
+  // The return on a pick six or scoop and score: from where the defense got the ball back to the offense's own goal line.
+  const retYds = defTd ? (Number((/return(?:ed)?\s+(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
+  const retFrom = retYds != null ? Math.max(0, Math.min(100, 100 - retYds)) : null;
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
@@ -1145,11 +1148,10 @@ function LiveField({ drives, game, onAll }) {
   const banner = flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
+  // Goalposts drawn flat, as seen from above: the crossbar runs along the end line, the uprights point out past it.
   const post = (s) => { // s: 1 = right end, -1 = left end
-    // Like a real one: the post stands just behind the end line and the gooseneck leans the uprights out over it.
-    const x = s > 0 ? FW : 0, bx = x + s * 5, cy = mid - 14;
-    const N = [x - s * 3.5, cy + 11], F = [x + s * 3.5, cy - 11], H = 34;
-    return { s, x, base: [bx, mid + 10], c: [x, cy], N, F, H, gap: [x, cy - 17] };
+    const x = s > 0 ? FW : 0, hw = 10, U = 15;
+    return { s, x, hw, U, N: [x, mid + hw], F: [x, mid - hw], gap: [x + s * 8, mid] };
   };
   const posts = [post(-1), post(1)];
   const GOLD = '#FFBE2E', INK = '#0C1124';
@@ -1169,15 +1171,15 @@ function LiveField({ drives, game, onAll }) {
     // The kick flies at the posts it is aimed at. A make splits the uprights; a miss goes where the feed says it went.
     const P = posts[dirn > 0 ? 1 : 0], s = P.s;
     const x0 = X(Math.min(99, (last.from ?? at ?? 20) + 7));
-    // The kicker's left is the far (top) upright going right, the near (bottom) one going left.
-    const far = (side) => (side === 'left') === (s > 0);
-    const out = (pt, from) => [pt[0] + (pt[0] - from[0]) * 0.75, pt[1] + (pt[1] - from[1]) * 0.75 - 17];
-    let end = [P.gap[0] + s * 5, P.gap[1] - 2], opts = { fade: true }, peak = Math.min(ly, P.gap[1]) - 26;
-    const drop = { bounce: [s * 5, 30] }; // a miss sails by and drops behind the posts
-    if (m.miss === 'left' || m.miss === 'right') { end = far(m.miss) ? out(P.F, P.N) : out(P.N, P.F); opts = drop; }
-    else if (m.miss === 'wide') { end = out(P.N, P.F); opts = drop; }
-    else if (m.miss === 'leftpost' || m.miss === 'rightpost') { const u = far(m.miss.replace('post', '')) ? P.F : P.N; end = [u[0], u[1] - 16]; opts = { bounce: [-s * 30, 34] }; }
-    else if (m.miss === 'short') { end = [P.x - s * 30, mid + 2]; peak = ly - 26; opts = {}; }
+    // Going right, the kicker's left is the top upright; going left, it is the bottom one.
+    const yOf = (side) => ((side === 'left') === (s > 0) ? mid - P.hw : mid + P.hw);
+    const away = (y) => (y < mid ? -1 : 1);
+    let end = P.gap, opts = { fade: true }, peak = mid - 40;
+    const drop = { bounce: [s * 4, 0] };
+    if (m.miss === 'left' || m.miss === 'right') { const y = yOf(m.miss); end = [P.x + s * 8, y + away(y) * 9]; opts = drop; }
+    else if (m.miss === 'wide') { end = [P.x + s * 8, mid + P.hw + 9]; opts = drop; }
+    else if (m.miss === 'leftpost' || m.miss === 'rightpost') { const y = yOf(m.miss.replace('post', '')); end = [P.x + s * 7, y]; opts = { bounce: [-s * 28, away(y) * 10] }; }
+    else if (m.miss === 'short') { end = [P.x - s * 26, mid + 2]; peak = ly - 26; opts = {}; }
     else if (m.miss === 'blocked') { end = [x0 + s * 16, ly - 4]; peak = ly - 20; opts = { bounce: [-s * 10, 6] }; }
     show = <g key={'fg' + lastKey} className="fshow">{flight('k', x0, ly, end[0], end[1], peak, opts)}</g>;
   } else if (last && (m.kind === 'punt' || m.kind === 'kickoff') && last.from != null && (m.yards || m.touchback)) {
@@ -1229,12 +1231,12 @@ function LiveField({ drives, game, onAll }) {
               <span><small>Ball on</small><b>{last.spot || '·'}</b></span>
             </div>
           ) : null}
-          <svg viewBox={`-10 0 ${FW + 20} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
+          <svg viewBox={`-18 0 ${FW + 36} ${FH + 16}`} className="field" role="img" aria-label={`${t.name} drive: ${d.summary}. ${last ? last.text : ''}`}>
             {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
             <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
             <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
-            <text className="ez" transform={`translate(${5 * K + 3} ${FH - 5}) rotate(-90)`} textAnchor="start" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
-            <text className="ez" transform={`translate(${115 * K - 3} ${FH - 5}) rotate(-90)`} textAnchor="start" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
+            <text className="ez" transform={`translate(${5 * K} ${mid}) rotate(-90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
+            <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
             {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
             {game.neutral ? null : <text className="ez mid" x={60 * K} y={mid - 8} textAnchor="middle" dominantBaseline="central" fill={game.home.color || cc.home.main}>{game.home.abbr}</text>}
@@ -1243,10 +1245,9 @@ function LiveField({ drives, game, onAll }) {
             {/* posts, back half: shadow, stem, crossbar, far upright */}
             {posts.map((P) => (
               <g key={P.s}>
-                <ellipse cx={P.base[0]} cy={P.base[1] + 1} rx="9" ry="3" fill="#0C1124" opacity="0.3" />
-                {bar(`M${P.base[0]} ${P.base[1]} V${P.c[1] + 7} Q${P.base[0]} ${P.c[1]} ${P.c[0]} ${P.c[1]}`, 3.4)}
-                {bar(`M${P.F[0]} ${P.F[1]} V${P.F[1] - P.H}`, 2.6)}
-                {bar(`M${P.N[0]} ${P.N[1]} L${P.F[0]} ${P.F[1]}`, 3.2)}
+                {bar(`M${P.x + P.s * 7} ${mid} H${P.x}`, 3)}
+                {bar(`M${P.N[0] + P.s * P.U} ${P.N[1]} H${P.N[0]} V${P.F[1]} H${P.F[0] + P.s * P.U}`, 3)}
+                <circle cx={P.x + P.s * 7} cy={mid} r="2.6" fill={GOLD} stroke={INK} strokeWidth="1.2" />
               </g>))}
             {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="2.4" /> : null}
             {start != null && at != null ? (
@@ -1255,7 +1256,7 @@ function LiveField({ drives, game, onAll }) {
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
                 <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
                 {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
-                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)` }}>
+                <g className="lfmove" style={{ transform: `translate(${X(at)}px, ${ly}px)`, display: defTd && retFrom != null ? 'none' : undefined }}>
                   <g className="lfball">
                     <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
                     {m.kind === 'fg' || m.kind === 'punt' ? null : (
@@ -1269,8 +1270,11 @@ function LiveField({ drives, game, onAll }) {
               </>
             ) : null}
             {show}
-            {/* posts, front half: the near upright goes on last so a kick passes behind it */}
-            {posts.map((P) => <g key={'n' + P.s}>{bar(`M${P.N[0]} ${P.N[1]} V${P.N[1] - P.H}`, 3.6)}</g>)}
+            {defTd && retFrom != null ? (
+              <g key={'ret' + lastKey} className="fshow">
+                {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(100)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(100) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
+                <g transform={`translate(${X(100)} ${ly - 19})`}>{ball(8)}</g>
+              </g>) : null}
             {stamp ? (
               <g key={'stamp' + lastKey} className="fshow">
                 {stamp.confetti ? Array.from({ length: 18 }, (_, i) => {
