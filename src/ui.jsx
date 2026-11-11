@@ -127,11 +127,13 @@ export function shortEvent(note) {
 // A team chip with its poll rank in a gold tag on the top-left corner, the way the team page shows it.
 export function RankBlob({ team, rank, size = 28, radius }) {
   if (!rank) return <Blob team={team} size={size} radius={radius} />;
-  const h = Math.max(15, Math.round(size * 0.42)), off = -Math.round(Math.min(8, size * 0.16));
+  // Small chips (schedules, score rows) get a small tag that sits on the corner without burying the abbreviation.
+  const big = size > 40;
+  const h = big ? Math.round(size * 0.42) : Math.max(11, Math.round(size * 0.38)), off = big ? -Math.round(size * 0.16) : -4;
   return (
     <span className="rblob" style={{ position: 'relative', display: 'inline-flex', flex: 'none' }}>
       <Blob team={team} size={size} radius={radius} />
-      <b className="rtag" aria-label={`Ranked ${rank}`} style={{ top: off, left: off, minWidth: h, height: h, fontSize: Math.max(9, Math.round(h * 0.54)), borderRadius: Math.round(h * 0.3), boxShadow: `${size > 40 ? 2 : 1.5}px ${size > 40 ? 2 : 1.5}px 0 #0C1124` }}>{rank}</b>
+      <b className="rtag" aria-label={`Ranked ${rank}`} style={{ top: off, left: off, minWidth: h, height: h, fontSize: big ? Math.round(h * 0.54) : Math.max(7.5, h * 0.62), padding: big ? undefined : '0 2px', borderRadius: Math.round(h * 0.3), boxShadow: `${big ? 2 : 1}px ${big ? 2 : 1}px 0 #0C1124` }}>{rank}</b>
     </span>
   );
 }
@@ -166,8 +168,8 @@ export function GameRow({ g, showLg = true }) {
   const lose = (mine, theirs) => fin && Number.isFinite(mine) && Number.isFinite(theirs) && mine < theirs;
   const side = (t, mine, theirs) => (
     <span className={'side' + (lose(mine, theirs) ? ' lose' : '')}>
-      <Blob team={t} />
-      <span className="nm"><span className="nmt">{t.rank ? <span className="rk">{t.rank}</span> : null}{t.name} <small>{t.record}</small></span>{g.poss && g.poss === String(t.id) ? <Ball red={g.redZone} /> : null}</span>
+      <RankBlob team={t} rank={t.rank} />
+      <span className="nm"><span className="nmt">{t.name} <small>{t.record}</small></span>{g.poss && g.poss === String(t.id) ? <Ball red={g.redZone} /> : null}</span>
       <span className="sc">{pre ? '' : t.score}</span>
     </span>
   );
