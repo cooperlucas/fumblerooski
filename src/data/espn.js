@@ -333,7 +333,8 @@ function standingGroups(data, lg) {
         const [lab, v] = col2Of(e, L); label = lab;
         return { team: normTeam(e.team, lg), overall: overallOf(e), col2: v, seed: seedOf(e) };
       });
-      if (L.college) rows.sort(bySeed);
+      // College always; pros when every team has a seed (the NBA feed sometimes lists a division worst to first).
+      if (L.college || rows.every((r) => Number.isFinite(r.seed))) rows.sort(bySeed);
       const full = node.name || node.abbreviation || L.name;
       groups.push({ name: shortGroup(full), full, col2Label: label, rows });
     }
