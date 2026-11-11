@@ -310,6 +310,8 @@ h1, h2, h3, p { margin: 0; }
 .pick { position: relative; display: inline-flex; align-items: center; color: var(--yellow); }
 .pick select { appearance: none; -webkit-appearance: none; min-height: 36px; padding: 0 30px 0 14px; border-radius: 999px; border: 1px solid var(--line3); background: var(--chip); color: var(--yellow); font: inherit; font-weight: 800; font-size: 13px; }
 .pick svg { position: absolute; right: 12px; pointer-events: none; }
+.pick.masked select { color: transparent; }
+.pick.masked .shown { position: absolute; left: 14px; right: 30px; pointer-events: none; font-weight: 800; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Installed on an iPhone Home Screen: the page box stops short of the bottom by the notch and home-bar insets.
    Full viewport height is the one measure that reaches the real bottom there. Browsers keep the rule above. */

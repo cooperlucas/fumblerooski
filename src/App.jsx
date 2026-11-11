@@ -409,7 +409,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
   const divPicker = (
     <div className="filters">
       {divs.length > 1 ? <Picker label="Division" value={div} onChange={(v) => { setHunting(false); setAll(true); setConf('all'); setDiv(v); }}>{divs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</Picker> : null}
-      {confNames.length ? <Picker label="Conference" value={confNames.includes(conf) ? conf : 'all'} onChange={(v) => { setAll(true); setConf(v); }}><option value="all">All {L.college || curView?.id === 'conference' && curView?.label === 'Conference' ? 'confs' : curView?.id === 'division' ? 'divisions' : 'teams'}</option>{confNames.map((n) => <option key={n} value={n}>{n}</option>)}</Picker> : null}
+      {confNames.length ? <Picker label="Conference" value={confNames.includes(conf) ? conf : 'all'} onChange={(v) => { setAll(true); setConf(v); }} shown={confNames.includes(conf) && shortConf(conf) !== conf ? shortConf(conf) : undefined}><option value="all">All {L.college || curView?.id === 'conference' && curView?.label === 'Conference' ? 'confs' : curView?.id === 'division' ? 'divisions' : 'teams'}</option>{confNames.map((n) => <option key={n} value={n}>{n}</option>)}</Picker> : null}
       {seasons.length > 1 ? <Picker label="Season" value={String(yr || seasons[0].year)} onChange={(v) => { setHunting(false); setAll(true); setYr(Number(v) === seasons[0].year ? null : Number(v)); }}>{seasons.map((x) => <option key={x.year} value={x.year}>{x.label}</option>)}</Picker> : null}
     </div>
   );
@@ -503,9 +503,14 @@ function Rankings({ lg, focus }) {
 }
 
 /* ---------- Stats: league leaders and every team's numbers ---------- */
-const Picker = ({ label, value, onChange, children }) => (
-  <label className="pick">
+// Short conference names for a closed picker.
+const CONF_SHORT = [[/^mountain west/i, 'MW'], [/independent/i, 'Ind'], [/^conference usa/i, 'CUSA'], [/^mid-american/i, 'MAC'], [/^atlantic coast/i, 'ACC'], [/^southeastern/i, 'SEC'], [/^american athletic/i, 'American'], [/^missouri valley/i, 'MVC'], [/^west coast/i, 'WCC']];
+const shortConf = (n) => (CONF_SHORT.find(([re]) => re.test(n)) || [null, n])[1];
+// shown: a shorter text for the closed button (the list still reads in full), e.g. "MW" for Mountain West.
+const Picker = ({ label, value, onChange, children, shown }) => (
+  <label className={'pick' + (shown ? ' masked' : '')}>
     <span style={{ position: 'absolute', left: -9999 }}>{label}</span>
+    {shown ? <span className="shown" aria-hidden="true">{shown}</span> : null}
     <select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select>
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
   </label>
@@ -570,7 +575,7 @@ function useGameFilter(lg) {
   const f = opts.find((x) => x.id === fid);
   const apply = (games) => (!f ? games : f.id === 'top25' ? games.filter((g) => g.home.rank || g.away.rank) : games.filter((g) => f.ids.has(g.home.id) || f.ids.has(g.away.id)));
   const el = (
-    <Picker label="Games" value={f ? fid : 'all'} onChange={setFid}>
+    <Picker label="Games" value={f ? fid : 'all'} onChange={setFid} shown={f && f.id.startsWith('g:') ? shortConf(f.label) : undefined}>
       <option value="all">All games</option>
       {opts.slice(0, opts.findIndex((o) => o.id.startsWith('g:')) < 0 ? opts.length : opts.findIndex((o) => o.id.startsWith('g:'))).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
       {opts.some((o) => o.id.startsWith('g:')) ? <optgroup label="Conferences">{opts.filter((o) => o.id.startsWith('g:')).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup> : null}
