@@ -117,6 +117,8 @@ export const Ball = ({ red }) => (
     <path d="M7.5 7h9M9.5 5.2v3.6M12 5.2v3.6M14.5 5.2v3.6" />
   </svg>
 );
+// Network names short enough for a score row: "ACC Network" reads "ACC Net".
+export const shortTv = (n) => String(n || '').replace(/\bNetwork\b/i, 'Net').replace(/^Big Ten Net$/i, 'BTN');
 export function GameRow({ g, showLg = true }) {
   const fin = g.state === 'final', pre = g.state === 'pre' || g.state === 'off';
   const h = parseInt(g.home.score, 10), a = parseInt(g.away.score, 10);
@@ -135,8 +137,10 @@ export function GameRow({ g, showLg = true }) {
       <span className="sides">{g.note ? <span className="gnote">{shortEvent(g.note)}</span> : null}{side(g.away, a, h)}{side(g.home, h, a)}</span>
       <span className="meta">
         <span className="stat" style={{ color: statusColor(g) }}>{g.state === 'live' ? <span className="dot" aria-hidden="true" /> : null}<span>{label}</span></span>
+        {/* A game on another day shows its date up top; the start time goes under it when it is set. */}
+        {g.state === 'pre' && !g.tbd && !isNaN(new Date(g.date)) && !sameDay(new Date(g.date), new Date()) ? <span className="gtime">{fmtTime(g.date)}</span> : null}
         {g.down ? <span className={'gdd' + (g.redZone ? ' rz' : '')}><b>{g.down}</b>{g.spot ? <span>{g.spot}</span> : null}</span> : null}
-        {g.state !== 'final' && g.tv?.national?.length ? <span className="gtv">{g.tv.national[0]}</span> : null}
+        {g.state !== 'final' && g.tv?.national?.length ? <span className="gtv">{shortTv(g.tv.national[0])}</span> : null}
         {g.state === 'final' && !sameDay(new Date(g.date), new Date()) && !isNaN(new Date(g.date)) ? <span className="gdate">{fmtDate(g.date)}</span> : null}
         {showLg ? <LgTag lg={g.lg} /> : null}
       </span>
