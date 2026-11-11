@@ -2042,7 +2042,12 @@ function FitName({ text }) {
     let live = true;
     document.fonts?.ready?.then(() => { if (live) again(); });
     window.addEventListener('resize', again);
-    return () => { live = false; window.removeEventListener('resize', again); };
+    // The room it has changes too: a live score in the middle gets wider and squeezes the team columns.
+    let w = 0;
+    const box = ref.current?.parentElement;
+    const ro = box && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(([e]) => { const nw = Math.round(e.contentRect.width); if (w && nw !== w) again(); w = nw; }) : null;
+    if (ro) ro.observe(box);
+    return () => { live = false; window.removeEventListener('resize', again); ro?.disconnect(); };
   }, []);
   useLayoutEffect(() => {
     const el = ref.current;
