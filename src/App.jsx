@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
@@ -357,6 +357,27 @@ function Leagues() {
   );
 }
 
+// NBA Cup group play: six groups of five. Group winners and the best second-place team in each conference move on.
+function CupGroups({ cup, lg, focus }) {
+  return (
+    <>
+      <p className="cupnote">{cup.played < cup.total ? `Group play · ${cup.played} of ${cup.total} games played. ` : 'Group play is over. '}Group winners (Leads) and the best second-place team in each conference (WC, wild card) reach the knockout round.</p>
+      {cup.groups.map((gr) => (
+        <div className="card" key={gr.name}>
+          <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>DIFF</span></div>
+          {gr.rows.map((r, j) => (
+            <button key={r.id} className={'srow' + (focus && r.id === String(focus) ? ' me' : '')} onClick={() => go(`team/${lg}/${r.id}`)}>
+              <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm cupnm"><span className="cn">{r.team.name}</span>{r.tag ? <span className={'cuptag ' + (r.tag === 'lead' ? 'cl' : 'cw')}>{r.tag === 'lead' ? 'Leads' : 'WC'}</span> : null}</span>
+              <span className="v">{r.w}-{r.l}</span><span className="v2">{r.pd > 0 ? '+' : ''}{r.pd}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+      <p className="cupnote">Ties go to head-to-head, then point differential, then points scored. Group numbers are ours: ESPN's feed does not name the groups.</p>
+    </>
+  );
+}
+
 function LeaguePage({ lg, focus, start, startDay }) {
   const L = LEAGUE[lg];
   const [tab, setTab] = useSticky('tab', start || 'standings');
@@ -368,6 +389,11 @@ function LeaguePage({ lg, focus, start, startDay }) {
   const [yr, setYr] = useSticky('yr', null); // null = this season
   const [conf, setConf] = useSticky('conf', 'all');
   const st = useQuery(`standings:${lg}${divs.length ? ':' + div : ''}${yr ? ':' + yr : ''}`, () => getStandings(lg, div, yr), () => 600000);
+  // NBA Cup groups: only looked up in Cup season (October to early January).
+  const mo = new Date().getMonth();
+  const cupQ = useQuery(lg === 'nba' && !yr && (mo >= 9 || (mo === 0 && new Date().getDate() <= 10)) ? 'nbacup' : null, () => getNbaCup(), () => 600000);
+  // It shows from the first group night until about three weeks after the last one (the final is mid-December).
+  const cup = cupQ.data && Date.now() < new Date(cupQ.data.last).getTime() + 25 * 864e5 ? cupQ.data : null;
   const seasonsQ = useQuery(`standings:${lg}${divs.length ? ':' + divs[0].id : ''}`, () => getStandings(lg, divs[0]?.id), () => 600000); // the year list
   // From a team page: if the team is not in this division, step down the divisions until we find it.
   useEffect(() => {
@@ -402,7 +428,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
       {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? <LeagueScores lg={lg} startDay={startDay} /> : (
         (st.loading && !st.data) || hunting ? <>{divPicker}<Loading rows={6} /></> : st.error && !st.data ? <>{divPicker}<Problem error={st.error} retry={st.reload} /></> :
           !st.data.groups.length ? <>{divPicker}<Empty>{divs.length > 1 ? `The scores feed has no ${divs.find((d) => d.id === div)?.label} standings.` : `No standings for ${L.name} right now.`}</Empty></> : (() => {
-            const views = st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }];
+            const views = [...(st.data.views || [{ id: 'conference', label: 'Conference', groups: st.data.groups }]), ...(cup ? [{ id: 'cup', label: 'NBA Cup', groups: [] }] : [])];
             const view = views.find((v) => v.id === by) || views[0];
             // Coming from a team page: show just that team's group, with the team lit up.
             const has = (gr) => gr.rows.some((r) => r.team.id === String(focus));
@@ -416,6 +442,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
                 {views.map((v) => <button key={v.id} aria-pressed={v.id === view.id} onClick={() => { setConf('all'); setBy(v.id); }}>{v.label}</button>)}
               </div>
             ) : null}
+            {view.id === 'cup' ? <CupGroups cup={cup} lg={lg} focus={focus} /> : null}
             {shown.map((gr, i) => (
               <div className="card" key={view.id + gr.name + i}>
                 <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>{gr.col2Label}</span></div>
@@ -1077,7 +1104,9 @@ function LiveField({ drives, game, onAll }) {
   const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
   const start = steps[0]?.from ?? null;
   const lastKept = [...steps].reverse()[0];
-  const at = d.kind === 'td' ? 0 : lastKept ? lastKept.to : start;
+  // A punt the kicking team got back (a muff) moves the ball to where they recovered it.
+  const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
+  const at = d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
   const going = d.live && last?.kept && last.nextDown > 0;
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
@@ -1100,14 +1129,15 @@ function LiveField({ drives, game, onAll }) {
           : m.kind === 'safety' ? { text: `${scoreT.abbr} +2 · Safety`, team: scoreT, hot: true }
             : m.kind === 'turnover' ? { text: `Turnover · ${m.how}`, team: opp, bad: true }
               : m.kind === 'big' ? { text: `${t.abbr} · ${m.yards}-Yard Gain`, team: t }
+                : m.kind === 'punt' && m.recovered ? { text: `Muffed Punt · ${t.abbr} Recovers`, team: t, hot: true }
                 : m.kind === 'punt' ? { text: m.blocked ? 'Punt Blocked' : `Punt${m.yards ? ` · ${m.yards} Yards` : ''}`, team: last.mine ? t : opp }
                   : m.kind === 'kickoff' ? { text: m.touchback ? 'Kickoff · Touchback' : 'Kickoff', team: last.mine ? t : opp } : null;
   const banner = flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
   const post = (s) => { // s: 1 = right end, -1 = left end
-    const x = s > 0 ? FW - 9 : 9, cy = mid - 14;
-    const N = [x - s * 8, cy + 8], F = [x + s * 7, cy - 8], H = 36;
+    const x = s > 0 ? FW - 8 : 8, cy = mid - 14;
+    const N = [x - s * 4.5, cy + 12], F = [x + s * 4.5, cy - 12], H = 34;
     return { s, x, base: [x, mid + 8], c: [x, cy], N, F, H, gap: [x, cy - 17] };
   };
   const posts = [post(-1), post(1)];
@@ -1144,7 +1174,9 @@ function LiveField({ drives, game, onAll }) {
     const side = last.mine ? d.side : other, sgn = side === 'away' ? 1 : -1;
     const land = m.touchback && !m.yards ? -4 : last.from - (m.yards || 0);
     const x0 = Xs(side, last.from), x1 = Xs(side, Math.max(-6, land));
-    const fin = !m.touchback && last.endRaw != null ? 100 - last.endRaw : null;
+    // The feed counts the end spot from whoever has the ball after the play: the kicking team on a muff they recover.
+    const endIsKicker = last.mine ? last.kept : !last.kept;
+    const fin = !m.touchback && last.endRaw != null ? (endIsKicker ? last.endRaw : 100 - last.endRaw) : null;
     const ret = fin != null && Math.abs(fin - land) >= 3 && Math.abs(fin - land) < 100 ? Xs(side, Math.max(0, Math.min(100, fin))) : null;
     show = (
       <g key={'kick' + lastKey} className="fshow">

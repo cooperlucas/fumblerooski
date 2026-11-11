@@ -407,6 +407,10 @@ test('fieldMoment reads the newest football play', async () => {
   assert.equal(fieldMoment({ type: 'Pass Interception Return', text: 'pass intercepted by #28 L.Talich at Irish49' }).how, 'Interception');
   assert.equal(fieldMoment({ type: 'Sack Opp Fumble Recovery', text: 'sacked at DAL 16. FUMBLES, RECOVERED by IND' }).kind, 'turnover');
   assert.equal(fieldMoment({ type: 'Fumble Recovery (Own)', text: 'fumbled, recovered' }).kind, '');
+  // a punt the receiving team muffs and the kicking team recovers: still a punt, and the kicking team keeps the ball
+  const muff = fieldMoment({ type: 'Fumble Recovery (Opponent)', text: '#42 M.Haines punt 50 yards to the MIA33 #10 L.Billups-Williams return 16 yards to the MIA42 fumbled recovered by Ohio', kept: true });
+  assert.deepEqual([muff.kind, muff.recovered, muff.yards], ['punt', true, 50]);
+  assert.equal(fieldMoment({ type: 'Fumble Recovery (Opponent)', text: 'rush fumbled, recovered by defense', kept: false }).kind, 'turnover');
   assert.deepEqual(fieldMoment({ type: 'Punt', text: '(01:46) #39 J.Scaife punt 45 yards to the Canes03' }), { kind: 'punt', yards: 45, touchback: false, blocked: false });
   assert.equal(fieldMoment({ type: 'Kickoff', text: '#22 J.Weinberg kickoff 65 yards to the Irish00, Touchback' }).touchback, true);
   assert.equal(fieldMoment({ type: 'Pass Reception', text: 'pass complete for 33 yards', yards: 33, kept: true }).kind, 'big');
@@ -443,4 +447,17 @@ test('scoringRun counts unanswered points back from the newest play', async () =
   assert.equal(scoringRun(sc([[20, 22], [22, 22], [24, 22], [27, 22], [29, 22]])), null); // 9-0 is not 10
   assert.equal(scoringRun(sc([[0, 0], [3, 0], [6, 0], [9, 0], [9, 2]])), null); // broken by the other team
   assert.deepEqual(scoringRun(sc([[0, 0], [0, 3], [0, 6], [0, 9], [0, 12]]), 10), { side: 'home', pts: 12 });
+});
+
+test('rankCupGroup uses record, then head-to-head, then point differential', async () => {
+  const { rankCupGroup } = await import('../src/data/espn.js');
+  const g = (a, as, h, hs) => ({ away: { id: a, score: String(as) }, home: { id: h, score: String(hs) } });
+  // A and B are both 2-1; B beat A head to head, so B is first even with a worse point differential.
+  const games = [g('A', 120, 'C', 90), g('A', 110, 'D', 80), g('B', 101, 'A', 100), g('B', 90, 'C', 100), g('B', 100, 'D', 95), g('C', 90, 'D', 100)];
+  const r = rankCupGroup(['A', 'B', 'C', 'D'], games);
+  assert.deepEqual(r.map((x) => x.id), ['B', 'A', 'D', 'C']);
+  assert.deepEqual([r[1].w, r[1].l, r[1].pd], [2, 1, 59]);
+  // three-way tie at 1-1 that head-to-head cannot split (each beat one): point differential decides
+  const loop = [g('X', 100, 'Y', 90), g('Y', 100, 'Z', 80), g('Z', 101, 'X', 100)];
+  assert.deepEqual(rankCupGroup(['X', 'Y', 'Z'], loop).map((x) => x.id), ['Y', 'X', 'Z']);
 });

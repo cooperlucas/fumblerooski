@@ -256,6 +256,89 @@ export async function getScoreboard(lg, day, week) {
   };
 }
 
+/* ---------- NBA Cup: group standings, worked out from the schedule (the feed has no Cup table) ---------- */
+// rankCupGroup: order one group's teams by the Cup's own tiebreakers: record, then head-to-head among the
+// tied teams, then point differential, then points scored. games: finished group games among these teams.
+export function rankCupGroup(ids, games) {
+  const row = (id) => {
+    let w = 0, l = 0, pf = 0, pa = 0;
+    games.forEach((g) => {
+      const me = g.away.id === id ? g.away : g.home.id === id ? g.home : null;
+      if (!me) return;
+      const them = me === g.away ? g.home : g.away;
+      const a = Number(me.score), b = Number(them.score);
+      pf += a; pa += b; if (a > b) w++; else l++;
+    });
+    return { id, w, l, pf, pa, pd: pf - pa };
+  };
+  const rows = ids.map(row);
+  const pct = (r) => (r.w + r.l ? r.w / (r.w + r.l) : 0);
+  const h2h = (id, tied) => games.filter((g) => tied.includes(g.away.id) && tied.includes(g.home.id) && (g.away.id === id || g.home.id === id))
+    .filter((g) => { const me = g.away.id === id ? g.away : g.home, them = me === g.away ? g.home : g.away; return Number(me.score) > Number(them.score); }).length;
+  // Record means winning percentage (teams can have played different numbers of games mid-way through).
+  const byPct = new Map();
+  rows.forEach((r) => { const k = pct(r).toFixed(4); byPct.set(k, [...(byPct.get(k) || []), r]); });
+  return [...byPct.keys()].sort((a, b) => b - a).flatMap((k) => {
+    const tied = byPct.get(k), ids2 = tied.map((r) => r.id);
+    return tied.length < 2 ? tied : [...tied].sort((a, b) => h2h(b.id, ids2) - h2h(a.id, ids2) || b.pd - a.pd || b.pf - a.pf);
+  });
+}
+// The whole Cup group stage: six groups of five, from the season's group games. Null when there are none.
+export async function getNbaCup() {
+  const lg = 'nba';
+  const sb = await getScoreboard(lg);
+  const dates = (sb.dates || []).filter(Boolean);
+  if (!dates.length) return null;
+  const y0 = Number(dates[0].slice(0, 4));
+  const inWindow = dates.filter((d) => { const [y, m, dd] = d.split('-').map(Number); return y === y0 && (m === 10 || m === 11 || (m === 12 && dd <= 3)); });
+  const dow = (d) => new Date(`${d}T12:00:00Z`).getUTCDay();
+  const games = new Map();
+  const scan = async (list) => {
+    const queue = [...list];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+      for (let d = queue.shift(); d; d = queue.shift()) {
+        try { (await getScoreboard(lg, d.replace(/-/g, ''))).games.filter((g) => /nba cup.*group/i.test(g.note || '')).forEach((g) => games.set(g.id, g)); } catch { /* skip that night */ }
+      }
+    }));
+  };
+  // Group games are on Tuesday, Wednesday and Friday nights; look there first, then the other nights if any are missing.
+  const likely = inWindow.filter((d) => [2, 3, 5].includes(dow(d)));
+  await scan(likely);
+  if (games.size && games.size < 60) await scan(inWindow.filter((d) => !likely.includes(d)));
+  if (!games.size) return null;
+  const list = [...games.values()];
+  // Groups: teams joined by a group game end up together.
+  const parent = new Map();
+  const find = (x) => { while (parent.get(x) !== x) x = parent.get(x); return x; };
+  const add = (x) => { if (!parent.has(x)) parent.set(x, x); };
+  list.forEach((g) => { add(g.away.id); add(g.home.id); parent.set(find(g.away.id), find(g.home.id)); });
+  const groups = new Map();
+  for (const id of parent.keys()) groups.set(find(id), [...(groups.get(find(id)) || []), id]);
+  const teamOf = new Map(list.flatMap((g) => [[g.away.id, g.away], [g.home.id, g.home]]));
+  let confOf = new Map();
+  try { (await getStandings(lg)).groups.forEach((gr) => gr.rows.forEach((r) => confOf.set(r.team.id, /east/i.test(gr.name) ? 'East' : /west/i.test(gr.name) ? 'West' : ''))); } catch { confOf = new Map(); }
+  const done = list.filter((g) => g.state === 'final');
+  const out = [...groups.values()].map((ids) => {
+    const ranked = rankCupGroup(ids, done.filter((g) => ids.includes(g.away.id) && ids.includes(g.home.id)));
+    const conf = confOf.get(ids[0]) || '';
+    return { conf, ids, rows: ranked.map((r) => ({ ...r, team: teamOf.get(r.id) })) };
+  });
+  // Stable order: East then West, groups by their alphabetically first team.
+  const first = (g) => [...g.rows.map((r) => r.team.name)].sort()[0];
+  out.sort((a, b) => (a.conf === b.conf ? first(a).localeCompare(first(b)) : a.conf === 'East' ? -1 : 1));
+  const n = {};
+  out.forEach((g) => { n[g.conf] = (n[g.conf] || 0) + 1; g.name = `${g.conf ? g.conf + ' · ' : ''}Group ${n[g.conf]}`; });
+  // Who is in line for the knockout round: each group's leader, plus the best second-place team in each conference.
+  out.forEach((g) => { if (g.rows[0]?.w + g.rows[0]?.l > 0) g.rows[0].tag = 'lead'; });
+  ['East', 'West'].forEach((c) => {
+    const seconds = out.filter((g) => g.conf === c && g.rows[1] && g.rows[1].w + g.rows[1].l > 0).map((g) => g.rows[1]);
+    seconds.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || b.pd - a.pd || b.pf - a.pf);
+    if (seconds[0]) seconds[0].tag = 'wild';
+  });
+  const last = list.map((g) => String(g.date)).sort().pop();
+  return { groups: out, played: done.length, total: list.length, last };
+}
+
 /* ---------- standings ---------- */
 const stat = (entry, ...names) => {
   for (const n of names) {
@@ -1397,8 +1480,12 @@ export function fieldMoment(p) {
     return { kind: 'td', two, turnover: /intercept|fumble/i.test(both), ret: /return|recover|block/i.test(type) };
   }
   if (/safety/i.test(type)) return { kind: 'safety' };
-  if (/intercept/i.test(type)) return { kind: 'turnover', how: 'Interception' };
-  if (/fumble recovery \(opponent\)|opp fumble recovery|muffed punt recovery \(opponent\)/i.test(type)) return { kind: 'turnover', how: 'Fumble' };
+  const lost = /intercept/i.test(type) ? 'Interception' : /fumble recovery \(opponent\)|opp fumble recovery|muffed punt recovery \(opponent\)/i.test(type) ? 'Fumble' : '';
+  if (lost) {
+    // On a punt, "opponent" recovery means the kicking team got it back: the drive's team keeps the ball.
+    if (p.kept === true && /\bpunts?\b/i.test(text)) { const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]); return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: false, blocked: false, recovered: true }; }
+    if (p.kept !== true) return { kind: 'turnover', how: lost };
+  }
   if (/^punt|blocked punt/i.test(type)) {
     const n = Number((/punts? (\d+) yards?/i.exec(text) || [])[1]);
     return { kind: 'punt', yards: Number.isFinite(n) && n > 0 ? n : null, touchback: /touchback/i.test(text), blocked: /block/i.test(both) };
@@ -1424,7 +1511,7 @@ export function normDrives(drives, awayId, homeId, live) {
       period: p.period?.number || 0, clock: p.clock?.displayValue || '',
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
       // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
-      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: fixSpot(num(p.start?.yardsToEndzone), num(p.end?.yardsToEndzone), num(p.statYardage)),
+      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: /\bpunts?\b|kickoff/i.test(p.text || '') ? num(p.end?.yardsToEndzone) : fixSpot(num(p.start?.yardsToEndzone), num(p.end?.yardsToEndzone), num(p.statYardage)), // kick yards are not field position, so no spot check
       // endRaw is the feed's own end spot (after a kick it is counted from the receiving team's side); mine = the drive's team ran the play.
       endRaw: num(p.end?.yardsToEndzone), mine: String(p.start?.team?.id ?? teamId) === teamId,
       kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
