@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, hasPlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
 import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn } from './data/colors.js';
 import { go, useRoute, Blob, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, enterRoute, useSticky, saveScroll, savedScroll, shortEvent } from './ui.jsx';
@@ -816,12 +816,33 @@ const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th
 const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
 function PlayerPage({ lg, id }) {
   const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
+  const pmq = useQuery(hasPlusMinus(lg) ? `pm:${lg}:${id}` : null, () => getPlusMinus(lg, id), () => 600000);
+  const pm = pmq.data;
   const [tab, setTab] = useSticky('tab', 'season');
   const d = q.data, p = d?.player;
   const color = p?.team?.color || '#2B3352';
-  const log = d?.gamelog, career = d?.career || [];
-  // This season = each stat group's most recent row.
-  const season = career.map((c) => ({ ...c, row: c.rows[c.rows.length - 1] })).filter((c) => c.row);
+  const career = d?.career || [];
+  // The game log's bottom row is the feed's per-game averages, so plus-minus there is an average too.
+  // This season = each stat group's most recent row. Pro hoops adds plus-minus to the averages and totals.
+  const season = career.map((c) => {
+    const row = c.rows[c.rows.length - 1];
+    if (!row || !pm || pm.total == null || (pm.year && row.year && row.year !== pm.year) || !/^(averages|totals)$/.test(c.key)) return { ...c, row };
+    const gp = Number(career.find((x) => x.key === 'averages')?.rows.at(-1)?.stats[0]) || Object.keys(pm.games).length;
+    const v = c.key === 'totals' ? signed(pm.total) : gp ? signed(Math.round((pm.total / gp) * 10) / 10) : '';
+    return { ...c, labels: [...c.labels, '+/-'], row: { ...row, stats: [...row.stats, v] } };
+  }).filter((c) => c.row);
+  const log0 = d?.gamelog;
+  const pmOn = pm && Object.keys(pm.games).length && log0?.labels.length;
+  const log = !pmOn ? log0 : {
+    labels: [...log0.labels, '+/-'],
+    spans: log0.spans.length ? [...log0.spans, { title: '', count: 1 }] : [],
+    seasons: log0.seasons.map((sn) => {
+      const rows = sn.rows.map((r) => ({ ...r, stats: [...r.stats, pm.games[r.id] != null ? signed(pm.games[r.id]) : ''] }));
+      const known = sn.rows.filter((r) => pm.games[r.id] != null);
+      return { ...sn, rows, totals: sn.totals ? [...sn.totals, known.length ? signed(Math.round((known.reduce((n, r) => n + pm.games[r.id], 0) / known.length) * 10) / 10) : ''] : null };
+    }),
+  };
+  const pmClass = (l, v) => (l === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined);
   const tabs = [['season', 'Season'], ['log', 'Game Log'], ['career', 'Career']];
   return (
     <>
@@ -867,7 +888,7 @@ function PlayerPage({ lg, id }) {
                       {sn.rows.map((r) => (
                         <tr key={r.id} className="tap" onClick={() => go(`game/${lg}/${r.id}`)}>
                           <th scope="row" className="who">{[fmtShort(r.date), r.at, r.opp].filter(Boolean).join(' ')}<small className={'res ' + (r.result === 'W' ? 'w' : '')}>{[r.result, r.score].filter(Boolean).join(' ')}</small></th>
-                          {log.labels.map((l, j) => <td key={j}>{pct1(l, r.stats[j] ?? '')}</td>)}
+                          {log.labels.map((l, j) => <td key={j} className={pmClass(l, r.stats[j])}>{pct1(l, r.stats[j] ?? '')}</td>)}
                         </tr>
                       ))}
                       {sn.totals ? <tr className="tot"><th scope="row" className="who">Total</th>{log.labels.map((l, j) => <td key={j}>{pct1(l, sn.totals[j] ?? '')}</td>)}</tr> : null}

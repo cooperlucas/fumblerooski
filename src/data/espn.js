@@ -666,6 +666,32 @@ export async function getPlayer(lg, id) {
   };
 }
 
+// Plus-minus for pro hoops players. The player feeds leave it out, so it comes from the core service:
+// the season total, and one small read per game for the game log. College feeds do not track it at all.
+export const hasPlusMinus = (lg) => LEAGUE[lg]?.sport === 'basketball' && !LEAGUE[lg]?.college;
+export const signed = (n) => (n > 0 ? `+${n}` : String(n));
+export async function getPlusMinus(lg, id) {
+  const L = LEAGUE[lg];
+  const base = `https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}`;
+  const pid = encodeURIComponent(id);
+  const log = await get(`${base}/athletes/${pid}/eventlog?limit=200&lang=en&region=us`);
+  const year = Number(/seasons\/(\d{4})/.exec(String(log.$ref || ''))?.[1]) || null;
+  const items = (log.events?.items || []).filter((x) => x.played && x.statistics?.$ref);
+  const pmOf = (d) => { for (const c of d?.splits?.categories || []) for (const x of c.stats || []) if (x.name === 'plusMinus') return Number(x.value); return null; };
+  const games = {};
+  // A few at a time, so a full season does not fire 80 reads at once.
+  for (let i = 0; i < items.length; i += 8) {
+    await Promise.allSettled(items.slice(i, i + 8).map(async (x) => {
+      const eid = /events\/(\d+)/.exec(String(x.event?.$ref || ''))?.[1];
+      const v = pmOf(await get(String(x.statistics.$ref).replace(/^http:/, 'https:')));
+      if (eid && Number.isFinite(v)) games[eid] = v;
+    }));
+  }
+  let total = null;
+  if (year) { try { total = pmOf(await get(`${base}/seasons/${year}/types/2/athletes/${pid}/statistics?lang=en&region=us`)); } catch { /* games only */ } }
+  return { year, total: Number.isFinite(total) ? total : null, games };
+}
+
 // Player search across every league the app covers. The feed's own search, asked as you type.
 const LEAGUE_NUM = { 28: 'nfl', 23: 'cfb', 46: 'nba', 90: 'nhl', 10: 'mlb', 41: 'ncaam', 54: 'ncaaw', 59: 'wnba', 700: 'epl', 770: 'mls' };
 export async function searchPlayers(text) {
