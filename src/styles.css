@@ -525,7 +525,7 @@ button.pick.date { cursor: pointer; }
 
 .feed.inl { margin: 12px -12px -12px; border-top: 1px solid var(--rule); }
 
-.field .tdglow { fill-opacity: 0.25; filter: drop-shadow(0 0 6px #FFBE2E); animation: tdglow 0.9s ease-in-out 6 alternate, glowoff 0.5s 5.4s forwards; }
+.field .tdglow { fill-opacity: 0.25; filter: drop-shadow(0 0 6px #FFBE2E); animation: tdglow 0.9s ease-in-out 11 alternate, glowoff 0.5s 9.9s forwards; }
 @keyframes glowoff { to { opacity: 0; } }
 @keyframes tdglow { from { fill-opacity: 0.05; stroke-opacity: 0.5; } to { fill-opacity: 0.4; stroke-opacity: 1; } }
 .court .goallamp { animation: glowoff 0.5s 5s forwards; }
@@ -533,4 +533,6 @@ button.pick.date { cursor: pointer; }
 .court .goallamp path { animation: lampb 0.7s ease-in-out infinite alternate; }
 @keyframes lamp { from { transform: scale(0.5); opacity: 0.1; } to { transform: scale(1.3); opacity: 0.5; } }
 @keyframes lampb { from { fill: #8E1022; } to { fill: #FF1F3D; } }
-@media (prefers-reduced-motion: reduce) { .field .tdglow, .court .goallamp .halo, .court .goallamp path { animation: none; } .field .tdglow, .court .goallamp { animation: glowoff 0.5s 5s forwards; } }
+@media (prefers-reduced-motion: reduce) { .field .tdglow, .court .goallamp .halo, .court .goallamp path { animation: none; } .field .tdglow { animation: glowoff 0.5s 10s forwards; } .court .goallamp { animation: glowoff 0.5s 5s forwards; } }
+
+.field .ez.mid { font-size: 24px; stroke: #fff; stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; }

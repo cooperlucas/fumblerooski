@@ -975,7 +975,7 @@ function DriveField({ d, game }) {
 /* ---------- football, live: the current drive marching down a bright cartoon field ---------- */
 export function fbHead(p) {
   const t = `${p.type} ${p.text}`, y = p.yards, yd = y != null ? `${Math.abs(y)}-yd ` : '';
-  if (/touchdown/i.test(p.type)) return 'Touchdown!';
+  if (/touchdown/i.test(p.type) || /\btouchdown\b/i.test(p.text) && !/extra point|two-point/i.test(p.type)) return 'Touchdown!';
   if (/field goal/i.test(p.type)) return /good|made/i.test(t) && !/no good|missed/i.test(t) ? 'Field Goal Good' : 'Field Goal Missed';
   if (/extra point/i.test(p.type)) return /good/i.test(p.type) ? 'Extra Point Good' : 'Extra Point Missed';
   if (/penalty/i.test(p.type)) return 'Penalty';
@@ -1034,7 +1034,7 @@ function LiveField({ drives, game, onAll }) {
             <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
             {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
-            {game.neutral ? null : <g><circle cx={60 * K} cy={mid} r="17" fill={cc.home.main} stroke="#fff" strokeWidth="2.4" /><text className="ez" style={{ fontSize: game.home.abbr.length > 3 ? 9 : 11 }} x={60 * K} y={mid} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text></g>}
+            {game.neutral ? null : <text className="ez mid" x={60 * K} y={mid - 8} textAnchor="middle" dominantBaseline="central" fill={game.home.color || cc.home.main}>{game.home.abbr}</text>}
             <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
             {[[0, -1], [FW, 1]].map(([x, s]) => <path key={x} d={`M${x - s * 2} ${mid} H${x - s * 9} M${x - s * 9} ${mid - 16} V${mid + 16} M${x - s * 9} ${mid - 16} H${x - s * 15} M${x - s * 9} ${mid + 16} H${x - s * 15}`} transform={`translate(${s * 12} 0)`} stroke="#FFBE2E" strokeWidth="2.6" fill="none" strokeLinecap="round" />)}
             {d.kind === 'td' ? <rect key={'td' + d.id} className="tdglow" x={d.side === 'away' ? 110 * K : 0} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
