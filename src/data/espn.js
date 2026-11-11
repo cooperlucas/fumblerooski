@@ -641,11 +641,20 @@ function normCareer(d) {
 // One player: who they are, this season, game by game, and the career. Any piece can be missing.
 export async function getPlayer(lg, id) {
   const pid = encodeURIComponent(id);
-  const [info, log, stats] = await Promise.allSettled([
+  const [info, log, stats, core] = await Promise.allSettled([
     get(url(COMMON, lg, `/athletes/${pid}`)),
     get(url(COMMON, lg, `/athletes/${pid}/gamelog`)),
     get(url(COMMON, lg, `/athletes/${pid}/stats`)),
+    get(`https://sports.core.api.espn.com/v2/sports/${LEAGUE[lg].sport}/leagues/${LEAGUE[lg].slug}/athletes/${pid}?lang=en&region=us`),
   ]);
+  // The feed links a pro to his college page and back. { lg, id, kind: 'college' | 'pro' } when the other page is one we cover.
+  let other = null;
+  if (core.status === 'fulfilled') {
+    const kind = core.value.collegeAthlete ? 'college' : core.value.proAthlete ? 'pro' : '';
+    const m = /leagues\/([^/]+)\/athletes\/(\d+)/.exec(String(core.value[kind + 'Athlete']?.$ref || ''));
+    const to = m && Object.values(LEAGUE).find((L) => L.slug === m[1]);
+    if (to && to.id !== lg) other = { lg: to.id, id: m[2], kind };
+  }
   if (info.status === 'rejected' && log.status === 'rejected' && stats.status === 'rejected') throw info.reason;
   const a = info.status === 'fulfilled' ? (info.value.athlete || info.value || {}) : {};
   // Name the team for each career season (a transfer's old school). The stats read may list its teams;
@@ -679,7 +688,7 @@ export async function getPlayer(lg, id) {
       }).filter((x) => x.label && x.value).slice(0, 4),
     },
     gamelog: log.status === 'fulfilled' ? normGamelog(log.value) : { labels: [], spans: [], seasons: [] },
-    career,
+    career, other,
     missing: { info: info.status === 'rejected', gamelog: log.status === 'rejected', career: stats.status === 'rejected' },
   };
 }

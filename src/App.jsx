@@ -872,6 +872,12 @@ function PlayerPage({ lg, id }) {
               </div>
             </div>
             {p.team ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${p.team.id}`)}><Blob team={p.team} size={28} /> {p.team.full}</button></div> : null}
+            {d.other ? (
+              <div className="seg" role="group" aria-label="College or pro career" style={{ marginTop: 12 }}>
+                {[['college', 'College'], ['pro', 'Pro']].map(([k, label]) => { const here = d.other.kind !== k; return (
+                  <button key={k} aria-pressed={here} onClick={() => { if (!here) go(`player/${d.other.lg}/${d.other.id}`); }}>{label}<small style={{ marginLeft: 6, opacity: 0.7 }}>{LEAGUE[here ? lg : d.other.lg].short}</small></button>); })}
+              </div>
+            ) : null}
             <div className="gtabs" role="tablist" aria-label="Player sections">
               {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
             </div>
