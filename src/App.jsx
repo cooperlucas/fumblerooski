@@ -1306,7 +1306,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
 /* ---------- hockey: every shot on the rink. Away team shoots right, home team shoots left. ---------- */
 export function IceChart({ ice, game }) {
   const [per, setPer] = useState(0);
-  const cc = chartColors(game.away, game.home);
+  const cc = chartColors(game.away, game.home, true), dk = chartColors(game.away, game.home);
   const col = (id) => (id === game.away.id ? cc.away.main : cc.home.main);
   const periods = [...new Set(ice.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
   const shown = ice.filter((s) => !per || s.period === per);
@@ -1327,27 +1327,17 @@ export function IceChart({ ice, game }) {
       <div className="card pad shotbox">
         <div className="icekey">
           {[game.away, game.home].map((t, i) => (
-            <span key={t.id} style={{ textAlign: i ? 'right' : 'left' }}><b style={{ color: col(t.id) }}>{t.abbr} {i ? '←' : '→'}</b><small>{count(t.id, 'goal')} goals · {count(t.id)} shots</small></span>
+            <span key={t.id} style={{ textAlign: i ? 'right' : 'left' }}><b style={{ color: i ? dk.home.main : dk.away.main }}>{t.abbr} {i ? '←' : '→'}</b><small>{count(t.id, 'goal')} goals · {count(t.id)} shots</small></span>
           ))}
         </div>
-        <div role="img" aria-label={`Shot locations. ${game.away.name}: ${count(game.away.id, 'goal')} goals on ${count(game.away.id)} shots. ${game.home.name}: ${count(game.home.id, 'goal')} goals on ${count(game.home.id)} shots.`}>
-          <svg viewBox={`-6 -6 ${W + 12} ${H + 12}`} className="court" aria-hidden="true">
-            <rect x="2.5" y="2.5" width={W} height={H} rx={28 * K} fill="none" stroke="#6E3AB5" strokeWidth="3" />
-            <rect x="0" y="0" width={W} height={H} rx={28 * K} fill="#10162C" stroke="#22D3D6" strokeWidth="3" />
-            <path d={`M${100 * K} 0 V${H}`} stroke="#FF3D7F" strokeWidth="3" />
-            <path d={`M${75 * K} 0 V${H} M${125 * K} 0 V${H}`} stroke="#22D3D6" strokeWidth="4" opacity="0.8" />
-            <path d={`M${11 * K} ${6 * K} V${H - 6 * K} M${189 * K} ${6 * K} V${H - 6 * K}`} stroke="#FF3D7F" strokeWidth="1.5" opacity="0.7" />
-            <circle cx={100 * K} cy={H / 2} r={15 * K} fill="none" stroke="#22D3D6" strokeWidth="1.5" opacity="0.6" />
-            {dots.map(([x, y], i) => <circle key={i} cx={x + (x < W / 2 ? 6 * K : -6 * K)} cy={y} r={15 * K} fill="none" stroke="#FF3D7F" strokeWidth="1.5" opacity="0.45" />)}
-            <path d={`M${11 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 1 0 ${8 * K} Z M${189 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 0 0 ${8 * K} Z`} fill="rgba(34,211,214,.25)" stroke="#22D3D6" strokeWidth="1.5" />
-            {[...shown].sort((a, b) => order[a.kind] - order[b.kind]).map((s, i) => {
-              const x = X(s.x), y = Y(s.y), c = col(s.teamId);
-              if (s.kind === 'miss') return <path key={i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke={c} strokeWidth="2.4" strokeLinecap="round" opacity="0.85" />;
-              if (s.kind === 'save') return <circle key={i} cx={x} cy={y} r="5" fill="#10162C" stroke={c} strokeWidth="2.6" />;
-              return <g key={i}><rect x={x - 8} y={y - 8} width="16" height="16" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" transform={`rotate(45 ${x} ${y})`} /><circle cx={x} cy={y} r="4" fill={c} stroke="#0C1124" strokeWidth="1.2" /></g>;
-            })}
-          </svg>
-        </div>
+        <Ice game={game} label={`Shot locations. ${game.away.name}: ${count(game.away.id, 'goal')} goals on ${count(game.away.id)} shots. ${game.home.name}: ${count(game.home.id, 'goal')} goals on ${count(game.home.id)} shots.`}>
+          {[...shown].sort((a, b) => order[a.kind] - order[b.kind]).map((s, i) => {
+            const x = X(s.x), y = Y(s.y), c = col(s.teamId);
+            if (s.kind === 'miss') return <path key={i} d={`M${x - 4.5} ${y - 4.5} L${x + 4.5} ${y + 4.5} M${x + 4.5} ${y - 4.5} L${x - 4.5} ${y + 4.5}`} stroke={c} strokeWidth="2.4" strokeLinecap="round" />;
+            if (s.kind === 'save') return <circle key={i} cx={x} cy={y} r="5" fill="#fff" stroke={c} strokeWidth="2.6" />;
+            return <g key={i}><rect x={x - 8} y={y - 8} width="16" height="16" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" transform={`rotate(45 ${x} ${y})`} /><circle cx={x} cy={y} r="4" fill={c} stroke="#0C1124" strokeWidth="1.2" /></g>;
+          })}
+        </Ice>
         <div className="legend" style={{ margin: '12px 0 0', flexWrap: 'wrap' }}>
           <span className="lg" style={{ background: '#FFBE2E' }}>◆ GOAL</span>
           <span className="lg" style={{ background: '#CBD2EA' }}>○ SAVED</span>
@@ -1356,6 +1346,28 @@ export function IceChart({ ice, game }) {
         <p className="stamp" style={{ marginTop: 10, textAlign: 'left' }}>Each team's shots are turned to face one goal, so the ends do not flip between periods.</p>
       </div>
     </section>
+  );
+}
+
+// The ice both hockey views share: bright sheet, away shoots right, home shoots left.
+function Ice({ game, label, children }) {
+  const cc = chartColors(game.away, game.home, true);
+  const K = 3, W = 200 * K, H = 85 * K;
+  const dots = [31, 169].flatMap((x) => [20.5, 64.5].map((y) => [x * K, y * K]));
+  return (
+    <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="court full" role="img" aria-label={label}>
+      <rect x="0" y="0" width={W} height={H} rx={28 * K} fill="#F4FAFF" stroke="#1B2350" strokeWidth="3" />
+      <path d={`M${11 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 1 0 ${8 * K} Z`} fill={cc.home.main} opacity="0.5" />
+      <path d={`M${189 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 0 0 ${8 * K} Z`} fill={cc.away.main} opacity="0.5" />
+      <path d={`M${100 * K} 0 V${H}`} stroke="#E0263C" strokeWidth="4" />
+      <path d={`M${75 * K} 0 V${H} M${125 * K} 0 V${H}`} stroke="#2A5BD7" strokeWidth="5" />
+      <path d={`M${11 * K} ${5 * K} V${H - 5 * K} M${189 * K} ${5 * K} V${H - 5 * K}`} stroke="#E0263C" strokeWidth="1.6" />
+      <circle cx={100 * K} cy={H / 2} r={15 * K} fill="#F4FAFF" stroke="#2A5BD7" strokeWidth="2" />
+      <text x={100 * K} y={H / 2 + 7} textAnchor="middle" className="ccode" style={{ fontSize: 20 }} fill={cc.home.main}>{game.neutral ? '' : game.home.abbr}</text>
+      {dots.map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r={15 * K} fill="none" stroke="#E0263C" strokeWidth="1.6" opacity="0.7" /><circle cx={x} cy={y} r="3" fill="#E0263C" /></g>)}
+      <path d={`M${11 * K - 9} ${H / 2 - 9} H${11 * K} V${H / 2 + 9} H${11 * K - 9} Z M${189 * K + 9} ${H / 2 - 9} H${189 * K} V${H / 2 + 9} H${189 * K + 9} Z`} fill="none" stroke="#1B2350" strokeWidth="2" />
+      {children}
+    </svg>
   );
 }
 
@@ -1376,7 +1388,6 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
   // The goal light: on while a goal is one of the three newest plays, over the net it went into.
   const g3 = recent.slice(0, 3).find((p) => p.scoring);
   const goalSide = g3 ? sideOf(g3.teamId) : null;
-  const dots = [31, 169].flatMap((x) => [20.5, 64.5].map((y) => [x * K, y * K]));
   return (
     <section className="sec">
       <div className="card livecourt">
@@ -1387,17 +1398,7 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
           <span><Blob team={game.away} size={20} /> <b>{game.away.abbr}</b> <small>shoots ▸</small></span>
           <span><small>◂ shoots</small> <b>{game.home.abbr}</b> <Blob team={game.home} size={20} /></span>
         </div>
-        <svg viewBox={`-4 -4 ${W + 8} ${H + 8}`} className="court full" role="img" aria-label={last ? `Latest shot: ${last.text}` : 'Rink'}>
-          <rect x="0" y="0" width={W} height={H} rx={28 * K} fill="#F4FAFF" stroke="#1B2350" strokeWidth="3" />
-          <path d={`M${11 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 1 0 ${8 * K} Z`} fill={cc.home.main} opacity="0.5" />
-          <path d={`M${189 * K} ${H / 2 - 4 * K} a${6 * K} ${4 * K} 0 0 0 0 ${8 * K} Z`} fill={cc.away.main} opacity="0.5" />
-          <path d={`M${100 * K} 0 V${H}`} stroke="#E0263C" strokeWidth="4" />
-          <path d={`M${75 * K} 0 V${H} M${125 * K} 0 V${H}`} stroke="#2A5BD7" strokeWidth="5" />
-          <path d={`M${11 * K} ${5 * K} V${H - 5 * K} M${189 * K} ${5 * K} V${H - 5 * K}`} stroke="#E0263C" strokeWidth="1.6" />
-          <circle cx={100 * K} cy={H / 2} r={15 * K} fill="#F4FAFF" stroke="#2A5BD7" strokeWidth="2" />
-          <text x={100 * K} y={H / 2 + 7} textAnchor="middle" className="ccode" style={{ fontSize: 20 }} fill={cc.home.main}>{game.neutral ? '' : game.home.abbr}</text>
-          {dots.map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r={15 * K} fill="none" stroke="#E0263C" strokeWidth="1.6" opacity="0.7" /><circle cx={x} cy={y} r="3" fill="#E0263C" /></g>)}
-          <path d={`M${11 * K - 9} ${H / 2 - 9} H${11 * K} V${H / 2 + 9} H${11 * K - 9} Z M${189 * K + 9} ${H / 2 - 9} H${189 * K} V${H / 2 + 9} H${189 * K + 9} Z`} fill="none" stroke="#1B2350" strokeWidth="2" />
+        <Ice game={game} label={last ? `Latest shot: ${last.text}` : 'Rink'}>
           {goalSide ? (
             <g key={'gl' + (g3.id || g3.clock)} className="goallamp" transform={`translate(${(goalSide === 'away' ? 189 : 11) * K} ${H / 2 - 62}) scale(1.7)`}>
               <circle r="16" fill="#FF1F3D" className="halo" />
@@ -1413,7 +1414,7 @@ function LiveRink({ ice, pbp, game, L, onAll }) {
                 : missed(X(last.x), Y(last.y), lc, 8, 4)}
             </g>
           ) : null}
-        </svg>
+        </Ice>
         <div className="feed inl">
           {recent.slice(0, 4).map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />)}
           {onAll ? <button className="more" onClick={onAll}>Full Play by Play ›</button> : null}
