@@ -597,7 +597,7 @@ button.pick.date { cursor: pointer; }
 .field .kstamp { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 30px; letter-spacing: 0.02em; stroke: #0C1124; stroke-width: 6px; paint-order: stroke; stroke-linejoin: round; transform-box: fill-box; transform-origin: center; animation: kstamp 0.45s cubic-bezier(.2, 1.5, .4, 1) both; }
 @keyframes kstamp { from { transform: rotate(-7deg) scale(3); opacity: 0; } to { transform: rotate(-7deg) scale(1); opacity: 1; } }
 .field .kconf { transform: translate(var(--cx), var(--cy)); animation: kconf 2s cubic-bezier(.1, .7, .3, 1) both; }
-@keyframes kconf { from { transform: translate(var(--cx), var(--cy)) rotate(0deg); opacity: 1; } 80% { opacity: 1; } to { transform: translate(calc(var(--cx) + var(--dx)), calc(var(--cy) + var(--dy))) rotate(400deg); opacity: 0; } }
+@keyframes kconf { from { transform: translate(var(--cx), var(--cy)) rotate(0deg); opacity: 0; } 3% { opacity: 1; } 80% { opacity: 1; } to { transform: translate(calc(var(--cx) + var(--dx)), calc(var(--cy) + var(--dy))) rotate(400deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .field .karc, .field .kx, .field .ky, .field .kbounce, .field .kret, .field .kstreak, .field .kspin, .field .kstamp, .field .kconf { animation-duration: 0.01s; animation-delay: 0s; } }
 
 /* live hockey: power play chip, empty net tag, save pulse */
