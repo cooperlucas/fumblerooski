@@ -614,6 +614,22 @@ export async function getStandings(lg, div, season) {
   if (entryTeams(conf.value).some((t) => !knowsColor(t, lg))) { try { await listTeams(lg); } catch { /* chips fall back */ } }
   const groups = standingGroups(conf.value, lg);
   const divisions = div3.status === 'fulfilled' ? standingGroups(div3.value, lg) : [];
+  // NFL and NHL conference tables: how each team is in the playoffs right now. NFL: the 4 division leaders (E/N/S/W) and
+  // 3 wild cards. NHL: the top 3 in each division (A1, M2, C3...) and 2 wild cards. Read off the conference order (seed).
+  const PO = { nfl: { per: 1, wc: 3 }, nhl: { per: 3, wc: 2 } }[lg];
+  if (PO && divisions.length) {
+    const divOf = new Map(divisions.flatMap((d) => { const m = /\b(East|North|South|West|Atlantic|Metropolitan|Central|Pacific)\b/i.exec(d.full || d.name); return m ? d.rows.map((r) => [r.team.id, m[1]]) : []; }));
+    for (const g of groups) {
+      if (!g.rows.every((r) => Number.isFinite(r.seed) && divOf.has(r.team.id))) continue;
+      const placed = new Map();
+      let wc = 0;
+      for (const r of [...g.rows].sort((x, y) => x.seed - y.seed)) {
+        const d = divOf.get(r.team.id), n = (placed.get(d) || 0) + 1;
+        if (n <= PO.per) { placed.set(d, n); r.tag = { text: d[0].toUpperCase() + (PO.per > 1 ? n : ''), kind: 'div', title: PO.per > 1 ? `${n === 1 ? '1st' : n === 2 ? '2nd' : '3rd'} in the ${d}` : `Leads the ${d}` }; }
+        else if (wc < PO.wc) { wc++; r.tag = { text: 'WC', kind: 'wc', title: 'Wild card spot' }; }
+      }
+    }
+  }
   const views = divisions.length > groups.length
     ? [{ id: 'division', label: 'Division', groups: divisions }, { id: 'conference', label: groups.length > 1 ? 'Conference' : 'League', groups }]
     : [{ id: 'conference', label: 'Conference', groups }];

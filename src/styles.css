@@ -735,3 +735,10 @@ button.pick.date { cursor: pointer; }
 /* Leagues list: the crossed-out eye on a league hidden from Scores (tap to show it again). */
 .lhid { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-right: 2px; border-radius: 10px; color: var(--mute); flex: none; cursor: pointer; }
 .lhid:active { background: var(--rule); }
+/* NFL conference standings: a tiny tag for where a playoff seed comes from (division leader E/N/S/W, or WC). */
+.stag { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 16px; padding: 0 3px; margin-left: 7px; border-radius: 5px; font-size: 9.5px; font-weight: 800; letter-spacing: .02em; vertical-align: 2px; line-height: 1; border: 1.5px solid currentColor; }
+.stag.div { color: var(--gold); }
+.stag.wc { color: var(--teal); }
+.shead .vh { width: 56px; }
+/* W-L-OT records (hockey) need a wider column so they never wrap. */
+.rec3 .srow .v, .rec3 .shead .vh { width: 74px; white-space: nowrap; }

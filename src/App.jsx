@@ -479,14 +479,14 @@ function LeaguePage({ lg, focus, start, startDay }) {
             ) : null}
             {view.id === 'cup' ? <CupGroups cup={cup} lg={lg} focus={focus} /> : null}
             {shown.map((gr, i) => (
-              <div className="card" key={view.id + gr.name + i}>
-                <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>{gr.col2Label}</span></div>
+              <div className={'card' + (gr.rows.some((r) => /^\d+-\d+-\d+/.test(r.overall || '')) ? ' rec3' : '')} key={view.id + gr.name + i}>
+                <div className="shead"><span className="nm">{gr.name}</span><span className="vh" style={{ textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>{gr.col2Label}</span></div>
                 {(gr.subs || [{ name: null, rows: gr.rows }]).map((sub) => (
                   <React.Fragment key={sub.name || 'all'}>
                     {sub.name ? <div className="subhead">{sub.name}</div> : null}
                     {sub.rows.map((r, j) => (
                       <button key={r.team.id} className={'srow' + (focus && r.team.id === String(focus) ? ' me' : '')} aria-current={focus && r.team.id === String(focus) ? 'true' : undefined} onClick={() => go(`team/${lg}/${r.team.id}${yr ? '/' + yr : ''}`)}>
-                        <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}</span>
+                        <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}{r.tag ? <span className={'stag ' + r.tag.kind} title={r.tag.title} aria-label={r.tag.title}>{r.tag.text}</span> : null}</span>
                         <span className="v">{r.overall}</span><span className="v2">{r.col2}</span>
                       </button>
                     ))}
