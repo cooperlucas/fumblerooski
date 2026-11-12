@@ -260,6 +260,33 @@ export function normEvent(ev, lg) {
 /* ---------- scoreboard ---------- */
 // day: 'YYYYMMDD' or undefined for the feed's current slate.
 // day: 'YYYYMMDD'. week: { week, type, year } for football's week-by-week slates.
+// FCS, D-II and D-III coaches polls for one football week, as one team id → rank map (a team is only in its own division's poll).
+// ESPN's scoreboard and game feeds never tag these ranks, so they get filled in from here. Cached per season and week.
+const divPollCache = new Map();
+export async function divisionRanks(season, week) {
+  const key = `${season}:${week}`;
+  if (!season || !week) return new Map();
+  if (!divPollCache.has(key)) {
+    divPollCache.set(key, (async () => {
+      const out = new Map();
+      await Promise.all([20, 11, 12].map(async (pid) => {
+        try {
+          const r = await get(`https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${season}/types/2/weeks/${week}/rankings/${pid}`);
+          for (const x of r.ranks || []) { const id = String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0]; if (id && Number(x.current) <= 25) out.set(id, Number(x.current)); }
+        } catch { /* that poll is not out for this week */ }
+      }));
+      return out;
+    })());
+  }
+  return divPollCache.get(key);
+}
+// Fill in division-poll ranks on games whose teams carry none.
+async function addDivisionRanks(games, season, week) {
+  const ranked = (r) => !!r && r <= 25; // (a blank rank must not pass as ranked: null <= 25 is true)
+  if (!games.some((g) => !ranked(g.away.rank) || !ranked(g.home.rank))) return;
+  const ranks = await divisionRanks(season, week);
+  for (const g of games) for (const sd of [g.away, g.home]) if (!(sd.rank && sd.rank <= 25) && ranks.get(String(sd.id))) sd.rank = ranks.get(String(sd.id));
+}
 export async function getScoreboard(lg, day, week) {
   const L = LEAGUE[lg];
   const wk = week ? { week: String(week.week), seasontype: String(week.type), ...(week.year ? { dates: String(week.year) } : {}) } : {};
@@ -271,6 +298,7 @@ export async function getScoreboard(lg, day, week) {
   const weeks = Lg.calendarType === 'list' ? cal.flatMap((t) => (t.entries || []).map((e) => ({ week: Number(e.value), type: Number(t.value), label: cleanText(e.label || ''), detail: cleanText(e.detail || ''), start: e.startDate, end: e.endDate })))
     .filter((w) => w.week && w.type !== 4 && (w.type !== 1 || L.sport === 'football' && !L.college)) : null;
   const dates = Lg.calendarType === 'day' ? cal.map((x) => String(x).slice(0, 10)) : null;
+  if (lg === 'cfb' && Number(data.season?.type) === 2) { try { await addDivisionRanks(games, Number(data.season?.year), Number(data.week?.number)); } catch { /* ranks stay as the feed had them */ } }
   return {
     lg, games, season: Lg.season?.type?.name || '',
     year: Number(data.season?.year || Lg.season?.year) || null,
@@ -2003,7 +2031,10 @@ function normPreview(data, game, lg) {
 }
 
 export async function getGame(lg, id) {
-  return gameFromSummary(lg, id, await get(url(SITE, lg, '/summary', { event: id })));
+  const data = await get(url(SITE, lg, '/summary', { event: id }));
+  const out = gameFromSummary(lg, id, data);
+  if (lg === 'cfb' && Number(data.header?.season?.type) === 2) { try { await addDivisionRanks([out.game], Number(data.header?.season?.year), Number(data.header?.week)); } catch { /* fine */ } }
+  return out;
 }
 export async function getSummary(lg, id) {
   return get(url(SITE, lg, '/summary', { event: id }));
