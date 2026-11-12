@@ -1255,9 +1255,37 @@ const DEEP = {
     penaltyMinutes: ['penalties', 'penaltyMinutes'], wins: ['general', 'wins'], shutouts: ['defensive', 'shutouts'],
   },
 };
-export const EXTRA_BOARDS = { rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
-export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key];
+// Average boards with our own minimum, so a rank on a player's tile can be checked against a list.
+// The feed's own average lists let in players with a handful of tries, and its ranks don't match any cutoff.
+export const QUALIFIED = {
+  football: {
+    yardsPerRushAttempt: { group: 'rushing', cat: 'offense:rushing', vol: 'rushingAttempts', num: 'rushingYards', per: 10, title: 'Yards Per Carry', min: 'MIN 10 CAR/G' },
+    yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', num: 'receivingYards', per: 3, title: 'Yards Per Catch', min: 'MIN 3 REC/G' },
+  },
+};
+export const qualifiedRule = (lg, key) => QUALIFIED[LEAGUE[lg]?.sport]?.[key] || null;
+async function qualifiedBoard(lg, q) {
+  // Everyone with real volume, then keep those over the minimum and sort by the average.
+  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat }));
+  const names = (g) => (d.categories || []).find((c) => c.name === g)?.names || [];
+  const num = (v) => Number(String(v ?? '').replace(/,/g, ''));
+  const at = (x, g, n) => num((x.categories || []).find((c) => c.name === g)?.totals?.[names(g).indexOf(n)]);
+  return (d.athletes || []).map((x) => {
+    const a = x.athlete || {}, vol = at(x, q.group, q.vol), tot = at(x, q.group, q.num), gp = at(x, 'general', 'gamesPlayed');
+    return { a, vol, gp, avg: vol ? tot / vol : 0 };
+  }).filter((r) => r.gp > 0 && r.vol >= q.per * r.gp && r.a.displayName)
+    .sort((x, y) => y.avg - x.avg)
+    .map((r) => ({
+      value: r.avg.toFixed(1),
+      player: { id: String(r.a.id ?? ''), name: cleanText(r.a.displayName || ''), pos: r.a.position?.abbreviation || '' },
+      team: r.a.teamId ? normTeam({ id: r.a.teamId, abbreviation: r.a.teamShortName, displayName: r.a.teamName, shortDisplayName: r.a.teamShortName }, lg) : null,
+    }));
+}
+export const EXTRA_BOARDS = { yardsPerRushAttempt: 'Yards Per Carry', yardsPerReception: 'Yards Per Catch', rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
+export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key] || !!qualifiedRule(lg, key);
 export async function getDeepLeader(lg, key) {
+  const q = qualifiedRule(lg, key);
+  if (q) return qualifiedBoard(lg, q);
   const m = DEEP[LEAGUE[lg]?.sport]?.[key];
   if (!m) return null;
   const [group, stat, cat] = m;

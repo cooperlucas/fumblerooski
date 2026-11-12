@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, MORNING_UNTIL } from './data/headlines.js';
@@ -633,7 +633,7 @@ function LeaderPage({ lg, cat, focus }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   if (q.loading && !q.data) return <Loading rows={8} />;
   if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
-  const c = q.data.cats.find((x) => x.key === cat) || (EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
+  const c = q.data.cats.find((x) => x.key === cat) || (EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: qualifiedRule(lg, cat)?.min || '', rows: [] } : null);
   if (!c) return <Empty>No {LEAGUE[lg].short} leader board for that stat right now.</Empty>;
   return (
     <>
@@ -974,6 +974,16 @@ function PlayerPage({ lg, id }) {
   // The league's leader boards, so a "5th in FBS" tile can open the matching board.
   const lq = useQuery(d?.summary?.items?.some((x) => x.rank) ? `leaders:${lg}` : null, () => getLeaders(lg), () => 600000);
   const leaderCats = lq.data?.cats || [];
+  // Averages rank on our own qualified board (ESPN's average ranks don't match any minimum). Not qualified: no rank.
+  const qKey = d?.summary?.items?.find((x) => qualifiedRule(lg, x.key))?.key || null;
+  const qb = useQuery(qKey ? `deep:${lg}:${qKey}` : null, () => getDeepLeader(lg, qKey), () => 600000);
+  const qRank = (key) => {
+    if (key !== qKey || !qb.data) return null;
+    const i = qb.data.findIndex((r) => r.player?.id === String(id));
+    if (i < 0) return null;
+    const pl = places(qb.data.map((r) => r.value))[i];
+    return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
+  };
   const color = p?.team?.color || '#2B3352';
   const career = d?.career || [];
   // One season picker drives both the Season and Game Log tabs. '' = the latest season.
@@ -1039,8 +1049,9 @@ function PlayerPage({ lg, id }) {
 
             {tab === 'season' ? (
               <>
-                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? (() => {
-                  const txt = `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
+                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualifiedRule(lg, x.key) ? qRank(x.key) : x.rank) ? (() => {
+                  const qr = qualifiedRule(lg, x.key) ? qRank(x.key) : null;
+                  const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
                   return k ? <button className="trank tlink" onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className="trank">{txt}</em>;
                 })() : null}</div>)}</div> : null}
