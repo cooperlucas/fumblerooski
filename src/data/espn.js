@@ -263,22 +263,36 @@ export function normEvent(ev, lg) {
 // FCS, D-II and D-III coaches polls for one football week, as one team id → rank map (a team is only in its own division's poll).
 // ESPN's scoreboard and game feeds never tag these ranks, so they get filled in from here. Cached per season and week.
 const divPollCache = new Map();
-export async function divisionRanks(season, week) {
-  const key = `${season}:${week}`;
-  if (!season || !week) return new Map();
+function weekPoll(season, week, pid) {
+  const key = `${season}:${week}:${pid}`;
   if (!divPollCache.has(key)) {
-    divPollCache.set(key, (async () => {
-      const out = new Map();
-      await Promise.all([20, 11, 12].map(async (pid) => {
-        try {
-          const r = await get(`https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${season}/types/2/weeks/${week}/rankings/${pid}`);
-          for (const x of r.ranks || []) { const id = String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0]; if (id && Number(x.current) <= 25) out.set(id, Number(x.current)); }
-        } catch { /* that poll is not out for this week */ }
-      }));
-      return out;
-    })());
+    divPollCache.set(key, get(`https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${season}/types/2/weeks/${week}/rankings/${pid}`)
+      .then((r) => new Map((r.ranks || []).map((x) => [String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0], Number(x.current)]).filter(([id, n]) => id && n <= 25)))
+      .catch(() => new Map())); // that poll is not out for this week
   }
   return divPollCache.get(key);
+}
+export async function divisionRanks(season, week) {
+  if (!season || !week) return new Map();
+  const maps = await Promise.all([20, 11, 12].map((pid) => weekPoll(season, week, pid)));
+  return new Map(maps.flatMap((m) => [...m]));
+}
+const POLL_NAME = { 20: 'FCS Coaches Poll', 11: 'D-II Coaches Poll', 12: 'D-III Coaches Poll' };
+// Ranks for a below-FBS team's schedule: { byGame: { gameId: { teamId: rank } }, own, note }. Loaded after the schedule shows.
+export async function getSchedulePollRanks(lg, info) {
+  if (!info) return null;
+  let pid = info.pollId;
+  if (!pid) { // ESPN did not say which division: find the team in the division standings (slow, so only then)
+    try { const me = (await getDivisionTeams(lg)).find((x) => String(x.id) === info.teamId); pid = { FCS: 20, 'D-II': 11, 'D-III': 12 }[me?.div] || null; } catch { /* unknown */ }
+  }
+  if (!pid) return null;
+  const weeks = [...new Set(Object.values(info.weeks).filter(Boolean))];
+  const polls = new Map(await Promise.all(weeks.map(async (w) => [w, await weekPoll(info.season, w, pid)])));
+  const byGame = {};
+  for (const [gid, w] of Object.entries(info.weeks)) { const pl = polls.get(w); if (pl && pl.size) byGame[gid] = Object.fromEntries(pl); }
+  const got = [...polls.values()].filter((m) => m.size).length;
+  const latest = polls.get(Math.max(0, ...weeks));
+  return { byGame, own: latest?.get(info.teamId) || null, note: { name: POLL_NAME[pid], weeks: got, asked: weeks.length } };
 }
 // Fill in division-poll ranks on games whose teams carry none.
 async function addDivisionRanks(games, season, week) {
@@ -633,35 +647,13 @@ export async function getTeam(lg, id, season) {
     pastRecord = w + l + tie ? [w, l, ...(tie ? [tie] : [])].join('-') : '';
   }
   // Below FBS, ESPN's schedule never tags a ranked opponent, but it keeps each week's FCS, D-II and D-III coaches polls.
-  // Mark each opponent with its rank in the poll that week's games were played under (and this team's own current rank).
-  let ownPollRank = null, pollNote = null;
-  const POLL = { 81: 20, 57: 11, 58: 12 }; // division group → poll id
-  const POLL_NAME = { 20: 'FCS Coaches Poll', 11: 'D-II Coaches Poll', 12: 'D-III Coaches Poll' };
-  // The division comes from the team record; if that read failed, from the divisions this team is listed under.
-  let pollId = lg === 'cfb' ? POLL[Number(t.groups?.parent?.id)] || POLL[Number(t.groups?.id)] : null;
-  if (lg === 'cfb' && !pollId && !(rankNow && rankNow <= 25)) {
-    try { const me2 = (await getDivisionTeams(lg)).find((x) => String(x.id) === String(t.id || id)); pollId = { FCS: 20, 'D-II': 11, 'D-III': 12 }[me2?.div] || null; } catch { /* no division list */ }
-  }
-  if (pollId && shown) {
-    const raw = sched.status === 'fulfilled' ? (sched.value.events || []) : [];
-    const wkOf = new Map(raw.map((e) => [String(e.id), Number(e.seasonType?.type || e.season?.type) === 3 ? null : Number(e.week?.number) || null]));
-    const weeks = [...new Set([...wkOf.values()].filter(Boolean))];
-    const polls = new Map();
-    await Promise.all(weeks.map(async (w) => {
-      try {
-        const r = await get(`${CORE}/seasons/${shown}/types/2/weeks/${w}/rankings/${pollId}`);
-        polls.set(w, new Map((r.ranks || []).map((x) => [String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0], Number(x.current)])));
-      } catch { /* no poll that week (preseason, or not out yet) */ }
-    }));
-    for (const g of schedule) {
-      const pl = polls.get(wkOf.get(String(g.id)));
-      if (!pl) continue;
-      for (const sd of [g.away, g.home]) { const rk = pl.get(String(sd.id)); if (rk && rk <= 25 && !(sd.rank && sd.rank <= 25)) sd.rank = rk; }
-    }
-    const latest = polls.get(Math.max(0, ...polls.keys()));
-    ownPollRank = latest?.get(String(t.id || id)) || null;
-    pollNote = { name: POLL_NAME[pollId], weeks: polls.size, asked: weeks.length };
-  }
+  // Those ranks load separately (getSchedulePollRanks) so the schedule itself shows right away; this is what they need.
+  const groupsKnown = !!(t.groups?.parent?.id || t.groups?.id);
+  const DIV = { 81: 20, 57: 11, 58: 12 }; // division group → poll id
+  const pollInfo = lg === 'cfb' && shown && !(rankNow && rankNow <= 25) && (!groupsKnown || DIV[Number(t.groups?.parent?.id)] || DIV[Number(t.groups?.id)])
+    ? { teamId: String(t.id || id), season: shown, pollId: DIV[Number(t.groups?.parent?.id)] || DIV[Number(t.groups?.id)] || null,
+        weeks: Object.fromEntries((sched.status === 'fulfilled' ? (sched.value.events || []) : []).map((e) => [String(e.id), Number(e.seasonType?.type || e.season?.type) === 3 ? null : Number(e.week?.number) || null])) }
+    : null;
   // "1st in Horizon" before a single league game is just alphabetical order. Hide the place until this team has
   // played a conference game (college; pros count every game toward the standings).
   let noConfYet = false;
@@ -677,8 +669,8 @@ export async function getTeam(lg, id, season) {
   return {
     team: normTeam(t.id ? t : { ...t, id }, lg),
     record: String((season && season !== current ? pastRecord : record) || ''),
-    rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : ownPollRank) : null,
-    pollNote,
+    rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : null) : null,
+    pollInfo,
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
     standing: (season && season !== current) || noConfYet ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule,

@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
@@ -718,7 +718,15 @@ function TeamPage({ lg, id, season }) {
   const favs = useFavs();
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
-  const sched = q.data?.schedule || [];
+  // Division-poll ranks (FCS, D-II, D-III) load after the schedule shows, then get laid onto it.
+  const pr = useQuery(q.data?.pollInfo ? `schedranks:${lg}:${id}:${q.data.pollInfo.season}` : null, () => getSchedulePollRanks(lg, q.data.pollInfo), () => 1800000).data;
+  const sched = useMemo(() => (q.data?.schedule || []).map((g) => {
+    const rk = pr?.byGame?.[g.id];
+    if (!rk) return g;
+    const up = (sd) => (sd.rank && sd.rank <= 25) || !rk[String(sd.id)] ? sd : { ...sd, rank: rk[String(sd.id)] };
+    return { ...g, away: up(g.away), home: up(g.home) };
+  }), [q.data, pr]);
+  const pollNote = pr?.note || null;
   // Long seasons (baseball, hoops, hockey) get split by month so the list is not one endless scroll.
   const monthKey = (g) => { const d = new Date(g.date); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
   const months = sched.length > 30 ? [...new Set(sched.map(monthKey).filter(Boolean))] : [];
@@ -747,7 +755,7 @@ function TeamPage({ lg, id, season }) {
   // or the one poll a lower-division team appears in (FCS Coaches, AFCA Div II, AFCA Div III).
   const lower = pollRanks.find((x) => x.level !== 'top');
   const mainPoll = lower ? lower.poll : polls[0];
-  const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || null);
+  const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || pr?.own || null);
   // The schedule feed leaves the score blank while a game is on, so read that one game live.
   const liveId = sched.find((g) => g.state === 'live')?.id;
   const lq = useQuery(liveId ? `game:${lg}:${liveId}` : null, () => getGame(lg, liveId), () => 30000);
@@ -812,7 +820,7 @@ function TeamPage({ lg, id, season }) {
                     {months.map((k) => <button key={k} className="chipb" aria-pressed={k === month} onClick={() => setMo(k)}>{monthName(k)}</button>)}
                   </div>
                 ) : null}
-                {q.data.pollNote ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{q.data.pollNote.weeks ? `Ranks from the ${q.data.pollNote.name}, as of each game's week` : `${q.data.pollNote.name} did not load (0 of ${q.data.pollNote.asked} weeks)`}</p> : null}
+                {pollNote && pollNote.weeks ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>Ranks from the {pollNote.name}, as of each game's week</p> : null}
                 {sched.length ? <div className="card">{shownSched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
               </section>
             ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>
