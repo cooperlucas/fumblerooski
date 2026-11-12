@@ -1263,7 +1263,12 @@ function LiveField({ drives, game, onAll }) {
                 : m.kind === 'punt' && m.recovered ? { text: `Turnover · Muffed Punt`, team: t, bad: true }
                 : m.kind === 'punt' ? { text: m.blocked ? 'Punt Blocked' : `Punt${m.yards ? ` · ${m.yards} Yards` : ''}`, team: last.mine ? t : opp }
                   : m.kind === 'kickoff' ? { text: m.touchback ? 'Kickoff · Touchback' : 'Kickoff', team: last.mine ? t : opp } : null;
-  const banner = flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
+  // After a punt the other side fields, the kick plays out, then possession changes over: the punting drive is done, and the
+  // receiving team has the ball where the play ended (before the feed opens their drive). Spots here are in the kicking team's terms.
+  const handoff = d.live && !flash && !!last && last.mine && !last.kept && m.kind === 'punt' && !m.recovered;
+  const hSpot = !handoff ? null : m.touchback ? 20 : m.blocked ? last.from - (Number.isFinite(last.yards) ? last.yards : 0) : last.endRaw != null ? 100 - last.endRaw : last.from - (m.yards || 0);
+  const hText = hSpot == null ? '' : Math.round(hSpot) === 50 ? '50' : hSpot < 50 ? `${opp.abbr} ${Math.round(hSpot)}` : `${t.abbr} ${Math.round(100 - hSpot)}`;
+  const banner = handoff ? { text: `${opp.abbr} Ball`, team: opp } : flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
   // Goalposts drawn flat, as seen from above: the crossbar runs along the end line, the uprights point out past it.
@@ -1344,8 +1349,10 @@ function LiveField({ drives, game, onAll }) {
             {banner.team ? <Blob team={banner.team} size={22} /> : null}<b>{banner.text}</b>
           </div>
           <div className="lfhead">
-            <Blob team={t} size={30} />
-            <span className="tx"><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></span>
+            <Blob team={handoff ? opp : t} size={30} />
+            <span className="tx">{handoff
+              ? <><b>Next Drive</b><small>Starts at {hText} · {t.abbr} punted ({d.summary || `${d.plays.length} plays`})</small></>
+              : <><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></>}</span>
             {d.result && !d.live ? <span className="res">{d.result}</span> : null}
           </div>
           {going ? (
@@ -1373,7 +1380,15 @@ function LiveField({ drives, game, onAll }) {
                 <circle cx={P.x + P.s * 7} cy={mid} r="2.6" fill={GOLD} stroke={INK} strokeWidth="1.2" />
               </g>))}
             {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="2.4" /> : null}
-            {start != null && at != null ? (
+            {handoff && hSpot != null ? (
+              <g className="lfmove" style={{ transform: `translate(${X(hSpot)}px, ${ly}px)` }}>
+                <g className="lfball">
+                  <path d={`M${-dirn * 3} -6.5 L${-dirn * 11} 0 L${-dirn * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
+                  <g transform="translate(0 -19)">{ball(9.5)}</g>
+                  <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
+                </g>
+              </g>
+            ) : start != null && at != null ? (
               <>
                 <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
@@ -1392,7 +1407,7 @@ function LiveField({ drives, game, onAll }) {
                 </g>
               </>
             ) : null}
-            {show}
+            {handoff ? null : show}
             {retEnd != null && retFrom != null && !noRet ? (
               <g key={'ret' + lastKey}>{/* the return stays drawn until the next play; only the stamp fades */}
                 {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
