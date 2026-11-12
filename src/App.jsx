@@ -991,7 +991,6 @@ function PlayerPage({ lg, id }) {
     const i = board.findIndex((r) => r.player?.id === String(id));
     if (i < 0) return null;
     const pl = places(board.map((r) => r.value))[i];
-    if (Number(pl.replace(/^T/, '')) > 150) return null; // same cutoff as the feed's ranks: deep in the pack says little
     return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
   };
   const color = p?.team?.color || '#2B3352';
