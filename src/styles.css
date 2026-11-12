@@ -760,3 +760,5 @@ button.pick.date { cursor: pointer; }
 .chipb.rchip { display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; }
 .rooski { display: block; }
 .rooski .rcface { color: var(--ink); }
+/* Link underlines: a hairline, not the heavy line bold text gets by default. */
+.plink, .trank.tlink { text-decoration-thickness: 1px; text-underline-offset: 3px; }
