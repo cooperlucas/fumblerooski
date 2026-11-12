@@ -216,14 +216,11 @@ export function Stamp({ at, live }) {
 }
 
 /* ---------- chrome ---------- */
-const SearchIcon = () => (<svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.6" /><path d="M15.5 15.5 L21 21" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>);
-// Home header buttons: chunky sticker icons in the app's throwback colors.
-const RooSearch = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M15.2 15.2 L20.6 20.6" stroke="#0C1124" strokeWidth="4.6" strokeLinecap="round" />
-    <path d="M15.6 15.6 L20.2 20.2" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="10" cy="10" r="6.6" fill="#F4FAFF" stroke="#0C1124" strokeWidth="2.6" />
-    <path d="M6.9 9.2 A3.4 3.4 0 0 1 9.4 6.6" fill="none" stroke="#22D3D6" strokeWidth="2" strokeLinecap="round" />
+const SearchIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M15.4 15.4 L20.4 20.4" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" />
+    <circle cx="10.2" cy="10.2" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.6" />
+    <path d="M7.2 9.4 A3.2 3.2 0 0 1 9.5 7.1" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 function gearPath(cx, cy, R, r, n, base = 0.95, top = 0.5) {
@@ -235,10 +232,10 @@ function gearPath(cx, cy, R, r, n, base = 0.95, top = 0.5) {
   return `M${pts.join(' L')} Z`;
 }
 const GEAR = gearPath(12, 12, 10.2, 7.6, 6, 0.6, 0.36);
-const RooGear = () => (
-  <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-    <path d={GEAR} fill="none" stroke="#0C1124" strokeWidth="2.2" strokeLinejoin="round" />
-    <circle cx="12" cy="12" r="3.1" fill="none" stroke="#0C1124" strokeWidth="2.2" />
+const GearIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d={GEAR} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" strokeWidth="2.2" />
   </svg>
 );
 
@@ -307,8 +304,8 @@ export function RootHeader() {
           <FitTagline />
         </div>
         <div className="headbtns">
-          <button className="roobtn srch" aria-label="Search" onClick={() => go('search')}><RooSearch /></button>
-          <button className="roobtn gear" aria-label="Settings" onClick={() => go('settings')}><RooGear /></button>
+          <button className="round" aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
+          <button className="round" aria-label="Settings" onClick={() => go('settings')}><GearIcon /></button>
         </div>
       </header>
       <div className="stripes" aria-hidden="true" />

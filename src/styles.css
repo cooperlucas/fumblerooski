@@ -662,16 +662,8 @@ button.pick.date { cursor: pointer; }
 .switch[aria-checked="true"] span { transform: translateX(20px); }
 .switch:disabled { opacity: .6; }
 
-.headbtns { margin-left: auto; display: flex; gap: 8px; flex: none; padding: 0 3px 3px 0; }
-.roobtn { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border-radius: 12px; border: 2.5px solid #0C1124; box-shadow: 3px 3px 0 var(--deep); transition: transform .12s ease, box-shadow .12s ease; }
-.roobtn.srch { background: #22D3D6; transform: rotate(-5deg); }
-.roobtn.gear { background: #FFBE2E; transform: rotate(4deg); }
-.roobtn:active { box-shadow: 1px 1px 0 var(--deep); }
-.roobtn.srch:active { transform: rotate(-5deg) translate(2px, 2px); }
-.roobtn.gear:active { transform: rotate(4deg) translate(2px, 2px); }
-.roobtn .gearsvg { transition: transform .35s cubic-bezier(.3, 1.6, .5, 1); }
-.roobtn.gear:active .gearsvg { transform: rotate(60deg); }
-@media (hover: hover) { .roobtn.srch:hover { transform: rotate(-9deg) scale(1.04); } .roobtn.gear:hover .gearsvg { transform: rotate(45deg); } }
+.headbtns { margin-left: auto; display: flex; gap: 8px; flex: none; }
+.headbtns .round { width: 42px; height: 42px; }
 .brandbox { flex: 1 1 auto; min-width: 0; }
 
 /* Game header: title swaps to a compact live score once the scoreboard scrolls away */
