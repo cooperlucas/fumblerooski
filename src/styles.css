@@ -727,3 +727,5 @@ button.pick.date { cursor: pointer; }
 .pbprow .tchips { margin-left: auto; }
 .pbprow .chipb { padding: 0 12px; }
 .pbprow .tchip { padding: 0 9px; display: inline-flex; align-items: center; }
+/* Lead Tracker team labels sit in the corners where a game starts level (rarely any data there), with a halo just in case. */
+.flow .halo { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }

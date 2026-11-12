@@ -1541,7 +1541,8 @@ export function playerBox(box, awayId, homeId, sport, plusMinus, ff) {
 /* ---------- score chart: both teams' scores across the game. Facts only, no predictions. ---------- */
 const OT_LEN = { football: 10, basketball: 5, hockey: 5 };
 // Minutes of game time elapsed at a play, or null if the clock cannot be read.
-function elapsed(period, clock, L) {
+// up: the clock counts up from 0:00 (ESPN's NHL plays do; its live NHL game clock still counts down).
+function elapsed(period, clock, L, up = false) {
   const c = String(clock ?? '').trim();
   if (L.sport === 'soccer') { const m = c.match(/(\d+)/); return m ? +m[1] : null; }
   if (!L.periodLen) return null;
@@ -1552,7 +1553,7 @@ function elapsed(period, clock, L) {
   const per = Math.max(1, period || 1), reg = L.periods, ot = OT_LEN[L.sport] || L.periodLen;
   const len = per <= reg ? L.periodLen : ot;
   const base = per <= reg ? (per - 1) * L.periodLen : reg * L.periodLen + (per - reg - 1) * ot;
-  return base + Math.min(len, Math.max(0, len - left));
+  return base + Math.min(len, Math.max(0, up ? left : len - left));
 }
 // plays: [{ period, clock, away, home }] in game order. Falls back to period scores when plays are missing.
 export function scoreSeries(game, plays, L) {
@@ -1561,7 +1562,7 @@ export function scoreSeries(game, plays, L) {
   let pts = [{ m: 0, a: 0, h: 0 }], pa = 0, ph = 0, timed = !!L.periodLen;
   for (const p of plays) {
     if (!Number.isFinite(p.away) || !Number.isFinite(p.home) || (p.away === pa && p.home === ph) || p.away < pa || p.home < ph) continue;
-    const m = elapsed(p.period, p.clock, L);
+    const m = elapsed(p.period, p.clock, L, L.sport === 'hockey');
     if (m == null) timed = false;
     pts.push({ m, a: p.away, h: p.home }); pa = p.away; ph = p.home;
   }

@@ -1074,7 +1074,8 @@ function LeadChart({ chart, game, L }) {
     const a = i ? chart.bounds[i - 1] : 0, b = chart.bounds[i] ?? 1;
     const len = i < reg ? L.periodLen : (L.sport === 'hockey' ? 5 : L.sport === 'football' ? 10 : L.sport === 'basketball' ? 5 : L.periodLen);
     let clock = '';
-    if (chart.stepped && len) { const left = Math.max(0, len * (1 - (scrub - a) / Math.max(1e-9, b - a))); clock = `${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}`; }
+    // Same clock style as the Plays list: hockey counts up from 0:00, everyone else counts down.
+    if (chart.stepped && len) { const f = (scrub - a) / Math.max(1e-9, b - a), v = Math.max(0, len * (L.sport === 'hockey' ? f : 1 - f)); clock = `${Math.floor(v)}:${String(Math.floor((v % 1) * 60)).padStart(2, '0')}`; }
     return { p, per: label(i), clock };
   })();
   return (
@@ -1096,8 +1097,8 @@ function LeadChart({ chart, game, L }) {
             onPointerUp={(e) => { if (e.pointerType !== 'mouse') setScrub(null); }} onPointerCancel={() => setScrub(null)} onPointerLeave={(e) => { if (e.pointerType === 'mouse') setScrub(null); }}>
             {gl.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: 'var(--rule)' }} strokeWidth="1" /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">+{Math.abs(v)}</text></g>)}
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
-            <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr}</text>
-            <text x={x1} y={y1 - 3} textAnchor="end" className="per" style={{ fill: cc.home.main }}>{game.home.abbr}</text>
+            <text x={x0 + 4} y={y0 + 9} textAnchor="start" className="per halo" style={{ fill: cc.away.main }}>{game.away.abbr}</text>
+            <text x={x0 + 4} y={y1 - 3} textAnchor="start" className="per halo" style={{ fill: cc.home.main }}>{game.home.abbr}</text>
             {(() => {
               // The margin as one stepped line (it only moves when someone scores), shaded back to the center line.
               // Above the line it's the away team's color, below it the home team's, so it changes color as the lead flips.
@@ -1121,7 +1122,7 @@ function LeadChart({ chart, game, L }) {
             })()}
             <path d={`M${x0} ${mid} H${x1}`} style={{ stroke: 'var(--soft)' }} strokeWidth="1.5" />
             <text x={x0 - 6} y={mid + 3.5} textAnchor="end" className="ax">0</text>
-            {at ? <g pointerEvents="none"><path d={`M${x(scrub)} ${y0} V${y1}`} stroke="#F5F5F7" strokeWidth="1.25" strokeDasharray="3 3" /><circle cx={x(scrub)} cy={y(at.p.a - at.p.h)} r="5" fill={at.p.a > at.p.h ? cc.away.main : at.p.a < at.p.h ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" /></g> : null}
+            {at ? <g pointerEvents="none"><path d={`M${x(scrub)} ${y0} V${y1}`} style={{ stroke: 'var(--ink)' }} strokeWidth="1.5" strokeDasharray="3 3" /><circle cx={x(scrub)} cy={y(at.p.a - at.p.h)} r="5" fill={at.p.a > at.p.h ? cc.away.main : at.p.a < at.p.h ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" /></g> : null}
             <circle cx={x(end.t)} cy={y(end.m)} r="4.5" fill={end.m > 0 ? cc.away.main : end.m < 0 ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" />
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={'p' + i} x={x((a + b) / 2)} y={H - 16} textAnchor="middle" className="per">{label(i)}</text>; })}
             <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
