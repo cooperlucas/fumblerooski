@@ -274,6 +274,18 @@ export function RooskiCut({ size = 40 }) {
     </svg>
   );
 }
+// The Headliners chip: a popcorn bucket cut out of the button. Outline in the chip's text color, the inside is the page
+// background (as if carved through), and the stripes are drawn in the page's ink over that hole.
+export function PopcornCut({ size = 26 }) {
+  const S = { stroke: 'currentColor', strokeWidth: 2, strokeLinejoin: 'round', strokeLinecap: 'round' };
+  return (
+    <svg className="rooski" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path d="M5.5 10.5h13l-1.8 10.5H7.3z" fill="var(--bg)" {...S} />
+      <path d="M9.6 10.5l.7 10.5M14.4 10.5l-.7 10.5" fill="none" stroke="var(--ink)" strokeWidth="1.5" />
+      <path d="M5.5 10.5a2.4 2.4 0 0 1 1.6-4.2 2.6 2.6 0 0 1 4.6-1.8 2.6 2.6 0 0 1 4.6 1 2.4 2.4 0 0 1 2.2 5" fill="var(--bg)" {...S} />
+    </svg>
+  );
+}
 export function Mascot() {
   return (
     <svg className="mascot" width="54" height="42" viewBox="0 0 64 50" aria-hidden="true">
