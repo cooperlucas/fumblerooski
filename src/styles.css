@@ -721,3 +721,8 @@ button.pick.date { cursor: pointer; }
 .tick .st, .grow .gtv, .titem .ttv { overflow: visible; text-overflow: clip; max-width: none; }
 .pick.masked .shown { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.1; }
 .chipb.tchip { display: inline-flex; align-items: center; gap: 6px; }
+.pbprow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.pbprow .chips { margin: 0; }
+.pbprow .tchips { margin-left: auto; }
+.pbprow .chipb { padding: 7px 12px; } .pbprow .tchip { padding: 7px 10px 7px 7px; } .pbprow { flex-wrap: nowrap; } .pbprow .chips { flex-wrap: nowrap; gap: 6px; }
+.pbprow .chipb { padding: 7px 11px; } .pbprow .tchip { padding: 4px; }

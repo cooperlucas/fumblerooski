@@ -1096,8 +1096,8 @@ function LeadChart({ chart, game, L }) {
             onPointerUp={(e) => { if (e.pointerType !== 'mouse') setScrub(null); }} onPointerCancel={() => setScrub(null)} onPointerLeave={(e) => { if (e.pointerType === 'mouse') setScrub(null); }}>
             {gl.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: 'var(--rule)' }} strokeWidth="1" /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">+{Math.abs(v)}</text></g>)}
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
-            <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr} AHEAD</text>
-            <text x={x1} y={y1 - 3} textAnchor="end" className="per" style={{ fill: cc.home.main }}>{game.home.abbr} AHEAD</text>
+            <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr}</text>
+            <text x={x1} y={y1 - 3} textAnchor="end" className="per" style={{ fill: cc.home.main }}>{game.home.abbr}</text>
             {(() => {
               // The margin as one stepped line (it only moves when someone scores), shaded back to the center line.
               // Above the line it's the away team's color, below it the home team's, so it changes color as the lead flips.
@@ -2063,7 +2063,7 @@ function PlayByPlay({ pbp, game, L }) {
   const kinds = (PLAY_KINDS[L.sport] || []).filter(([, , re]) => pbp.some((p) => re.test(`${p.type} ${p.text}`)));
   const kre = kinds.find(([k]) => k === kind)?.[2];
   const teamFilter = teamOn.size < 2;
-  let rows = pbp.filter((p) => p.period === cur && (!kre || kre.test(`${p.type} ${p.text}`)) && (!teamFilter || teamOn.has(p.teamId)));
+  let rows = pbp.filter((p) => (cur === 0 || p.period === cur) && (!kre || kre.test(`${p.type} ${p.text}`)) && (!teamFilter || teamOn.has(p.teamId)));
   if (live) rows = [...rows].reverse();
   const reg = L.periods || 4, word = PERIOD_WORD[L.sport] ?? '';
   const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? (L.sport === 'baseball' ? String(p) : perName(L, p)) : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
@@ -2076,10 +2076,13 @@ function PlayByPlay({ pbp, game, L }) {
           {kinds.length ? <div className="chips" role="group" aria-label="Plays to show" style={{ marginTop: 8 }}>
             {[['all', 'All'], ...kinds].map(([k, t]) => <button key={k} className="chipb" aria-pressed={kind === k} onClick={() => setKind(k)}>{t}</button>)}
           </div> : null}
-          {periods.length > 1 ? <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>{periods.map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{label(p)}</button>)}</div> : null}
-          {kinds.length ? <div className="chips" role="group" aria-label="Teams" style={{ marginTop: 8 }}>
-            {[game.away, game.home].map((t) => <button key={t.id} className="chipb tchip" aria-pressed={teamOn.has(t.id)} onClick={() => flipTeam(t.id)}><Blob team={t} size={18} /> {t.abbr}</button>)}
-          </div> : null}
+          {/* Periods (with All) on the left, the two teams on the right of the same row. */}
+          <div className="pbprow">
+            {periods.length > 1 ? <div className="chips" role="group" aria-label="Period">{[0, ...periods].map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{p === 0 ? 'All' : label(p)}</button>)}</div> : <span />}
+            {kinds.length ? <div className="chips tchips" role="group" aria-label="Teams">
+              {[game.away, game.home].map((t) => <button key={t.id} className="chipb tchip" aria-pressed={teamOn.has(t.id)} aria-label={`${t.name} plays`} onClick={() => flipTeam(t.id)}><Blob team={t} size={24} /></button>)}
+            </div> : null}
+          </div>
           <div className="card feed">
             {rows.length ? rows.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />) : <p className="stamp" style={{ padding: '16px' }}>Nothing that matches in this {L.sport === 'hockey' ? 'period' : 'stretch'}.</p>}
           </div>
