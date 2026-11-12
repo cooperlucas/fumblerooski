@@ -238,11 +238,9 @@ const GEAR = gearPath(12, 12, 10.4, 7.8, 8);
 const RooGear = () => (
   <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
     <path d={GEAR} fill="#0C1124" strokeLinejoin="round" />
-    {/* a little football for the hub */}
-    <g transform="rotate(-35 12 12)">
-      <ellipse cx="12" cy="12" rx="5.3" ry="3.3" fill="#A0522D" stroke="#F4FAFF" strokeWidth="1" />
-      <path d="M9.6 12 H14.4 M10.7 10.9 V13.1 M12 10.9 V13.1 M13.3 10.9 V13.1" stroke="#F4FAFF" strokeWidth="0.85" strokeLinecap="round" />
-    </g>
+    {/* a baseball for the hub: reads like a gear's hole, with red stitches */}
+    <circle cx="12" cy="12" r="4.6" fill="#F4FAFF" />
+    <path d="M9.6 8.7 Q11.4 12 9.6 15.3 M14.4 8.7 Q12.6 12 14.4 15.3" fill="none" stroke="#E0263C" strokeWidth="1.1" strokeLinecap="round" />
   </svg>
 );
 
