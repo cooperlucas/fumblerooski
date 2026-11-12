@@ -1972,20 +1972,33 @@ function ReplayPage({ lg, id, start = 0 }) {
   const feed = useMemo(() => (q.data && n ? gameFromSummary(lg, id, replayCut(q.data, L.sport, i)) : null), [q.data, i, n]);
   const nextMoment = moments.find((m) => m > i);
   const prevMoment = [...moments].reverse().find((m) => m < i);
-  const bar = n ? (
+  const [tucked, setTucked] = useState(false);
+  const playBtn = <button className="go" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}><RIcon k={playing ? 'pause' : 'play'} size={16} /></button>;
+  // The remote: a slim bar by default, or tucked into a small pill (still with play/pause) so the field has room.
+  const bar = !n ? null : tucked ? (
+    <div className="replaybar tucked" role="group" aria-label="Replay controls">
+      {playBtn}
+      <button className="rbopen" onClick={() => setTucked(false)} aria-label="Show replay controls">
+        <b>Replay</b><span>{i + 1}/{n}</span><RIcon k="up" size={12} />
+      </button>
+    </div>
+  ) : (
     <div className="replaybar" role="group" aria-label="Replay controls">
-      <div className="rbtop"><b>Replay</b><span>Play {i + 1} of {n}</span></div>
-      <input type="range" min="0" max={n - 1} value={i} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }} aria-label="Jump to a play" />
+      <div className="rbtop">
+        <input type="range" min="0" max={n - 1} value={i} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }} aria-label="Jump to a play" />
+        <span>{i + 1}/{n}</span>
+      </div>
       <div className="rbrow">
-        <button onClick={() => { setPlaying(false); setI(prevMoment ?? 0); }} disabled={i === 0} aria-label="Previous big moment"><RIcon k="prevBig" /></button>
-        <button onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Back one play"><RIcon k="back" /></button>
-        <button className="go" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}><RIcon k={playing ? 'pause' : 'play'} /></button>
-        <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play"><RIcon k="fwd" /></button>
-        <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment"><RIcon k="nextBig" /></button>
+        <button onClick={() => { setPlaying(false); setI(prevMoment ?? 0); }} disabled={i === 0} aria-label="Previous big moment"><RIcon k="prevBig" size={15} /></button>
+        <button onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Back one play"><RIcon k="back" size={15} /></button>
+        {playBtn}
+        <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play"><RIcon k="fwd" size={15} /></button>
+        <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment"><RIcon k="nextBig" size={15} /></button>
         <button className="spd" onClick={() => setSpeed((x) => (x === 1 ? 3 : x === 3 ? 6 : 1))} aria-label="Playback speed">{speed}x</button>
+        <button className="hide" onClick={() => setTucked(true)} aria-label="Hide replay controls"><RIcon k="down" size={14} /></button>
       </div>
     </div>
-  ) : null;
+  );
   if (!REPLAY_SPORTS.has(L.sport)) return <GamePage lg={lg} id={id} />;
   if (q.loading && !q.data) return <><SubHeader title="Replay" /><Page><Loading rows={5} /></Page></>;
   if (q.error && !q.data) return <><SubHeader title="Replay" /><Page><Problem error={q.error} retry={q.reload} /></Page></>;
@@ -2025,9 +2038,12 @@ const RICON = {
   fwd: 'M7 4.5 L19.5 12 L7 19.5 Z',
   prevBig: 'M4.5 4.5 H7.5 V19.5 H4.5 Z M20 4.5 L8.5 12 L20 19.5 Z',
   nextBig: 'M16.5 4.5 H19.5 V19.5 H16.5 Z M4 4.5 L15.5 12 L4 19.5 Z',
+  down: 'M5 8.5 L12 16 L19 8.5',
+  up: 'M5 15.5 L12 8 L19 15.5',
 };
 function RIcon({ k, size = 18 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-0.15em' }}><path d={RICON[k]} fill="currentColor" strokeLinejoin="round" stroke="currentColor" strokeWidth="1.2" /></svg>;
+  const line = k === 'up' || k === 'down';
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-0.15em' }}><path d={RICON[k]} fill={line ? 'none' : 'currentColor'} strokeLinejoin="round" strokeLinecap="round" stroke="currentColor" strokeWidth={line ? 3.2 : 1.2} /></svg>;
 }
 
 function GamePage({ lg, id, feed, replayBar }) {

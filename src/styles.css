@@ -620,16 +620,21 @@ button.pick.date { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .court .runchip, .court .runchip rect { animation: none; } }
 
 /* replay: a finished game played back as if live */
-.replaybar { margin-top: 14px; padding: 8px 10px 10px; border-radius: 16px; background: var(--panel); border: 2px solid var(--yellow); display: flex; flex-direction: column; gap: 6px; position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
-.replaybar .rbtop { display: flex; justify-content: space-between; align-items: baseline; }
-.replaybar .rbtop b { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); }
-.replaybar .rbtop span { font-size: 12px; font-weight: 800; color: var(--mute); font-variant-numeric: tabular-nums; }
-.replaybar input[type=range] { width: 100%; accent-color: var(--yellow); }
-.replaybar .rbrow { display: flex; gap: 6px; }
-.replaybar .rbrow button { flex: 1; min-height: 38px; border-radius: 10px; border: 1px solid var(--rule); background: var(--panel2); color: var(--ink); font: inherit; font-weight: 900; font-size: 15px; cursor: pointer; }
-.replaybar .rbrow button:disabled { opacity: 0.35; cursor: default; }
-.replaybar .rbrow .go { background: var(--yellow); color: #0C1124; border-color: var(--yellow); }
-.replaybar .rbrow .spd { flex: 0.8; font-size: 13px; }
+.replaybar { margin-top: 14px; padding: 6px 8px 8px; border-radius: 14px; background: var(--panel); border: 2px solid var(--yellow); display: flex; flex-direction: column; gap: 4px; position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
+.replaybar .rbtop { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+.replaybar .rbtop span { flex: none; font-size: 11px; font-weight: 800; color: var(--mute); font-variant-numeric: tabular-nums; }
+.replaybar input[type=range] { flex: 1; min-width: 0; margin: 0; height: 22px; accent-color: var(--yellow); }
+.replaybar .rbrow { display: flex; gap: 5px; }
+.replaybar button { flex: 1; min-height: 34px; padding: 0; border-radius: 9px; border: 1px solid var(--rule); background: var(--panel2); color: var(--ink); font: inherit; font-weight: 900; font-size: 13px; cursor: pointer; display: grid; place-items: center; }
+.replaybar button:disabled { opacity: 0.35; cursor: default; }
+.replaybar .go { background: var(--yellow); color: #0C1124; border-color: var(--yellow); }
+.replaybar .spd { flex: 0.8; }
+.replaybar .hide { flex: 0.6; color: var(--mute); }
+.replaybar.tucked { flex-direction: row; align-items: center; gap: 6px; width: max-content; margin-left: auto; padding: 5px; border-radius: 999px; }
+.replaybar.tucked .go { width: 36px; min-height: 36px; flex: none; border-radius: 50%; }
+.replaybar .rbopen { flex: none; display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px 0 8px; border: none; background: transparent; color: var(--mute); }
+.replaybar .rbopen b { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow); }
+.replaybar .rbopen span { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .gtabs .replaybtn { margin-left: auto; color: var(--yellow); }
 
 /* NBA Cup groups */
