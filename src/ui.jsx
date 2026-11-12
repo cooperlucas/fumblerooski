@@ -234,13 +234,11 @@ function gearPath(cx, cy, R, r, n, base = 0.95, top = 0.5) {
   }
   return `M${pts.join(' L')} Z`;
 }
-const GEAR = gearPath(12, 12, 11, 8, 6, 0.6, 0.36);
+const GEAR = gearPath(12, 12, 10.2, 7.6, 6, 0.6, 0.36);
 const RooGear = () => (
   <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-    <path d={GEAR} fill="#0C1124" strokeLinejoin="round" />
-    {/* a baseball for the hub: reads like a gear's hole, with red stitches */}
-    <circle cx="12" cy="12" r="3.5" fill="#F4FAFF" />
-    <path d="M10.2 9.5 Q11.5 12 10.2 14.5 M13.8 9.5 Q12.5 12 13.8 14.5" fill="none" stroke="#E0263C" strokeWidth="0.9" strokeLinecap="round" />
+    <path d={GEAR} fill="none" stroke="#0C1124" strokeWidth="2.2" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="3.1" fill="none" stroke="#0C1124" strokeWidth="2.2" />
   </svg>
 );
 
