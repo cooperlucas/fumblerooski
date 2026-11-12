@@ -812,6 +812,7 @@ function TeamPage({ lg, id, season }) {
                     {months.map((k) => <button key={k} className="chipb" aria-pressed={k === month} onClick={() => setMo(k)}>{monthName(k)}</button>)}
                   </div>
                 ) : null}
+                {q.data.pollNote ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{q.data.pollNote.weeks ? `Ranks from the ${q.data.pollNote.name}, as of each game's week` : `${q.data.pollNote.name} did not load (0 of ${q.data.pollNote.asked} weeks)`}</p> : null}
                 {sched.length ? <div className="card">{shownSched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
               </section>
             ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>

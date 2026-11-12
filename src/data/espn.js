@@ -606,9 +606,14 @@ export async function getTeam(lg, id, season) {
   }
   // Below FBS, ESPN's schedule never tags a ranked opponent, but it keeps each week's FCS, D-II and D-III coaches polls.
   // Mark each opponent with its rank in the poll that week's games were played under (and this team's own current rank).
-  let ownPollRank = null;
+  let ownPollRank = null, pollNote = null;
   const POLL = { 81: 20, 57: 11, 58: 12 }; // division group → poll id
-  const pollId = lg === 'cfb' ? POLL[Number(t.groups?.parent?.id)] || POLL[Number(t.groups?.id)] : null;
+  const POLL_NAME = { 20: 'FCS Coaches Poll', 11: 'D-II Coaches Poll', 12: 'D-III Coaches Poll' };
+  // The division comes from the team record; if that read failed, from the divisions this team is listed under.
+  let pollId = lg === 'cfb' ? POLL[Number(t.groups?.parent?.id)] || POLL[Number(t.groups?.id)] : null;
+  if (lg === 'cfb' && !pollId && !(rankNow && rankNow <= 25)) {
+    try { const me2 = (await getDivisionTeams(lg)).find((x) => String(x.id) === String(t.id || id)); pollId = { FCS: 20, 'D-II': 11, 'D-III': 12 }[me2?.div] || null; } catch { /* no division list */ }
+  }
   if (pollId && shown) {
     const raw = sched.status === 'fulfilled' ? (sched.value.events || []) : [];
     const wkOf = new Map(raw.map((e) => [String(e.id), Number(e.seasonType?.type || e.season?.type) === 3 ? null : Number(e.week?.number) || null]));
@@ -627,6 +632,7 @@ export async function getTeam(lg, id, season) {
     }
     const latest = polls.get(Math.max(0, ...polls.keys()));
     ownPollRank = latest?.get(String(t.id || id)) || null;
+    pollNote = { name: POLL_NAME[pollId], weeks: polls.size, asked: weeks.length };
   }
   // "1st in Horizon" before a single league game is just alphabetical order. Hide the place until this team has
   // played a conference game (college; pros count every game toward the standings).
@@ -644,6 +650,7 @@ export async function getTeam(lg, id, season) {
     team: normTeam(t.id ? t : { ...t, id }, lg),
     record: String((season && season !== current ? pastRecord : record) || ''),
     rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : ownPollRank) : null,
+    pollNote,
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
     standing: (season && season !== current) || noConfYet ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule,
