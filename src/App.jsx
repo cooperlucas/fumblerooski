@@ -1685,7 +1685,10 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   const run = scoringRun(plays);
   const runT = run ? game[run.side] : null;
   const runTxt = run ? `${run.pts}-0` : '';
-  const call = flash && now ? { text: now.scoring && run && side(now.teamId) === run.side ? `${head} · ${runTxt} Run` : head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : atBreak ? { text: game.statusText } : null;
+  // The banner calls out the run only when this basket carries it past 10, 20, 30...; the chip on the court stays up all along.
+  const nowPts = Number((/\+(\d)/.exec(head) || [])[1]) || 0;
+  const milestone = !!run && now?.scoring && side(now.teamId) === run.side && nowPts && Math.floor(run.pts / 10) > Math.floor((run.pts - nowPts) / 10);
+  const call = flash && now ? { text: milestone ? `${head} · ${runTxt} Run` : head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : atBreak ? { text: game.statusText } : null;
   // Chevrons march toward the basket the team with the ball is attacking.
   const dir = poss === 'away' ? -1 : 1, pc = poss && !atBreak ? cc[poss].main : null;
   const shown = recent.slice(0, 4);
