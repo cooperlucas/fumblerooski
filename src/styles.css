@@ -756,3 +756,7 @@ button.pick.date { cursor: pointer; }
 /* Long ranks ("T118th in FBS") get a touch smaller so they stay centered inside the tile. */
 .trank { max-width: 100%; }
 .trank.long { font-size: 8.5px; letter-spacing: 0; }
+/* Headliners chip: the rooski cut out of the button (see RooskiCut). */
+.chipb.rchip { display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; }
+.rooski { display: block; }
+.rooski .rcface { color: var(--ink); }

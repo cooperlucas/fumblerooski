@@ -252,6 +252,28 @@ const GearIcon = () => (
   </svg>
 );
 
+// The Headliners chip: the rooski cut out of the button. Its outline is the chip's text color and the inside is the
+// page background, as if the shape were carved through the chip. The face is drawn in the page's ink over that hole.
+export function RooskiCut({ size = 40 }) {
+  const ball = { cx: 38, cy: 25, rx: 21, ry: 14, transform: 'rotate(-20 38 25)' };
+  const lines = ['M5 16 H20', 'M9 23 H19', 'M3 30 H19'];
+  return (
+    <svg className="rooski" viewBox="0 3 63 44" width={size} height={size * 44 / 63} aria-hidden="true">
+      <defs><clipPath id="rcBall"><ellipse {...ball} /></clipPath></defs>
+      {lines.map((d) => <path key={d} d={d} stroke="currentColor" strokeWidth="5.6" strokeLinecap="round" />)}
+      {lines.map((d) => <path key={d + 'c'} d={d} stroke="var(--bg)" strokeWidth="2.6" strokeLinecap="round" />)}
+      <ellipse {...ball} fill="var(--bg)" stroke="currentColor" strokeWidth="2.8" />
+      <g className="rcface">
+        <path clipPath="url(#rcBall)" d="M7.7 29.0 L64.1 8.6 M5.8 23.4 L62.1 3.1" stroke="currentColor" strokeWidth="1.8" />
+        <ellipse cx="32.5" cy="27" rx="3.8" ry="3.3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <ellipse cx="44" cy="22.8" rx="3.8" ry="3.3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="33.6" cy="27.4" r="1.6" fill="currentColor" /><circle cx="45.1" cy="23.2" r="1.6" fill="currentColor" />
+        <path d="M28.6 23.2 L35.6 24.2 M40.8 20.6 L47.4 17.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M35.5 33.5 q6 1.8 11 -3.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
 export function Mascot() {
   return (
     <svg className="mascot" width="54" height="42" viewBox="0 0 64 50" aria-hidden="true">
