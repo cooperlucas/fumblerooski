@@ -1566,14 +1566,25 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   const plays = pbp.filter((p) => !isSub(p));
   const recent = [...plays].reverse();
   // One play at a time: only the latest shot is marked on the floor.
-  // It clears once the ball changes hands after it: the other side rebounds, steals, shoots, or anyone turns it over.
+  // It stays up through the other team's trip down the floor and clears once the shooting team has the ball back.
   const last0 = recent.find((p) => p.shot && p.xy && side(p.teamId));
-  const after = last0 ? recent.slice(0, recent.indexOf(last0)) : [];
-  const last = last0 && !after.some((p) => {
-    const t = `${p.type} ${p.text}`;
-    if (/turnover|lost ball|bad pass|traveling|offensive foul|out of bounds/i.test(t)) return true;
-    return side(p.teamId) && p.teamId !== last0.teamId && (p.shot || /rebound|steal/i.test(t));
-  }) ? last0 : null;
+  const last = (() => {
+    if (!last0) return null;
+    const mine = side(last0.teamId), theirs = mine === 'away' ? 'home' : 'away';
+    const t0 = `${last0.type} ${last0.text}`;
+    let who = /free throw/i.test(t0) ? null : last0.scoring ? theirs : null; // after a miss, nobody has it until the rebound
+    let lost = who === theirs;
+    for (const p of plays.slice(plays.indexOf(last0) + 1)) {
+      const sd = side(p.teamId), t = `${p.type} ${p.text}`;
+      if (!sd) continue;
+      if (p.shot) who = p.scoring && !/free throw/i.test(t) ? (sd === 'away' ? 'home' : 'away') : sd;
+      else if (/rebound|steal/i.test(t)) who = sd;
+      else if (/turnover|traveling|bad pass|lost ball|offensive foul|out of bounds/i.test(t)) who = sd === 'away' ? 'home' : 'away';
+      if (who === theirs) lost = true;
+      if (lost && who === mine) return null;
+    }
+    return last0;
+  })();
   const now = recent[0];
   // Who has the ball, worked out by walking the plays in order.
   const poss = useMemo(() => {
