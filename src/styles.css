@@ -744,3 +744,7 @@ button.pick.date { cursor: pointer; }
 .rec3 .srow .v, .rec3 .shead .vh { width: 74px; white-space: nowrap; }
 /* "See all" sits in the league header without making it taller than Your Teams (bigger tap area, no extra height). */
 .lghead .link { height: auto; line-height: inherit; padding: 10px 6px; margin: -10px -6px -10px auto; }
+/* Player rank tiles: "5th in FBS" opens that stat's leader board. */
+.trank.tlink { margin: 5px auto 0; padding: 2px 2px; white-space: nowrap; font-family: inherit; background: transparent; border: none; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: pointer; }
+.lead.me { background: rgba(255, 190, 46, 0.14); box-shadow: inset 4px 0 0 var(--yellow); }
+.lead.me .nm, .lead.me .pos { color: var(--yellow); }

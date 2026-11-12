@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, MORNING_UNTIL } from './data/headlines.js';
@@ -39,6 +39,7 @@ export default function App() {
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
+  else if (name === 'leaders' && LEAGUE[a] && b) { tab = 'stats'; body = <LeaderPage key={a + b + (c || '')} lg={a} cat={b} focus={c} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
@@ -619,6 +620,30 @@ function useGameFilter(lg) {
   );
   return { el, apply, on: !!f, label: f?.label };
 }
+// A player's headline stat → the leader board it ranks on (the names differ for some hoops stats).
+const BOARD_ALIAS = { avgPoints: 'pointsPerGame', avgRebounds: 'reboundsPerGame', avgAssists: 'assistsPerGame', fieldGoalPct: 'fieldGoalPercentage' };
+function boardFor(key, items, cats, lg) {
+  const k = BOARD_ALIAS[key] || key;
+  if (EXTRA_BOARDS[k] && canGoDeep(lg, k)) return k;
+  // A quarterback's INT is picks thrown; the INT board is picks made.
+  if (k === 'interceptions' && items.some((x) => /^passing/.test(x.key))) return null;
+  return cats.some((c) => c.key === k) ? k : null;
+}
+// One stat's full leader board, opened from a player's rank tile, with that player lit up and in view.
+function LeaderPage({ lg, cat, focus }) {
+  const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
+  if (q.loading && !q.data) return <Loading rows={8} />;
+  if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
+  const c = q.data.cats.find((x) => x.key === cat) || (EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
+  if (!c) return <Empty>No {LEAGUE[lg].short} leader board for that stat right now.</Empty>;
+  return (
+    <>
+      <div className="sechead" style={{ marginTop: 4 }}><H2>{LEAGUE[lg].short} Leaders</H2></div>
+      <LeaderCard lg={lg} c={c} focus={focus} />
+      <div style={{ textAlign: 'center', marginTop: 14 }}><button className="btn" onClick={() => go(`stats/${lg}`)}>All {LEAGUE[lg].short} leaders</button></div>
+    </>
+  );
+}
 function Leaders({ lg }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   const filters = useLeaderFilters(lg);
@@ -653,9 +678,10 @@ function Leaders({ lg }) {
   );
 }
 // One stat's leaders. Top 10 comes with the page; filtering or asking for more pulls that stat's full board.
-function LeaderCard({ lg, c, f }) {
-  const [n, setN] = useState(5);
-  useEffect(() => setN(5), [f?.id]);
+function LeaderCard({ lg, c, f, focus }) {
+  // Opened for one player: start on the full board (25 deep), then grow to reach them.
+  const [n, setN] = useState(focus ? 25 : 5);
+  useEffect(() => { if (!focus) setN(5); }, [f?.id]);
   const deepOk = canGoDeep(lg, c.key);
   const wantDeep = deepOk && (!!f || n > 5);
   const deep = useQuery(wantDeep ? `deep:${lg}:${c.key}` : null, () => getDeepLeader(lg, c.key), () => 600000);
@@ -665,13 +691,20 @@ function LeaderCard({ lg, c, f }) {
   const place = places(list.map((r) => r.value));
   const loadingDeep = wantDeep && deep.loading && !deep.data;
   const total = !wantDeep && deepOk ? null : list.length; // unknown until the full board loads
+  const at = focus ? list.findIndex((r) => r.player?.id === String(focus)) : -1;
+  useEffect(() => { if (at >= n) setN(Math.ceil((at + 1) / 25) * 25); }, [at, n]);
+  useEffect(() => {
+    if (at < 0 || at >= n) return;
+    const el = document.querySelector('.lead.me');
+    if (el) el.scrollIntoView({ block: 'center' });
+  }, [at, n >= at + 1]);
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="shead"><span className="nm">{c.title}</span>{c.abbr ? <span>{c.abbr}</span> : null}</div>
       {loadingDeep && f ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>Loading the full list...</span></div>
         : !rows.length ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>No one from {f?.label} {deepOk ? 'has this stat yet.' : 'in the top 10.'}</span></div> : null}
       {(loadingDeep && f ? [] : rows).map((r, i) => (
-        <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
+        <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '') + (focus && r.player?.id === String(focus) ? ' me' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
           <span className="pos">{place[i]}</span>
           {r.team ? <Blob team={r.team} /> : null}
           <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
@@ -941,6 +974,9 @@ function PlayerPage({ lg, id }) {
   const pm = pmq.data;
   const [tab, setTab] = useSticky('tab', 'season');
   const d = q.data, p = d?.player;
+  // The league's leader boards, so a "5th in FBS" tile can open the matching board.
+  const lq = useQuery(d?.summary?.items?.some((x) => x.rank) ? `leaders:${lg}` : null, () => getLeaders(lg), () => 600000);
+  const leaderCats = lq.data?.cats || [];
   const color = p?.team?.color || '#2B3352';
   const career = d?.career || [];
   // One season picker drives both the Season and Game Log tabs. '' = the latest season.
@@ -1006,7 +1042,11 @@ function PlayerPage({ lg, id }) {
 
             {tab === 'season' ? (
               <>
-                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? <em className="trank">{x.tied ? 'T' : ''}{ordinal(x.rank)} in {LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}</em> : null}</div>)}</div> : null}
+                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{x.rank ? (() => {
+                  const txt = `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
+                  const k = boardFor(x.key, d.summary.items, leaderCats, lg);
+                  return k ? <button className="trank tlink" onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className="trank">{txt}</em>;
+                })() : null}</div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
                     <div className="ptitle">{c.row.season} {c.title}</div>

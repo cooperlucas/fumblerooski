@@ -1010,7 +1010,7 @@ export async function getPlayer(lg, id) {
       // The feed ranks each headline stat against the league ("12th"). Show it when they are in the top 150.
       items: (sum.statistics || []).map((x) => {
         const rank = Number(x.rank) || Number(/^(\d+)/.exec(String(x.rankDisplayValue || ''))?.[1]) || 0;
-        return { label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? ''), rank: rank > 0 && rank <= 150 ? rank : 0, tied: /^T/i.test(String(x.rankDisplayValue || '')) };
+        return { key: String(x.name || ''), label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? ''), rank: rank > 0 && rank <= 150 ? rank : 0, tied: /^T/i.test(String(x.rankDisplayValue || '')) };
       }).filter((x) => x.label && x.value).slice(0, 4),
     },
     gamelog: log.status === 'fulfilled' ? normGamelog(log.value) : { labels: [], spans: [], seasons: [] },
@@ -1240,6 +1240,10 @@ const DEEP = {
     receivingYards: ['receiving', 'receivingYards', 'offense:receiving'], receptions: ['receiving', 'receptions', 'offense:receiving'], receivingTouchdowns: ['receiving', 'receivingTouchdowns', 'offense:receiving'],
     sacks: ['defensive', 'sacks', 'defense'], totalTackles: ['defensive', 'totalTackles', 'defense'], passesDefended: ['defensive', 'passesDefended', 'defense'],
     totalPoints: ['scoring', 'totalPoints', 'scoring'],
+    // Boards the leaders page doesn't list, reachable from a player's rank tile (counting stats only: the feed's
+    // average boards include tiny samples and wouldn't match the rank shown).
+    rushingAttempts: ['rushing', 'rushingAttempts', 'offense:rushing'], soloTackles: ['defensive', 'soloTackles', 'defense'],
+    tacklesForLoss: ['defensive', 'tacklesForLoss', 'defense'], fumblesForced: ['general', 'fumblesForced', 'defense'],
   },
   basketball: {
     pointsPerGame: ['offensive', 'avgPoints'], assistsPerGame: ['offensive', 'avgAssists'], reboundsPerGame: ['general', 'avgRebounds'],
@@ -1251,6 +1255,7 @@ const DEEP = {
     penaltyMinutes: ['penalties', 'penaltyMinutes'], wins: ['general', 'wins'], shutouts: ['defensive', 'shutouts'],
   },
 };
+export const EXTRA_BOARDS = { rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
 export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key];
 export async function getDeepLeader(lg, key) {
   const m = DEEP[LEAGUE[lg]?.sport]?.[key];
