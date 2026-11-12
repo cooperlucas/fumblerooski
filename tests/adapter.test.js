@@ -525,3 +525,18 @@ test('football: a touchdown nullified by penalty is not a touchdown', async () =
   assert.equal(m.nulled, true);
   assert.equal(fieldMoment({ type: 'Kickoff', text: 'kickoff 65 yards, returned 100 yards for a TOUCHDOWN' }).kind, 'td');
 });
+
+test('football drives: a pick six on the offense\'s drive is the defense\'s touchdown', async () => {
+  const { normDrives } = await import('../src/data/espn.js');
+  const drives = { previous: [{ id: '7', team: { id: '113', abbreviation: 'MASS' }, isScore: true, displayResult: 'Interception Touchdown', result: 'INT TD', yards: 28, description: '5 plays, 28 yards, 2:23',
+    start: { yardsToEndzone: 72, text: 'MASS 28' },
+    plays: [
+      { type: { text: 'Pass Reception' }, text: 'pass complete for 23 yards', start: { team: { id: '113' }, yardsToEndzone: 72 }, end: { team: { id: '113' }, yardsToEndzone: 49 }, statYardage: 23 },
+      { type: { text: 'Interception Return Touchdown' }, text: 'pass intercepted by #22 N.Thompson return 62 yards to the UMASS00 TOUCHDOWN', scoringPlay: true, awayScore: 0, homeScore: 17, start: { team: { id: '113' }, yardsToEndzone: 44 }, end: { team: { id: '2649' }, yardsToEndzone: 0 }, statYardage: 62 },
+    ] }] };
+  const [d] = normDrives(drives, '113', '2649', false);
+  assert.equal(d.kind, 'defTd');
+  assert.equal(d.result, 'Pick Six');
+  assert.equal(d.scoreSide, 'home');
+  assert.notEqual(d.x1, 100); // the offense did not reach the end zone
+});

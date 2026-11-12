@@ -1261,7 +1261,7 @@ function footballRows(box, drives, awayId, homeId, a, h, row) {
       const deep = (d.plays || []).some((p) => Number(p.start?.yardsToEndzone) <= 20 && String(p.start?.team?.id ?? id) === String(id));
       if (!deep) continue;
       trips++;
-      if (d.isScore && /touchdown|\btd\b/i.test(`${d.displayResult || ''} ${d.result || ''}`)) tds++;
+      if (d.isScore && /touchdown|\btd\b/i.test(`${d.displayResult || ''} ${d.result || ''}`) && !returnScoreAgainst(d, id)) tds++;
     }
     return `${tds}/${trips}`;
   };
@@ -1571,6 +1571,16 @@ export function spotToEnd(text, abbr) {
   return m[1].trim().toUpperCase() === String(abbr || '').toUpperCase() ? 100 - n : n;
 }
 
+// A drive that ended with the other side scoring on the return: a pick six, scoop and score, or a punt or blocked kick run back.
+// The feed files it under the offense's drive ("Interception Touchdown"), but the points went the other way.
+function returnScoreAgainst(d, teamId) {
+  const last = d?.plays?.[d.plays.length - 1];
+  if (d?.isScore !== true || !last || CALLED_BACK.test(last.text || '')) return '';
+  const t = `${last.type?.text || ''}`, both = `${t} ${last.text || ''}`;
+  if (!/return touchdown|(interception|fumble).*touchdown/i.test(t)) return '';
+  if (String(last.start?.team?.id ?? teamId) !== String(teamId)) return ''; // the drive team's own kick return: their score
+  return /intercept/i.test(both) ? 'Pick Six' : /fumble/i.test(both) ? 'Scoop & Score' : /block/i.test(both) ? 'Blocked Kick TD' : /punt/i.test(both) ? 'Punt Return TD' : 'Return TD';
+}
 export function normDrives(drives, awayId, homeId, live, opts = {}) {
   const list = [...(drives?.previous || [])];
   const cur = drives?.current;
@@ -1600,10 +1610,12 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     })).filter((p) => p.text);
     const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
     let result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    const against = returnScoreAgainst(d, teamId); // the defense scored on this drive's last play
     // "Downs Touchdown" and the like: the feed glued the other team's turnover onto this drive's score.
-    if (d.isScore === true && /touchdown|\btd\b/i.test(result)) result = result.replace(/^\s*(downs|punt|blocked punt|fumble|interception)\s+/i, '');
+    if (!against && d.isScore === true && /touchdown|\btd\b/i.test(result)) result = result.replace(/^\s*(downs|punt|blocked punt|fumble|interception)\s+/i, '');
+    if (against) result = against;
     if (swapped && /^downs$/i.test(result)) result = '';
-    const kind = d.isScore === true && /touchdown|\btd\b/i.test(result) ? 'td' : d.isScore === true && /field goal|\bfg\b/i.test(result) ? 'fg'
+    const kind = against ? 'defTd' : d.isScore === true && /touchdown|\btd\b/i.test(result) ? 'td' : d.isScore === true && /field goal|\bfg\b/i.test(result) ? 'fg'
       : /intercept|fumble|downs|safety/i.test(result) && d.isScore !== true ? 'turnover' : 'other';
     // A drive that opens on the other team's kick starts where the kick ended. The feed's drive start text says where;
     // the kick play's own spots are the kicking team's.
@@ -1619,7 +1631,8 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     const pos = (toEnd) => (toEnd == null || !side ? null : Math.max(0, Math.min(100, side === 'away' ? 100 - toEnd : toEnd)));
     return {
       id: String(d.id ?? i), teamId, side,
-      result, kind, isScore: d.isScore === true, turnover: kind === 'turnover',
+      result, kind, isScore: d.isScore === true, turnover: kind === 'turnover' || kind === 'defTd',
+      scoreSide: kind === 'defTd' ? (side === 'away' ? 'home' : 'away') : side, // who the points went to
       summary: cleanText(d.description || ''),
       period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
       startText: cleanText(d.start?.text || ''), startToEnd: kickOpen ? from : null,

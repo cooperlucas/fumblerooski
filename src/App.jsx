@@ -1064,7 +1064,7 @@ function ScoreChart({ chart, game, L }) {
 // Touchdowns and field goals read differently at a glance:
 // a touchdown is a solid gold bar that runs into a lit-up end zone; a field goal is a lime bar that stops at the
 // spot of the kick, with a dotted kick sailing through the uprights.
-const DRIVE_COLOR = { td: '#FFBE2E', fg: '#9BE33A', turnover: '#FF3D7F', other: '#22D3D6' };
+const DRIVE_COLOR = { td: '#FFBE2E', fg: '#9BE33A', turnover: '#FF3D7F', defTd: '#FF3D7F', other: '#22D3D6' };
 function DriveField({ d, game }) {
   if (d.x0 == null || d.x1 == null) return null;
   const W = 300, H = 30, ez = 22, mid = H / 2, fx = (v) => ez + (v / 100) * (W - ez * 2);
@@ -1078,6 +1078,13 @@ function DriveField({ d, game }) {
       <rect x="0" y="2" width={ez} height={H - 4} fill={game.away.color} /><rect x={W - ez} y="2" width={ez} height={H - 4} fill={game.home.color} />
       {Array.from({ length: 9 }, (_, i) => <path key={i} d={`M${fx((i + 1) * 10)} 2 V${H - 2}`} stroke={i === 4 ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.22)'} />)}
       {d.kind === 'td' ? <rect x={dir === 1 ? W - ez : 0} y="2" width={ez} height={H - 4} fill="none" stroke={color} strokeWidth="3" /> : null}
+      {d.kind === 'defTd' ? ( // the other side ran it back the other way into this team's own end zone
+        <>
+          <rect x={dir === 1 ? 0 : W - ez} y="2" width={ez} height={H - 4} fill="none" stroke="#FFBE2E" strokeWidth="3" />
+          <path d={`M${tip} ${mid} H${(dir === 1 ? ez : W - ez) + dir * 10}`} stroke="#FFBE2E" strokeWidth="3" strokeDasharray="4 4" strokeLinecap="round" />
+          <path d={`M${(dir === 1 ? ez : W - ez) - dir * 0} ${mid} L${(dir === 1 ? ez : W - ez) + dir * 10} ${mid - 7} V${mid + 7} Z`} fill="#FFBE2E" stroke="#0C1124" strokeWidth="1" />
+        </>
+      ) : null}
       <path d={`M${a} ${mid + 2} H${tip}`} stroke="#6E3AB5" strokeWidth="7" transform="translate(2 2)" />
       <path d={`M${a} ${mid} H${tip}`} stroke={color} strokeWidth="7" />
       {d.kind === 'fg' ? (
@@ -1360,17 +1367,17 @@ function Drives({ drives, game }) {
     <section className="sec">
       <H2>Drives</H2>
       <div className="card">
-        {list.map((d) => { const t = team(d), isOpen = open === d.id; const color = d.kind === 'td' ? 'var(--yellow)' : d.kind === 'fg' ? 'var(--lime)' : d.turnover ? '#FF7AA6' : 'var(--teal)'; return (
+        {list.map((d) => { const t = team(d), isOpen = open === d.id; const color = d.kind === 'td' ? 'var(--yellow)' : d.kind === 'fg' ? 'var(--lime)' : d.turnover ? '#FF7AA6' : 'var(--teal)'; const opp = d.side === 'home' ? game.away : game.home; return (
           <div className="drive" key={d.id}>
             <button className="dhead" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.id)}>
               <Blob team={t} />
               <span className="dmain">
-                <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.result || 'Drive')}
+                <span className="dres" style={{ color }}>{d.live ? <><span className="dot" aria-hidden="true" style={{ marginRight: 6 }} />On the field</> : (d.kind === 'defTd' ? `${d.result} · ${opp.abbr} TD` : d.result || 'Drive')}
 </span>
                 <span className="dsum">{[d.summary, d.startText ? `from ${d.startText}` : ''].filter(Boolean).join(' · ')}</span>
               </span>
               <span className="dwhen"><span>{d.period ? `Q${d.period}` : ''} {d.clock}<i aria-hidden="true">{isOpen ? '▴' : '▾'}</i></span>
-                {d.scoreChanged && !d.live ? <span className="dscore" aria-label={`Score: ${game.away.abbr} ${d.score.away}, ${game.home.abbr} ${d.score.home}`}><b className={d.side === 'away' ? 'hit' : ''}>{d.score.away}</b>-<b className={d.side === 'home' ? 'hit' : ''}>{d.score.home}</b></span> : null}</span>
+                {d.scoreChanged && !d.live ? <span className="dscore" aria-label={`Score: ${game.away.abbr} ${d.score.away}, ${game.home.abbr} ${d.score.home}`}><b className={(d.scoreSide || d.side) === 'away' ? 'hit' : ''}>{d.score.away}</b>-<b className={(d.scoreSide || d.side) === 'home' ? 'hit' : ''}>{d.score.home}</b></span> : null}</span>
             </button>
             <DriveField d={d} game={game} />
             {isOpen ? (
