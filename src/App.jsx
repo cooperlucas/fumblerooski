@@ -2058,7 +2058,7 @@ function PlayByPlay({ pbp, game, L }) {
   const [show, setShow] = useState(true);
   const [kind, setKind] = useState('all');
   const [teamOn, flipTeam] = useToggles([game.away.id, game.home.id]);
-  const cur = per ?? periods[periods.length - 1];
+  const cur = per ?? 0; // All periods unless one is picked
   const live = game.state === 'live';
   const kinds = (PLAY_KINDS[L.sport] || []).filter(([, , re]) => pbp.some((p) => re.test(`${p.type} ${p.text}`)));
   const kre = kinds.find(([k]) => k === kind)?.[2];
@@ -2080,7 +2080,7 @@ function PlayByPlay({ pbp, game, L }) {
           <div className="pbprow">
             {periods.length > 1 ? <div className="chips" role="group" aria-label="Period">{[0, ...periods].map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{p === 0 ? 'All' : label(p)}</button>)}</div> : <span />}
             {kinds.length ? <div className="chips tchips" role="group" aria-label="Teams">
-              {[game.away, game.home].map((t) => <button key={t.id} className="chipb tchip" aria-pressed={teamOn.has(t.id)} aria-label={`${t.name} plays`} onClick={() => flipTeam(t.id)}><Blob team={t} size={24} /></button>)}
+              {[game.away, game.home].map((t) => <button key={t.id} className="chipb tchip" aria-pressed={teamOn.has(t.id)} aria-label={`${t.name} plays`} onClick={() => flipTeam(t.id)}><Blob team={t} size={22} /></button>)}
             </div> : null}
           </div>
           <div className="card feed">
