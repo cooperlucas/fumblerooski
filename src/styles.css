@@ -753,3 +753,6 @@ button.pick.date { cursor: pointer; }
 .skeys .legend.kinds { flex-wrap: nowrap; gap: 8px; }
 .skeys .legend.kinds .lg { flex: 1 1 0; min-width: 0; white-space: nowrap; padding: 4px 4px; font-size: 10px; letter-spacing: 0.02em; text-align: center; }
 .skeys .legend.kinds .lg b { font-size: 13px; margin-left: 3px; }
+/* Long ranks ("T118th in FBS") get a touch smaller so they stay centered inside the tile. */
+.trank { max-width: 100%; }
+.trank.long { font-size: 8.5px; letter-spacing: 0; }

@@ -1060,7 +1060,7 @@ function PlayerPage({ lg, id }) {
                   const qr = qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : null;
                   const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
-                  return k ? <button className="trank tlink" onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className="trank">{txt}</em>;
+                  return k ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className={'trank' + (txt.length >= 12 ? ' long' : '')}>{txt}</em>;
                 })() : null}</div>)}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
@@ -1654,8 +1654,8 @@ const made = (x, y, c, r = 5) => <><circle cx={x} cy={y} r={r} fill="none" strok
 const missed = (x, y, c, r = 3.6, w = 1.8) => <path d={`M${x - r} ${y - r} L${x + r} ${y + r} M${x + r} ${y - r} L${x - r} ${y + r}`} stroke={c} strokeWidth={w} strokeLinecap="round" />;
 
 /* ---------- basketball shot chart: both teams on one floor ---------- */
-// Court Chart: every shot on the floor with the plays underneath. Chips pick the plays (All, Shots, Rebounds...), the
-// period chips and team toggles filter both, and tapping a shot on the floor shows just that play below.
+// Court Chart: every shot on the floor with those plays underneath. The period chips, made/missed and team toggles filter
+// both, and tapping a shot on the floor shows just that play below.
 function ShotChart({ shots, game, lg, pbp = [] }) {
   const L = LEAGUE[lg];
   const [per, setPer] = useState(0);
@@ -1669,8 +1669,9 @@ function ShotChart({ shots, game, lg, pbp = [] }) {
   const [teamOn, flipTeam0] = useToggles([game.away.id, game.home.id]);
   const flipKind = (k) => { setSel(null); flipKind0(k); };
   const flipTeam = (k) => { setSel(null); flipTeam0(k); };
-  const others = (PLAY_KINDS.basketball || []).filter(([k]) => k !== 'made' && k !== 'miss').filter(([, , re]) => pbp.some((p) => re.test(`${p.type} ${p.text}`)));
-  const modes = [...(pbp.length ? [['all', 'All']] : []), ['shots', 'Shots'], ...others.map(([k, t]) => [k, t])];
+  // Only shots are charted, so the list is the shots on the floor: no play-type chips.
+  const others = [];
+  const modes = [['shots', 'Shots']];
   const m = modes.some(([k]) => k === mode) ? mode : 'shots';
   const floorOn = m === 'shots' || m === 'all';
   const shown = shots.filter((s) => !per || s.period === per);
