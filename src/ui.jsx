@@ -286,6 +286,17 @@ export function PopcornCut({ size = 26 }) {
     </svg>
   );
 }
+// The Headliners chip: a star with the logo's three racing stripes trailing it. The star is cut out of the button (outline
+// in the chip's text color, inside the page background); the stripes are solid so they read at chip size.
+export function StarCut({ size = 24 }) {
+  const lines = ['M2 7.5 H10.5', 'M5 12 H10', 'M1 16.5 H9.5'];
+  return (
+    <svg className="rooski" viewBox="0 0 33 24" width={size * 33 / 24} height={size} aria-hidden="true">
+      {lines.map((d) => <path key={d} d={d} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />)}
+      <path d="M21 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L21 17.1l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z" fill="var(--bg)" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
 export function Mascot() {
   return (
     <svg className="mascot" width="54" height="42" viewBox="0 0 64 50" aria-hidden="true">
