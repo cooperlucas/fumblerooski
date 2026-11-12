@@ -1263,6 +1263,8 @@ export const QUALIFIED = {
     yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', per: 1.875, title: 'Yards Per Catch', min: 'MIN 1.875 REC/G' },
     completionPct: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Completion %', min: 'MIN 14 ATT/G' },
     yardsPerPassAttempt: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Yards Per Pass', min: 'MIN 14 ATT/G' },
+    // Picks thrown: fewest first, so a qualified passer with 0 is 1st and the most is last.
+    interceptionsThrown: { group: 'passing', stat: 'interceptions', asc: true, cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Interceptions Thrown', min: 'MIN 14 ATT/G' },
     adjQBR: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'QBR', min: 'MIN 14 ATT/G' },
     fieldGoalPct: { group: 'kicking', cat: 'specialTeams:kicking', vol: 'fieldGoalAttempts', per: 1, title: 'Field Goal %', min: 'MIN 1 FGA/G' },
     grossAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Punting Average', min: 'MIN 2.5 PUNTS/G' },
@@ -1300,9 +1302,10 @@ async function qualifiedBoard(lg, key, q) {
     get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat })),
     teamGames(lg),
   ]);
-  return byAthleteRows(d).map((x) => ({ a: x.a, vol: x.at(q.group, q.vol), gp: x.at('general', 'gamesPlayed'), v: x.at(q.group, key), shown: String(x.raw(q.group, key) ?? '') }))
+  const stat = q.stat || key;
+  return byAthleteRows(d).map((x) => ({ a: x.a, vol: x.at(q.group, q.vol), gp: x.at('general', 'gamesPlayed'), v: x.at(q.group, stat), shown: String(x.raw(q.group, stat) ?? '') }))
     .filter((r) => { const tg = Math.max(tgs.get(String(r.a.teamId ?? '')) || 0, r.gp || 0); return tg > 0 && r.vol >= q.per * tg && Number.isFinite(r.v) && r.a.displayName; })
-    .sort((x, y) => y.v - x.v)
+    .sort((x, y) => (q.asc ? x.v - y.v : y.v - x.v))
     .map((r) => ({
       value: r.shown || String(r.v),
       player: { id: String(r.a.id ?? ''), name: cleanText(r.a.displayName || ''), pos: r.a.position?.abbreviation || '' },

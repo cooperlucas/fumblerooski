@@ -621,8 +621,13 @@ function useGameFilter(lg) {
 }
 // A player's headline stat → the leader board it ranks on (the names differ for some hoops stats).
 const BOARD_ALIAS = { avgPoints: 'pointsPerGame', avgRebounds: 'reboundsPerGame', avgAssists: 'assistsPerGame', fieldGoalPct: 'fieldGoalPercentage' };
+// A tile's stat → its qualified board, if it has one (a QB's INT is picks thrown).
+function qualKey(lg, key, items) {
+  if (key === 'interceptions' && items.some((x) => /^passing/.test(x.key))) return qualifiedRule(lg, 'interceptionsThrown') ? 'interceptionsThrown' : null;
+  return qualifiedRule(lg, key) ? key : null;
+}
 function boardFor(key, items, cats, lg) {
-  if (qualifiedRule(lg, key)) return key;
+  if (qualKey(lg, key, items)) return qualKey(lg, key, items);
   const k = BOARD_ALIAS[key] || key;
   if (EXTRA_BOARDS[k] && canGoDeep(lg, k)) return k;
   // A quarterback's INT is picks thrown; the INT board is picks made.
@@ -976,7 +981,7 @@ function PlayerPage({ lg, id }) {
   const lq = useQuery(d?.summary?.items?.some((x) => x.rank) ? `leaders:${lg}` : null, () => getLeaders(lg), () => 600000);
   const leaderCats = lq.data?.cats || [];
   // Averages rank on our own qualified board (ESPN's average ranks don't match any minimum). Not qualified: no rank.
-  const qKeys = (d?.summary?.items || []).map((x) => x.key).filter((k) => qualifiedRule(lg, k));
+  const qKeys = (d?.summary?.items || []).map((x) => qualKey(lg, x.key, d.summary.items)).filter(Boolean);
   const qb = useQuery(qKeys.length ? `qual:${lg}:${qKeys.join(',')}` : null, async () => Object.fromEntries(await Promise.all(qKeys.map(async (k) => [k, await getDeepLeader(lg, k)]))), () => 600000);
   const qRank = (key) => {
     const board = qb.data?.[key];
@@ -1051,8 +1056,8 @@ function PlayerPage({ lg, id }) {
 
             {tab === 'season' ? (
               <>
-                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualifiedRule(lg, x.key) ? qRank(x.key) : x.rank) ? (() => {
-                  const qr = qualifiedRule(lg, x.key) ? qRank(x.key) : null;
+                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : x.rank) ? (() => {
+                  const qr = qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : null;
                   const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
                   return k ? <button className="trank tlink" onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className="trank">{txt}</em>;
