@@ -2074,7 +2074,7 @@ function PlayByPlay({ pbp, game, L }) {
       {show ? (
         <>
           {kinds.length ? <div className="chips" role="group" aria-label="Plays to show" style={{ marginTop: 8 }}>
-            {[['all', 'All'], ...kinds].map(([k, t]) => <button key={k} className="chipb" aria-pressed={kind === k} onClick={() => setKind(k)}>{t}</button>)}
+            {kinds.map(([k, t]) => <button key={k} className="chipb" aria-pressed={kind === k} onClick={() => setKind(kind === k ? 'all' : k)}>{t}</button>) /* nothing picked shows every play; tap a picked one again to go back */}
           </div> : null}
           {/* Periods (with All) on the left, the two teams on the right of the same row. */}
           <div className="pbprow">
