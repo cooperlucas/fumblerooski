@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
@@ -2050,7 +2050,10 @@ function GamePage({ lg, id, feed, replayBar }) {
   const L = LEAGUE[lg];
   const q0 = useQuery(feed ? null : `game:${lg}:${id}`, () => getGame(lg, id), (d) => gameRefresh(d?.game));
   const q = feed ? { data: feed, loading: false, error: null } : q0;
-  const d = q.data, g = d?.game;
+  // Today's scoreboard (the ticker keeps it fresh) settles the clock when the game feed gets stuck on a bad one.
+  const today = useDay(0);
+  const boardG = feed ? null : (today.data?.games || []).find((x) => x.lg === lg && String(x.id) === String(id));
+  const d = q.data, g = pickClock(d?.game, boardG);
   const title = g ? `${replayBar ? 'Replay: ' : ''}${g.away.abbr} at ${g.home.abbr}` : L.name;
   const pair = usePairFit(g ? [g.away.name, g.home.name] : []);
   const started = g && (g.state === 'live' || g.state === 'final');
