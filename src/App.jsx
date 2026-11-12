@@ -731,7 +731,9 @@ function TeamPage({ lg, id, season }) {
   const [viewRaw, setView] = useSticky('view', 'schedule');
   const full = isCovered(useCovered(lg), id);
   const view = full ? viewRaw : 'schedule';
-  const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}` : null, () => getRoster(lg, id), () => 0);
+  // Past rosters come from ESPN's season player lists, which are only right for colleges; pros keep today's roster (labeled).
+  const pastRo = isPast && LEAGUE[lg].college;
+  const ro = useQuery(view === 'roster' ? `roster:${lg}:${id}${pastRo ? ':' + yr : ''}` : null, () => getRoster(lg, id, pastRo ? yr : null), () => 0);
   const recs = useQuery(`records:${lg}`, () => getRecords(lg), () => 600000).data || {};
   // Ranked colleges: show where they sit in each poll (CFP, AP, Coaches).
   const polls = useQuery(LEAGUE[lg].college ? `rankings:${lg}` : null, () => getRankings(lg), () => 1800000).data?.polls || [];
@@ -814,7 +816,7 @@ function TeamPage({ lg, id, season }) {
               </section>
             ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>
               : !ro.data?.groups.length ? <Empty>No roster listed for this team right now.</Empty>
-                : ro.data.groups.map((gr) => (
+                : <>{isPast && !pastRo ? <p className="stamp" style={{ textAlign: 'left', margin: '12px 0 0' }}>Current roster. Past {LEAGUE[lg].short} rosters aren't available.</p> : null}{ro.data.groups.map((gr) => (
                   <section className="sec" key={gr.title} style={{ marginTop: 12 }}>
                     <div className="card">
                       {ro.data.groups.length > 1 ? <div className="shead"><span className="nm">{gr.title}</span></div> : null}
@@ -827,7 +829,7 @@ function TeamPage({ lg, id, season }) {
                       ))}
                     </div>
                   </section>
-                ))}
+                ))}</>
           </>
         )}
       </Page>

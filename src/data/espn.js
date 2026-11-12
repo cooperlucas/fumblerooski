@@ -748,7 +748,31 @@ const byJersey = (x, y) => (parseInt(x.jersey, 10) || 999) - (parseInt(y.jersey,
 const GROUP_TITLE = { offense: 'Offense', defense: 'Defense', specialteam: 'Special Teams', specialteams: 'Special Teams', injuredreserveorout: 'Injured', practicesquad: 'Practice Squad' };
 
 // A team's roster. Football comes grouped (offense, defense, special teams); most other sports come as one list.
-export async function getRoster(lg, teamId) {
+// Football positions sorted into the usual three units, for past rosters (which come as one list).
+const UNIT = (pos) => (/^(QB|RB|FB|HB|WR|TE|OL|OT|OG|G|T|C|OC|IOL)$/i.test(pos) ? 'offense' : /^(K|PK|P|LS|KR|PR)$/i.test(pos) ? 'specialteams' : pos ? 'defense' : 'other');
+// A past season's roster. ESPN's roster feed only knows the current season, but its stats feed keeps each season's
+// list of players (as links), so read that and fetch the players a batch at a time.
+async function pastRoster(lg, teamId, season) {
+  const L = LEAGUE[lg];
+  const base = `https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}/seasons/${season}`;
+  const list = await get(`${base}/teams/${encodeURIComponent(teamId)}/athletes?limit=400&lang=en&region=us`);
+  const refs = (list.items || []).map((x) => String(x.$ref || '').replace(/^http:/, 'https:')).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < refs.length; i += 60) {
+    const got = await Promise.allSettled(refs.slice(i, i + 60).map((r) => get(r)));
+    got.forEach((g) => { if (g.status === 'fulfilled') out.push(g.value); });
+  }
+  const players = out.map((a) => normPlayerLite(a, lg)).filter((p) => p.id && p.name);
+  if (L.sport !== 'football') return [{ position: 'Roster', items: players }];
+  const by = {};
+  for (const p of players) (by[UNIT(p.pos)] ||= []).push(p);
+  return ['offense', 'defense', 'specialteams', 'other'].filter((k) => by[k]).map((k) => ({ position: k, items: by[k] }));
+}
+export async function getRoster(lg, teamId, season) {
+  if (season) {
+    const groups = (await pastRoster(lg, teamId, season)).map((g) => ({ title: GROUP_TITLE[g.position] || 'Roster', players: g.items.sort(byJersey) })).filter((g) => g.players.length);
+    return { lg, teamId: String(teamId), groups, season };
+  }
   const data = await get(url(SITE, lg, `/teams/${encodeURIComponent(teamId)}/roster`));
   const raw = data.athletes || [];
   const grouped = raw.length && Array.isArray(raw[0]?.items);
