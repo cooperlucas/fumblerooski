@@ -688,3 +688,10 @@ button.pick.date { cursor: pointer; }
 .ms-clk.live { color: var(--pink); }
 .ms-sit { font-size: 10px; font-weight: 800; color: var(--mute); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .subswap .subtitle, .subswap .subMini { transition: none; } }
+.leadstats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.leadstats .lscap { font-size: 11px; font-weight: 800; color: var(--mute); text-transform: uppercase; letter-spacing: .04em; }
+.leadstats .lsch { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--mute); white-space: nowrap; }
+.leadstats .lsch b { color: var(--ink); font-weight: 900; }
+.leadstats .ls { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--panel2); font-size: 11px; font-weight: 700; color: var(--mute); white-space: nowrap; }
+.leadstats .ls i { width: 8px; height: 8px; border-radius: 2px; }
+.leadstats .ls b { color: var(--ink); font-weight: 900; font-variant-numeric: tabular-nums; }

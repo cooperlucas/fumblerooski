@@ -1026,33 +1026,44 @@ const perName = (L, n) => (L.periods === 2 || L.sport === 'soccer' ? `${n}H` : `
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
 // like a late-80s broadcast graphic. Each line is the team's primary color with its secondary as the drop shadow.
 function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1)))); const f = raw / pow; return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow); }
-function ScoreChart({ chart, game, L }) {
-  const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 14, y1 = 158;
-  const step = niceStep(chart.max), top = Math.max(step, Math.ceil(chart.max / step) * step);
-  const x = (t) => x0 + t * (x1 - x0), y = (v) => y1 - (v / top) * (y1 - y0);
-  const path = (k) => chart.points.map((p, i) => (i === 0 ? `M${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}` : chart.stepped ? `H${x(p.t).toFixed(1)} V${y(p[k]).toFixed(1)}` : `L${x(p.t).toFixed(1)} ${y(p[k]).toFixed(1)}`)).join(' ');
-  const end = chart.points[chart.points.length - 1];
-  const reg = L.periods || chart.periods, word = PERIOD_WORD[L.sport] ?? '';
-  const label = (i) => (i < reg ? perName(L, i + 1) : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
-  const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+// Lead tracker: the margin as filled steps around a center line. Above it the away team leads, below it the home team does,
+// in that team's color, so every lead change and how big each lead got reads at a glance.
+function LeadChart({ chart, game, L }) {
+  const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 10, y1 = 160, mid = (y0 + y1) / 2;
+  const pts = chart.points.map((p) => ({ t: p.t, m: p.a - p.h }));
+  const most = Math.max(1, ...pts.map((p) => Math.abs(p.m)));
+  const step = niceStep(most * 1.5), top = Math.max(step, Math.ceil((most * 1.15) / step) * step);
+  const x = (t) => x0 + t * (x1 - x0), y = (m) => mid - (m / top) * (mid - y0);
   const cc = chartColors(game.away, game.home);
-  const sides = [[game.away, 'a', cc.away.main, cc.away.second], [game.home, 'h', cc.home.main, cc.home.second]];
+  const reg = L.periods || chart.periods;
+  const label = (i) => (i < reg ? perName(L, i + 1) : chart.periods - reg > 1 ? `OT${i - reg + 1}` : 'OT');
+  const bigA = Math.max(0, ...pts.map((p) => p.m)), bigH = Math.max(0, ...pts.map((p) => -p.m));
+  let changes = 0, prev = 0; for (const p of pts) { const sg = Math.sign(p.m); if (sg && prev && sg !== prev) changes++; if (sg) prev = sg; }
+  const end = pts[pts.length - 1];
+  const gl = [top, -top].concat(top / step >= 2 ? [step * Math.floor(top / step / 2), -step * Math.floor(top / step / 2)] : []);
+  const stat = (t, c, n) => <span className="ls"><i style={{ background: c }} />{t.abbr} <b>{n ? `+${n}` : '—'}</b></span>;
   return (
     <section className="sec">
-      <H2>Score Chart</H2>
+      <H2>Lead Tracker</H2>
       <div className="card pad chart">
-        <div className="legend">
-          {sides.map(([t, k, c, c2]) => <span key={k} className="lg" style={{ background: c, color: inkOn(c), boxShadow: `3px 3px 0 ${c2}` }}>{t.abbr} <b>{end[k]}</b></span>)}
+        <div className="leadstats">
+          <span className="lscap">Biggest lead</span>
+          {stat(game.away, cc.away.main, bigA)}
+          {stat(game.home, cc.home.main, bigH)}
+          <span className="lsch"><b>{changes}</b> lead {changes === 1 ? 'change' : 'changes'}</span>
         </div>
-        <div role="img" aria-label={`Score over time. ${game.away.name} ${end.a}, ${game.home.name} ${end.h}.`}>
+        <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
           <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-            {ticks.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: v === 0 ? 'var(--line3)' : 'var(--rule)' }} strokeWidth={v === 0 ? 2 : 1} /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">{v}</text></g>)}
+            {gl.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: 'var(--rule)' }} strokeWidth="1" /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">+{Math.abs(v)}</text></g>)}
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
-            {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={i} x={x((a + b) / 2)} y={H - 18} textAnchor="middle" className="per">{label(i)}</text>; })}
-            {sides.map(([, k, , c2]) => <path key={'s' + k} d={path(k)} transform="translate(3 3)" fill="none" stroke={c2} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
-            {sides.map(([, k, c]) => <path key={k} d={path(k)} fill="none" stroke={c} strokeWidth="4" strokeLinejoin="miter" strokeLinecap="square" />)}
-            {sides.map(([, k, c, c2]) => <rect key={'e' + k} x={x(end.t) - 5} y={y(end[k]) - 5} width="10" height="10" fill={c} stroke={c2} strokeWidth="2" />)}
-            <path d={`M${x0} ${H - 8} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 5} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 2} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
+            <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr} AHEAD</text>
+            <text x={x1} y={y1 - 3} textAnchor="end" className="per" style={{ fill: cc.home.main }}>{game.home.abbr} AHEAD</text>
+            {pts.slice(0, -1).map((p, i) => p.m ? <rect key={i} shapeRendering="crispEdges" x={x(p.t)} y={Math.min(y(p.m), mid)} width={Math.max(0, x(pts[i + 1].t) - x(p.t))} height={Math.abs(y(p.m) - mid)} fill={p.m > 0 ? cc.away.main : cc.home.main} /> : null)}
+            <path d={`M${x0} ${mid} H${x1}`} style={{ stroke: 'var(--soft)' }} strokeWidth="1.5" />
+            <text x={x0 - 6} y={mid + 3.5} textAnchor="end" className="ax">0</text>
+            {end.m ? <rect x={x(end.t) - 4.5} y={y(end.m) - 4.5} width="9" height="9" fill={end.m > 0 ? cc.away.main : cc.home.main} stroke="#0C1124" strokeWidth="2" /> : null}
+            {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={'p' + i} x={x((a + b) / 2)} y={H - 16} textAnchor="middle" className="per">{label(i)}</text>; })}
+            <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
           </svg>
         </div>
       </div>
@@ -2146,7 +2157,7 @@ function GamePage({ lg, id, feed, replayBar }) {
                     </table>
                   </section>
                 ) : null}
-                {d.chart ? <ScoreChart chart={d.chart} game={g} L={L} /> : null}
+                {d.chart ? <LeadChart chart={d.chart} game={g} L={L} /> : null}
                 {d.plays.length ? (
                   <section className="sec">
                     <H2>Scoring</H2>
