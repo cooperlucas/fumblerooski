@@ -1030,7 +1030,7 @@ function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math
 // in that team's color, so every lead change and how big each lead got reads at a glance.
 function LeadChart({ chart, game, L }) {
   const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 10, y1 = 160, mid = (y0 + y1) / 2;
-  const pts = chart.points.map((p) => ({ t: p.t, m: p.a - p.h }));
+  const pts = chart.points.map((p) => ({ t: p.t, m: p.a - p.h, a: p.a, h: p.h }));
   const most = Math.max(1, ...pts.map((p) => Math.abs(p.m)));
   const step = niceStep(most * 1.5), top = Math.max(step, Math.ceil((most * 1.15) / step) * step);
   const x = (t) => x0 + t * (x1 - x0), y = (m) => mid - (m / top) * (mid - y0);
@@ -1047,6 +1047,19 @@ function LeadChart({ chart, game, L }) {
   const share = Math.round((lead[1] / span) * 100);
   const gl = [top, -top].concat(top / step >= 2 ? [step * Math.floor(top / step / 2), -step * Math.floor(top / step / 2)] : []);
   const stat = (t, c, n) => <span className="ls"><i style={{ background: c }} />{t.abbr} <b>{n ? `+${n}` : '—'}</b></span>;
+  // Touch and drag across the chart to read the score and game clock at any moment.
+  const [scrub, setScrub] = useState(null);
+  const svgRef = useRef(null);
+  const tAt = (e) => { const r = svgRef.current.getBoundingClientRect(); const px = ((e.clientX - r.left) / r.width) * W; return Math.max(pts[0].t, Math.min(end.t, (px - x0) / (x1 - x0))); };
+  const at = scrub == null ? null : (() => {
+    let p = pts[0]; for (const q of pts) { if (q.t <= scrub + 1e-9) p = q; else break; }
+    const i = Math.max(0, chart.bounds.findIndex((b) => scrub <= b + 1e-9));
+    const a = i ? chart.bounds[i - 1] : 0, b = chart.bounds[i] ?? 1;
+    const len = i < reg ? L.periodLen : (L.sport === 'hockey' ? 5 : L.sport === 'football' ? 10 : L.sport === 'basketball' ? 5 : L.periodLen);
+    let clock = '';
+    if (chart.stepped && len) { const left = Math.max(0, len * (1 - (scrub - a) / Math.max(1e-9, b - a))); clock = `${Math.floor(left)}:${String(Math.floor((left % 1) * 60)).padStart(2, '0')}`; }
+    return { p, per: label(i), clock };
+  })();
   return (
     <section className="sec">
       <H2>Lead Tracker</H2>
@@ -1056,9 +1069,14 @@ function LeadChart({ chart, game, L }) {
           {stat(game.away, cc.away.main, bigA)}
           {stat(game.home, cc.home.main, bigH)}
         </div>
-        <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>
+        {at ? (
+          <p className="leadnote scrubbing"><b>{[at.per, at.clock].filter(Boolean).join(' · ')}</b><span style={{ color: cc.away.main }}>{game.away.abbr} {at.p.a}</span><span style={{ color: cc.home.main }}>{game.home.abbr} {at.p.h}</span></p>
+        ) : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}<span className="scrubhint"> · drag the chart to scrub</span></p>}
         <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
-          <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+          <svg ref={svgRef} className="flow scrub" viewBox={`0 0 ${W} ${H}`} aria-hidden="true"
+            onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); setScrub(tAt(e)); }}
+            onPointerMove={(e) => setScrub(tAt(e))}
+            onPointerUp={(e) => { if (e.pointerType !== 'mouse') setScrub(null); }} onPointerCancel={() => setScrub(null)} onPointerLeave={(e) => { if (e.pointerType === 'mouse') setScrub(null); }}>
             {gl.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: 'var(--rule)' }} strokeWidth="1" /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">+{Math.abs(v)}</text></g>)}
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
             <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr} AHEAD</text>
@@ -1086,6 +1104,7 @@ function LeadChart({ chart, game, L }) {
             })()}
             <path d={`M${x0} ${mid} H${x1}`} style={{ stroke: 'var(--soft)' }} strokeWidth="1.5" />
             <text x={x0 - 6} y={mid + 3.5} textAnchor="end" className="ax">0</text>
+            {at ? <g pointerEvents="none"><path d={`M${x(scrub)} ${y0} V${y1}`} stroke="#F5F5F7" strokeWidth="1.25" strokeDasharray="3 3" /><circle cx={x(scrub)} cy={y(at.p.a - at.p.h)} r="5" fill={at.p.a > at.p.h ? cc.away.main : at.p.a < at.p.h ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" /></g> : null}
             <circle cx={x(end.t)} cy={y(end.m)} r="4.5" fill={end.m > 0 ? cc.away.main : end.m < 0 ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" />
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={'p' + i} x={x((a + b) / 2)} y={H - 16} textAnchor="middle" className="per">{label(i)}</text>; })}
             <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />

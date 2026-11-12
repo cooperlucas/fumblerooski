@@ -703,3 +703,8 @@ button.pick.date { cursor: pointer; }
 .breakclock .bk-t { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 52px; line-height: 1; color: var(--yellow); font-variant-numeric: tabular-nums; -webkit-text-stroke: 1px #0C1124; text-shadow: 3px 3px 0 #6E3AB5; }
 .breakclock .bk-t.soon { font-size: 30px; }
 .breakclock .bk-sub { font-size: 12px; font-weight: 700; color: var(--mute); }
+.flow.scrub { touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; }
+.leadnote.scrubbing { display: flex; gap: 12px; align-items: baseline; font-weight: 800; }
+.leadnote.scrubbing b { color: var(--ink); font-weight: 900; }
+.leadnote .scrubhint { color: var(--mute); font-weight: 600; }
+@media (hover: hover) { .leadnote .scrubhint { display: none; } }
