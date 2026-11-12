@@ -505,4 +505,5 @@ test('refresh timing: games are checked often around their start time', async ()
   assert.equal(boardRefresh({ games: [{ state: 'pre', date: at(3) }, { state: 'final' }] }), 20000);
   assert.equal(boardRefresh({ games: [{ state: 'live' }, { state: 'pre', date: at(300) }] }), 30000);
   assert.equal(gameRefresh({ state: 'final' }), 0);
+  assert.equal(gameRefresh({ state: 'live' }), 10000);
 });

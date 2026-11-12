@@ -163,8 +163,9 @@ export const boardRefresh = (d) => {
   const pre = Math.min(300000, ...gs.filter((g) => g.state === 'pre').map((g) => preRefresh(g, 20000)));
   return gs.some((g) => g.state === 'live') ? Math.min(30000, pre) : pre;
 };
-// One game's page.
-export const gameRefresh = (g) => (g?.state === 'live' ? 20000 : g?.state === 'pre' ? preRefresh(g) : 0);
+// One game's page. Live: every 10 seconds, which is about how often the feed itself updates (its cache holds ~10s),
+// so asking faster would only get the same answer back.
+export const gameRefresh = (g) => (g?.state === 'live' ? 10000 : g?.state === 'pre' ? preRefresh(g) : 0);
 export const dayRefresh = boardRefresh;
 export function useDay(offset) {
   const day = ymd(dayOffset(offset));
