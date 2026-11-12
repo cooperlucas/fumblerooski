@@ -1243,7 +1243,7 @@ function LiveField({ drives, game, onAll }) {
   }
   // Stamps: touchdown, turnover, safety. They slam in, sit a few seconds, and clear.
   let stamp = null;
-  if (last && m.nulled) stamp = { text: 'CALLED BACK', color: '#FFD23F', x: 60 * K }; // flag yellow, and no confetti
+  if (last && m.nulled) stamp = null; // a called-back score gets the flag banner only: no stamp, no confetti
   else if (last && m.kind === 'td') {
     const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
     stamp = { text: m.how === 'Pick Six' ? 'PICK SIX!' : m.how === 'Scoop & Score' ? 'SCOOP & SCORE!' : 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
