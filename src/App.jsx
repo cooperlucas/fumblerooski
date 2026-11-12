@@ -1658,16 +1658,18 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   // The banner calls out the newest play for a few seconds, then settles back to who has the ball.
   const [flash, setFlash] = useState(true);
   useEffect(() => { setFlash(true); const h = setTimeout(() => setFlash(false), 4500); return () => clearTimeout(h); }, [now?.id]);
-  const possT = poss === 'away' ? game.away : poss === 'home' ? game.home : null;
+  // At a break (halftime, end of a period) nobody has the ball: no arrows, no possession glow, and the banner names the break.
+  const atBreak = /halftime|^end of|intermission/i.test(String(game.statusText || ''));
+  const possT = atBreak ? null : poss === 'away' ? game.away : poss === 'home' ? game.home : null;
   const lt = last ? place(last.xy, side(last.teamId)) : null;
   const head = now ? playHead(now, L) : '';
   // A 10-0 run (or better) gets called out while it lasts.
   const run = scoringRun(plays);
   const runT = run ? game[run.side] : null;
   const runTxt = run ? `${run.pts}-0` : '';
-  const call = flash && now ? { text: now.scoring && run && side(now.teamId) === run.side ? `${head} · ${runTxt} Run` : head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : null;
+  const call = flash && now ? { text: now.scoring && run && side(now.teamId) === run.side ? `${head} · ${runTxt} Run` : head, team: teamOf(now.teamId), hot: now.scoring, bad: /turnover|foul/i.test(head) } : possT ? { text: `${possT.abbr} Ball`, team: possT } : atBreak ? { text: game.statusText } : null;
   // Chevrons march toward the basket the team with the ball is attacking.
-  const dir = poss === 'away' ? -1 : 1, pc = poss ? cc[poss].main : null;
+  const dir = poss === 'away' ? -1 : 1, pc = poss && !atBreak ? cc[poss].main : null;
   const shown = recent.slice(0, 4);
   return (
     <>
