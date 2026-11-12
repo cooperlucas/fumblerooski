@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, MORNING_UNTIL } from './data/headlines.js';
@@ -775,6 +775,10 @@ function TeamPage({ lg, id, season }) {
   // The gold number comes from the team's main poll: CFP (or AP before it is out) for the top division,
   // or the one poll a lower-division team appears in (FCS Coaches, AFCA Div II, AFCA Div III).
   const lower = pollRanks.find((x) => x.level !== 'top');
+  // D-II and D-III teams: their conference instead of the poll's name (or ESPN's "12th in Div II/III").
+  const ldiv = q.data?.lowerDiv;
+  const smallDiv = lg === 'cfb' && (ldiv === 'd2' || ldiv === 'd3' || (ldiv === '?' && lower && lower.level !== 'fcs') || (lower && (lower.level === 'd2' || lower.level === 'd3')));
+  const confName = useQuery(smallDiv ? `conf:${lg}:${id}` : null, () => getTeamConference(lg, id, ldiv === 'd2' || ldiv === 'd3' ? ldiv : lower?.level), () => 0).data || null;
   const mainPoll = lower ? lower.poll : polls[0];
   const topRank = mainPoll ? (mainPoll.ranks.find((x) => x.team.id === String(id))?.rank || null) : (q.data?.rank || pr?.own || null);
   // The schedule feed leaves the score blank while a game is on, so read that one game live.
@@ -811,8 +815,9 @@ function TeamPage({ lg, id, season }) {
               <span className="hlogo"><Blob team={t} size={58} radius={16} />{!isPast && topRank ? <b className="hrk" aria-label={`Ranked ${topRank}`}>{topRank}</b> : null}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{t.full}</h2>
-                <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
-                {!isPast && (topRank || pollRanks.length) ? <p className="hrank">{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
+                <p>{[isPast ? `${yearLabel(yr)}: ${q.data.record || 'no games'}` : q.data.record, smallDiv ? '' : q.data.standing].filter(Boolean).join(' · ') || LEAGUE[lg].name}</p>
+                {smallDiv ? (confName && !isPast ? <p className="hrank"><span>{confName}</span></p> : null)
+                  : !isPast && (topRank || pollRanks.length) ? <p className="hrank">{lower ? <span>{lower.poll.name}</span> : pollRanks.length ? <span>{pollRanks.map((x) => `${x.name} ${x.r}`).join(' · ')}</span> : null}</p> : null}
               </div>
             </div>
             <div className="teambar">

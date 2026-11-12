@@ -114,6 +114,15 @@ export function GameNote({ text }) {
 }
 export function shortEvent(note) {
   let n = String(note || '').replace(/\s+-\s+Rescheduled.*$/i, '').replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '').trim();
+  // Lower-division football playoffs: "NCAA DIVISION III FOOTBALL CHAMPIONSHIP - FIRST ROUND" → "Division III Playoffs · First Round".
+  const div = /^(?:NCAA\s+)?(Division\s+III|Division\s+II|Division\s+I|FCS)\s+(?:Football\s+)?Championship(?:\s*[-:·]\s*|\s+)?(.*)$/i.exec(n);
+  if (div) {
+    const d = /^fcs|^division\s+i$/i.test(div[1].trim()) ? 'FCS' : /iii$/i.test(div[1]) ? 'Division III' : 'Division II';
+    const r = div[2].trim().toLowerCase();
+    const round = /first/.test(r) ? 'First Round' : /second/.test(r) ? 'Second Round' : /third/.test(r) ? 'Third Round' : /quarter/.test(r) ? 'Quarterfinal' : /semi/.test(r) ? 'Semifinal' : null;
+    if (round) return `${d} Playoffs · ${round}`;
+    if (!r || /champ|final|title/.test(r)) return `${d} National Championship`;
+  }
   n = n.replace(/College Football Playoff/gi, 'CFP').replace(/NCAA (Men's|Women's) Basketball Championship/i, 'NCAA Tournament')
     .replace(/\bNational Championship\b/i, 'Title Game').replace(/\s+Region\b/i, '').replace(/\bFirst Round\b/i, '1st Round').replace(/\bSecond Round\b/i, '2nd Round');
   // Conference title games: the short names everyone uses.

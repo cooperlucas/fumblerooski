@@ -290,7 +290,13 @@ async function pollBefore(season, week, pid, gameDate) {
   const cands = (await Promise.all([week - 1, week, week + 1].filter((w) => w >= 1).map((w) => weekPoll(season, w, pid)))).filter((p) => p.ranks.size && p.date);
   if (!Number.isFinite(t)) return cands.find((p) => p) ? cands[Math.min(1, cands.length - 1)].ranks : new Map();
   const before = cands.filter((p) => p.date <= t).sort((x, y) => y.date - x.date);
-  return before[0]?.ranks || new Map();
+  if (before[0]) return before[0].ranks;
+  // Playoff games come after the last poll (the final one is out before the bracket), so look further back.
+  for (let w = week - 2; w >= Math.max(1, week - 6); w--) {
+    const pl = await weekPoll(season, w, pid);
+    if (pl.ranks.size && pl.date && pl.date <= t) return pl.ranks;
+  }
+  return new Map();
 }
 export async function divisionRanks(season, week, gameDate) {
   if (!season || !week) return new Map();
@@ -658,6 +664,18 @@ export async function getDivisionTeams(lg) {
   }
   return out;
 }
+// A D-II or D-III team's conference, read from its division's standings. Saved on the device: it rarely changes.
+export async function getTeamConference(lg, teamId, div) {
+  const key = `fr.conf.${lg}.${teamId}`, saved = stash.get(key);
+  if (saved && Date.now() - saved.at < 30 * 864e5) return saved.name;
+  for (const d of div === 'd2' || div === 'd3' ? [div] : ['d3', 'd2']) {
+    try {
+      const g = (await getStandings(lg, d)).groups.find((x) => x.rows.some((r) => String(r.team.id) === String(teamId)));
+      if (g) { const name = /^independent/i.test(g.name) ? 'Independent' : g.name; stash.set(key, { at: Date.now(), name }); return name; }
+    } catch { /* try the next */ }
+  }
+  return null;
+}
 export async function getTeams(lg) {
   let lastErr = null;
   try { return await listTeams(lg); } catch (e) { lastErr = e; }
@@ -736,6 +754,8 @@ export async function getTeam(lg, id, season) {
     record: String((season && season !== current ? pastRecord : record) || ''),
     rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : null) : null,
     pollInfo,
+    // D-II and D-III: ESPN files these under one "Div II/III" group, so the conference gets looked up (getTeamConference).
+    lowerDiv: lg !== 'cfb' || fbs ? null : { 81: 'fcs', 57: 'd2', 58: 'd3' }[Number(t.groups?.parent?.id) || Number(t.groups?.id)] || (pollInfo ? '?' : null),
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
     standing: (season && season !== current) || noConfYet ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule,
