@@ -1335,7 +1335,7 @@ function LiveField({ drives, game, onAll }) {
   }
   // Stamps: touchdown, turnover, safety. They slam in, sit a few seconds, and clear.
   let stamp = null;
-  if (last && defTwo) { stamp = { text: 'DEFENSIVE 2!', color: GOLD, x: 60 * K }; glowSide = (twoBy === 'away' ? 110 : 0) * K; } // lights the end zone, like a good two-point try
+  if (last && defTwo) { stamp = { text: 'DEFENSIVE 2!', color: GOLD, x: 60 * K, cdelay: 1.1 }; glowSide = (twoBy === 'away' ? 110 : 0) * K; } // lights the end zone, like a good two-point try
   else if (last && m.nulled) stamp = null; // a called-back score gets the flag banner only: no stamp, no confetti
   else if (last && m.kind === 'td') {
     const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
@@ -1434,7 +1434,7 @@ function LiveField({ drives, game, onAll }) {
                   return <rect key={i} className="kconf" x="-3.5" y="-3.5" width="7" height="7" rx="1.5" fill={[stamp.confetti[1], GOLD, '#fff', '#2ED9D9'][i % 4]} stroke={INK} strokeWidth="0.6"
                     style={{ '--cx': `${stamp.confetti[0]}px`, '--cy': `${mid}px`, '--dx': `${Math.cos(a2) * r}px`, '--dy': `${Math.sin(a2) * r * 0.9}px`, animationDelay: `${(stamp.cdelay || 0) + (i % 5) * 0.05}s` }} />;
                 }) : null}
-                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color} style={{ ...(stamp.text.length > 11 ? { fontSize: 24 } : {}), ...(stamp.delay ? { animationDelay: `${stamp.delay}s` } : {}) }}>{stamp.text}</text></g>
+                <g transform={`translate(${stamp.x} ${mid - 6})`}><text className="kstamp" textAnchor="middle" dominantBaseline="central" fill={stamp.color} style={{ ...(stamp.text.length > 11 ? { fontSize: 24 } : {}), ...(stamp.delay || stamp.cdelay ? { animationDelay: `${stamp.delay || stamp.cdelay}s` } : {}) /* a score's stamp lands with its confetti */ }}>{stamp.text}</text></g>
               </g>) : null}
           </svg>
           {last ? (
