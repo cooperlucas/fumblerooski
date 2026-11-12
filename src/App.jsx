@@ -376,7 +376,13 @@ function Leagues() {
           {orderLeagues(prefs).map((l) => { const n = count(l.id), season = q.data?.seasons?.[l.id]; return (
             <button key={l.id} className="lrow" onClick={() => go(`league/${l.id}`)}>
               <span className="blob" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 12, background: l.color, color: '#0C1124', overflow: 'hidden', fontStretch: l.short.length > 4 ? '100%' : undefined, fontSize: l.short.length > 4 ? 9 : l.short.length > 3 ? 10 : 11 }}>{l.short}</span>
-              <span className="nm">{l.name}<span className="sub">{n ? `${n} ${n === 1 ? 'game' : 'games'} today` : season || 'No games today'}{isLeagueOn(l.id, prefs) ? '' : ' · Hidden on Scores'}</span></span>
+              <span className="nm">{l.name}<span className="sub">{n ? `${n} ${n === 1 ? 'game' : 'games'} today` : season || 'No games today'}</span></span>
+              {/* Hidden on Scores: a tiny crossed-out eye. Tap it to show the league on Scores again. */}
+              {isLeagueOn(l.id, prefs) ? null : (
+                <span className="lhid" role="button" tabIndex={0} aria-label={`${l.name} is hidden on Scores. Show it`} title="Hidden on Scores. Tap to show"
+                  onClick={(e) => { e.stopPropagation(); toggleLeague(l.id); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleLeague(l.id); } }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12 C5 7.5 8.3 5.5 12 5.5 S19 7.5 21.5 12 C19 16.5 15.7 18.5 12 18.5 S5 16.5 2.5 12 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M4 20 L20 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+                </span>)}
               <span className="chev" aria-hidden="true">›</span>
             </button>); })}
         </div>
