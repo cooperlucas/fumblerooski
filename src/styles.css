@@ -55,7 +55,7 @@ h1, h2, h3, p { margin: 0; }
 @media (min-width: 560px) { .app { border-left: 1px solid var(--line2); border-right: 1px solid var(--line2); } }
 .head { flex: none; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 14px) max(18px, env(safe-area-inset-right, 0px)) 10px max(18px, env(safe-area-inset-left, 0px)); }
 .brand { margin: 0; padding-right: 4px; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 22px; line-height: 1.05; white-space: nowrap; display: inline-block; letter-spacing: 0.01em; text-transform: uppercase; background: linear-gradient(180deg, #FFFFFF 0%, #C8FAFB 40%, #22D3D6 52%, #0E6F7A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0.6px #0C1124; filter: drop-shadow(2px 2px 0 #6E3AB5) drop-shadow(1px 1px 0 #0C1124); }
-.tagline { margin-top: 5px; font-size: 10px; font-weight: 800; font-style: italic; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+.tagline { display: inline-block; white-space: nowrap; margin-top: 5px; font-size: 10px; font-weight: 800; font-style: italic; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
 .mascot { flex: none; overflow: visible; transform-origin: 60% 55%; animation: frWobble 2.6s ease-in-out infinite; }
 .round { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--chip); border: 1px solid var(--line3); display: flex; align-items: center; justify-content: center; padding: 0; }
 .subtitle { flex: 1; min-width: 0; font-stretch: 125%; font-weight: 800; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -664,5 +664,4 @@ button.pick.date { cursor: pointer; }
 
 .headbtns { margin-left: auto; display: flex; gap: 6px; flex: none; }
 .headbtns .round { width: 40px; height: 40px; }
-.tagline span { white-space: nowrap; }
 .brandbox { flex: 1 1 auto; min-width: 0; }

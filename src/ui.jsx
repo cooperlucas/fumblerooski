@@ -251,16 +251,16 @@ const GearIcon = () => (
     <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2.2" />
   </svg>
 );
-// The logo shrinks to the room it has, measured on the real font (the wide Archivo can take a beat to load).
-function FitBrand() {
+// Text that shrinks to the room it has, measured on the real font (the wide Archivo can take a beat to load).
+function useFit(base, floor, slack = 0) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
     const fit = () => {
-      el.style.fontSize = '22px';
-      const need = el.getBoundingClientRect().width + 6, have = el.parentElement.clientWidth; // a few px for the italic lean and shadow
-      if (need > have) el.style.fontSize = `${Math.max(13, Math.floor((22 * have / need) * 10) / 10)}px`;
+      el.style.fontSize = `${base}px`;
+      const need = el.getBoundingClientRect().width + slack, have = el.parentElement.clientWidth;
+      if (need > have) el.style.fontSize = `${Math.max(floor, Math.floor((base * have / need) * 10) / 10)}px`;
     };
     fit();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
@@ -268,8 +268,16 @@ function FitBrand() {
     document.fonts?.ready?.then(fit);
     document.fonts?.addEventListener?.('loadingdone', fit);
     return () => { ro?.disconnect(); document.fonts?.removeEventListener?.('loadingdone', fit); };
-  }, []);
+  }, [base, floor, slack]);
+  return ref;
+}
+function FitBrand() {
+  const ref = useFit(22, 13, 6); // a few px for the italic lean and shadow
   return <h1 ref={ref} className="brand">Fumblerooski</h1>;
+}
+function FitTagline() {
+  const ref = useFit(10, 7, 2);
+  return <div ref={ref} className="tagline">Pure sports · No odds · No ads</div>;
 }
 export function RootHeader() {
   return (
@@ -278,7 +286,7 @@ export function RootHeader() {
         <Mascot />
         <div className="brandbox">
           <FitBrand />
-          <div className="tagline"><span>Pure sports ·</span> <span>No odds ·</span> <span>No ads</span></div>
+          <FitTagline />
         </div>
         <div className="headbtns">
           <button className="round" aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
