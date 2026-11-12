@@ -604,12 +604,24 @@ export async function getTeam(lg, id, season) {
     });
     pastRecord = w + l + tie ? [w, l, ...(tie ? [tie] : [])].join('-') : '';
   }
+  // "1st in Horizon" before a single league game is just alphabetical order. Hide the place until this team has
+  // played a conference game (college; pros count every game toward the standings).
+  let noConfYet = false;
+  if (LEAGUE[lg]?.college && (!season || season === current) && /\bin\b/i.test(t.standingSummary || '') && t.groups?.isConference && t.groups?.id) {
+    try {
+      const st = await get(url(V2, lg, '/standings', { group: String(t.groups.id) }));
+      const ents = st.standings?.entries || (st.children || []).flatMap((c) => c.standings?.entries || []);
+      const me = ents.find((e) => String(e.team?.id) === String(t.id || id));
+      const vc = me?.stats?.find((x) => x.type === 'vsconf');
+      if (vc && /^0-0(-0)?$/.test(String(vc.displayValue || vc.summary || '').trim())) noConfYet = true;
+    } catch { /* keep the feed's place */ }
+  }
   return {
     team: normTeam(t.id ? t : { ...t, id }, lg),
     record: String((season && season !== current ? pastRecord : record) || ''),
     rank: !season || season === current ? (rankNow && rankNow <= 25 ? rankNow : null) : null,
     // "20th in Div II/III" pools hundreds of schools and says little; keep it only for a top-25 spot.
-    standing: season && season !== current ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
+    standing: (season && season !== current) || noConfYet ? '' : (() => { const v = cleanText(t.standingSummary || ''); const n = parseInt(v, 10); return /div(ision)?\.?\s*(ii|iii|2|3)\b/i.test(v) && !(n <= 25) ? '' : v; })(),
     schedule,
     scheduleMissing: sched.status === 'rejected',
     season: shown, currentSeason: current,
