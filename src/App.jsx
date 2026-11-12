@@ -1308,7 +1308,7 @@ function LiveField({ drives, game, onAll }) {
             ) : null}
             {show}
             {retEnd != null && retFrom != null && !noRet ? (
-              <g key={'ret' + lastKey} className="fshow">
+              <g key={'ret' + lastKey}>{/* the return stays drawn until the next play; only the stamp fades */}
                 {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
                 <g transform={`translate(${X(retEnd)} ${ly - 19})`}>{ball(8)}</g>
               </g>) : null}
