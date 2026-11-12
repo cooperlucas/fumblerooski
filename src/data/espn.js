@@ -1703,7 +1703,14 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       // Score once the drive was over (extra point included), from its last play that carries one.
       score: (() => { const p = [...plays].reverse().find((x) => Number.isFinite(x.away) && Number.isFinite(x.home)); return p ? { away: p.away, home: p.home } : null; })(),
     };
-  }).filter((d) => d.side && (d.plays.length || d.summary)).map((d, i, all) => {
+  }).filter((d) => d.side && (d.plays.length || d.summary)).reduce((acc, d) => {
+    // A defensive two (a try blocked or picked and run back) is part of the scoring drive's try, not a drive of its own:
+    // fold it under the drive before it, with that drive's score updated.
+    const twoOnly = d.plays.length && d.plays.every((p) => /defensive (pat|2pt|two)|return for (a )?defensive (pat|2)/i.test(`${p.type} ${p.text}`));
+    const prev = acc[acc.length - 1];
+    if (twoOnly && prev) { acc[acc.length - 1] = { ...prev, plays: [...prev.plays, ...d.plays], score: d.score || prev.score, live: prev.live || d.live }; return acc; }
+    acc.push(d); return acc;
+  }, []).map((d, i, all) => {
     // Show the score on drives that changed it (touchdowns, field goals, and safeties or return scores by the other side).
     const prev = all.slice(0, i).reverse().find((x) => x.score)?.score || { away: 0, home: 0 };
     return { ...d, scoreChanged: !!d.score && (d.score.away !== prev.away || d.score.home !== prev.home) };

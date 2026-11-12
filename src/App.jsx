@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
@@ -1200,7 +1200,7 @@ export function fbHead(p) {
   if (/end (of )?(period|quarter|half|game)/i.test(p.type)) return p.type;
   return p.type || 'Play';
 }
-function LiveField({ drives, game, onAll }) {
+function LiveField({ drives, game, lg, onAll }) {
   const d = drives.find((x) => x.live) || drives[drives.length - 1];
   const last = d ? d.plays[d.plays.length - 1] : null;
   const lastKey = d ? `${d.id}:${d.plays.length}` : '';
@@ -1230,7 +1230,7 @@ function LiveField({ drives, game, onAll }) {
   const m0 = fieldMoment(last);
   const tRet = !defTd && m0.kind === 'turnover' && last && last.endRaw != null ? Math.max(0, Math.min(100, 100 - last.endRaw)) : null;
   const retEnd = defTd ? 100 : tRet;
-  const retYds = (defTd || tRet != null) && /return(?:ed)? for no gain|no return/i.test(last.text) ? 0 : defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
+  const retYds = (defTd || tRet != null) && /return(?:ed)? for no gain|no return/i.test(last.text) ? 0 : defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /for (\d+) y(?:ar)?ds?\b[^.]*\btouchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
   const retFrom = retYds != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retYds)) : null;
   // On a pick the offense's line stops at the line of scrimmage; the ball turns over where it was caught.
   const picked = tRet != null && /intercept/i.test(`${last.type} ${last.text}`);
@@ -1269,8 +1269,12 @@ function LiveField({ drives, game, onAll }) {
                   : m.kind === 'kickoff' ? { text: m.touchback ? 'Kickoff · Touchback' : 'Kickoff', team: last.mine ? t : opp } : null;
   // After a punt the other side fields, the kick plays out, then possession changes over: the punting drive is done, and the
   // receiving team has the ball where the play ended (before the feed opens their drive). Spots here are in the kicking team's terms.
-  const handoff = d.live && !flash && !!last && last.mine && !last.kept && m.kind === 'punt' && !m.recovered;
-  const hSpot = !handoff ? null : m.touchback ? 20 : m.blocked ? last.from - (Number.isFinite(last.yards) ? last.yards : 0) : last.endRaw != null ? 100 - last.endRaw : last.from - (m.yards || 0);
+  // A kickoff (after a score) belongs to the scoring team's finished drive: show only the kick, not that drive again.
+  const kickMine = !!last && m.kind === 'kickoff' && last.mine && !last.kept;
+  // A kick this drive's team received: the ball (and the line to gain) show up once the kick has landed and been run back.
+  const kickIn = !!last && flash && (m.kind === 'kickoff' || m.kind === 'punt') && !last.mine && !m.recovered ? (m.touchback || m.fairCatch ? 1.4 : 2.3) : 0;
+  const handoff = d.live && !flash && !!last && last.mine && !last.kept && (m.kind === 'punt' || m.kind === 'kickoff') && !m.recovered;
+  const hSpot = !handoff ? null : m.kind === 'kickoff' && m.touchback ? 100 - touchbackSpot(lg, game.season, 'kickoff') : m.touchback ? 20 : m.blocked ? last.from - (Number.isFinite(last.yards) ? last.yards : 0) : last.endRaw != null ? 100 - last.endRaw : last.from - (m.yards || 0);
   const hText = hSpot == null ? '' : Math.round(hSpot) === 50 ? '50' : hSpot < 50 ? `${opp.abbr} ${Math.round(hSpot)}` : `${t.abbr} ${Math.round(100 - hSpot)}`;
   const banner = handoff ? { text: `${opp.abbr} Ball`, team: opp } : flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
@@ -1356,7 +1360,7 @@ function LiveField({ drives, game, onAll }) {
           <div className="lfhead">
             <Blob team={handoff ? opp : t} size={30} />
             <span className="tx">{handoff
-              ? <><b>Next Drive</b><small>Starts at {hText} · {t.abbr} punted ({d.summary || `${d.plays.length} plays`})</small></>
+              ? <><b>Next Drive</b><small>Starts at {hText} · {t.abbr} {m.kind === 'kickoff' ? 'kicked off' : `punted (${d.summary || `${d.plays.length} plays`})`}</small></>
               : <><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></>}</span>
             {d.result && !d.live ? <span className="res">{d.result}</span> : null}
           </div>
@@ -1384,7 +1388,7 @@ function LiveField({ drives, game, onAll }) {
                 {bar(`M${P.N[0] + P.s * P.U} ${P.N[1]} H${P.N[0]} V${P.F[1]} H${P.F[0] + P.s * P.U}`, 3)}
                 <circle cx={P.x + P.s * 7} cy={mid} r="2.6" fill={GOLD} stroke={INK} strokeWidth="1.2" />
               </g>))}
-            {fd != null ? <line className="lfmove" x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)` }} stroke="#FFBE2E" strokeWidth="2.4" /> : null}
+            {fd != null ? <line className={'lfmove' + (kickIn ? ' lfwait' : '')} x1="0" x2="0" y1={top} y2={FH} style={{ transform: `translateX(${X(fd)}px)`, '--wait': `${kickIn}s` }} stroke="#FFBE2E" strokeWidth="2.4" /> : null}
             {handoff && hSpot != null ? (
               <g className="lfmove" style={{ transform: `translate(${X(hSpot)}px, ${ly}px)` }}>
                 <g className="lfball">
@@ -1393,13 +1397,13 @@ function LiveField({ drives, game, onAll }) {
                   <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
                 </g>
               </g>
-            ) : !defTwo && start != null && at != null ? (
+            ) : !defTwo && !kickMine && start != null && at != null ? (
               <>
                 <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
                 <circle cx={X(start)} cy={ly} r="3.2" fill="#fff" stroke="#0C1124" strokeWidth="1.3" />
                 {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
-                <g className="lfmove" style={{ transform: `translate(${X(ballAt)}px, ${ly}px)`, display: retEnd != null && retFrom != null && !noRet ? 'none' : undefined }}>
+                <g className={'lfmove' + (kickIn ? ' lfwait' : '')} style={{ transform: `translate(${X(ballAt)}px, ${ly}px)`, display: retEnd != null && retFrom != null && !noRet ? 'none' : undefined, '--wait': `${kickIn}s` }}>
                   <g className="lfball">
                     <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
                     {m.kind === 'fg' || m.kind === 'punt' ? null : (
@@ -2263,7 +2267,7 @@ function GamePage({ lg, id, feed, replayBar }) {
               <div className="gtab">
                 <BreakClock lg={lg} game={g} lastWall={d.lastWall} />
                 {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} rink={d.rink} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
-                {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
+                {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} lg={lg} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
                   <section className="card pad linesbox" style={{ marginTop: 12 }}>

@@ -707,3 +707,5 @@ button.pick.date { cursor: pointer; }
 .leadnote.scrubbing b { color: var(--ink); font-weight: 900; }
 .leadnote .scrubhint { color: var(--mute); font-weight: 600; }
 @media (hover: hover) { .leadnote .scrubhint { display: none; } }
+.field .lfwait { animation: lfwait 0.3s var(--wait, 1.4s) both; }
+@keyframes lfwait { from { opacity: 0; } to { opacity: 1; } }
