@@ -1993,6 +1993,30 @@ function ReplayPage({ lg, id, start = 0 }) {
   return <GamePage lg={lg} id={id} feed={feed} replayBar={bar} />;
 }
 
+// The compact score that rides in the game page header while you scroll: both teams, the score, the clock,
+// and for football the down, distance and who has the ball. Tap it to jump back to the top.
+function MiniScore({ g, L, onTap }) {
+  const live = g.state === 'live';
+  const has = (t) => live && g.poss && g.poss === t.id;
+  const side = (t, right) => (
+    <span className={'ms-side' + (right ? ' r' : '')}>
+      <Blob team={t} size={26} radius={8} />
+      <b className={'ms-sc' + (live || g.state !== 'final' || Number(t.score) >= Number((right ? g.away : g.home).score) ? '' : ' lose')}>{t.score}</b>
+      {has(t) ? <span className="ms-pos" aria-label={`${t.abbr} ball`} /> : null}
+    </span>
+  );
+  return (
+    <button className="miniscore" onClick={onTap} aria-label={`${g.away.abbr} ${g.away.score}, ${g.home.abbr} ${g.home.score}, ${statusLabel(g)}. Back to top.`}>
+      {side(g.away, false)}
+      <span className="ms-mid">
+        <span className={'ms-clk' + (live ? ' live' : '')}>{statusLabel(g)}</span>
+        {g.down ? <span className="ms-sit">{g.down} · {g.spot}</span> : null}
+      </span>
+      {side(g.home, true)}
+    </button>
+  );
+}
+
 function GamePage({ lg, id, feed, replayBar }) {
   const L = LEAGUE[lg];
   const q0 = useQuery(feed ? null : `game:${lg}:${id}`, () => getGame(lg, id), (d) => gameRefresh(d?.game));
@@ -2003,6 +2027,16 @@ function GamePage({ lg, id, feed, replayBar }) {
   const started = g && (g.state === 'live' || g.state === 'final');
   const periods = g ? Math.max(g.home.lines.length, g.away.lines.length, g.state === 'live' ? (L.periods || 4) : 0) : 0;
   const [picked, setTab] = useSticky('tab', 'summary');
+  // The big scoreboard: when it scrolls up under the tabs, the header shows a compact score instead of the title.
+  const boardRef = useRef(null);
+  const [mini, setMini] = useState(false);
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([e]) => setMini(!e.isIntersecting && e.boundingClientRect.top < 80), { root: el.closest('.page'), threshold: 0, rootMargin: '-64px 0px 0px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [!!d]);
   // Only offer the sections this game actually has.
   const tabs = !d || !started ? [] : [
     ['summary', g.state === 'live' ? 'Live' : 'Summary'],
@@ -2018,11 +2052,11 @@ function GamePage({ lg, id, feed, replayBar }) {
   const perLabel = (i) => (i < (L.periods || 4) || L.sport === 'baseball' ? perName(L, i + 1) : periods - (L.periods || 4) > 1 ? `OT${i - (L.periods || 4) + 1}` : 'OT');
   return (
     <>
-      <SubHeader title={title} />
+      <SubHeader title={title} miniOn={mini && started} mini={started ? <MiniScore g={g} L={L} onTap={() => boardRef.current?.closest('.page')?.scrollTo({ top: 0, behavior: 'smooth' })} /> : null} />
       <Page>
         {q.loading && !d ? <Loading rows={5} /> : q.error && !d ? <Problem error={q.error} retry={q.reload} /> : (
           <>
-            <div className="board" style={{ background: `linear-gradient(rgba(12,17,36,.38), rgba(12,17,36,.5)), linear-gradient(115deg, ${g.away.color} 0 44%, ${g.home.color} 56% 100%)` }}>
+            <div className="board" ref={boardRef} style={{ background: `linear-gradient(rgba(12,17,36,.38), rgba(12,17,36,.5)), linear-gradient(115deg, ${g.away.color} 0 44%, ${g.home.color} 56% 100%)` }}>
               <div className="top">
                 <span className="pill num" style={g.state === 'live' ? { background: 'var(--pink)', color: '#0C1124' } : g.state === 'final' ? { background: '#232C50', color: '#F5F5F7' } : { background: 'var(--teal)', color: '#0C1124' }}>
                   {g.state === 'live' ? <span className="dot" aria-hidden="true" style={{ background: '#0C1124', marginRight: 6 }} /> : null}{g.state === 'pre' ? 'UPCOMING' : statusLabel(g).toUpperCase()}

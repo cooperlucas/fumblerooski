@@ -317,14 +317,20 @@ export function RootHeader() {
     </>
   );
 }
-export function SubHeader({ title, children }) {
+export function SubHeader({ title, children, mini, miniOn }) {
   return (
     <header className="head">
       <button className="round" aria-label="Back" onClick={back}>
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
       {children || (<>
-        <h1 className="subtitle">{title}</h1>
+        {mini ? (
+          // Game pages: once the big scoreboard scrolls away, the title gives way to a compact live score.
+          <div className={'subswap' + (miniOn ? ' on' : '')}>
+            <h1 className="subtitle" aria-hidden={miniOn ? 'true' : undefined}>{title}</h1>
+            <div className="subMini" aria-hidden={miniOn ? undefined : 'true'}>{mini}</div>
+          </div>
+        ) : <h1 className="subtitle">{title}</h1>}
         <button className="round" aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
       </>)}
     </header>
