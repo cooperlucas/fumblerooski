@@ -1977,11 +1977,11 @@ function ReplayPage({ lg, id, start = 0 }) {
       <div className="rbtop"><b>Replay</b><span>Play {i + 1} of {n}</span></div>
       <input type="range" min="0" max={n - 1} value={i} onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }} aria-label="Jump to a play" />
       <div className="rbrow">
-        <button onClick={() => { setPlaying(false); setI(prevMoment ?? 0); }} disabled={i === 0} aria-label="Previous big moment">⏮</button>
-        <button onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Back one play">◀</button>
-        <button className="go" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? '❚❚' : '▶'}</button>
-        <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play">▶</button>
-        <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment">⏭</button>
+        <button onClick={() => { setPlaying(false); setI(prevMoment ?? 0); }} disabled={i === 0} aria-label="Previous big moment"><RIcon k="prevBig" /></button>
+        <button onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Back one play"><RIcon k="back" /></button>
+        <button className="go" onClick={() => setPlaying((x) => !x)} aria-label={playing ? 'Pause' : 'Play'}><RIcon k={playing ? 'pause' : 'play'} /></button>
+        <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play"><RIcon k="fwd" /></button>
+        <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment"><RIcon k="nextBig" /></button>
         <button className="spd" onClick={() => setSpeed((x) => (x === 1 ? 3 : x === 3 ? 6 : 1))} aria-label="Playback speed">{speed}x</button>
       </div>
     </div>
@@ -2015,6 +2015,19 @@ function MiniScore({ g, L, onTap }) {
       {side(g.home, true)}
     </button>
   );
+}
+
+// Replay controls, drawn rather than typed: iPhones turn ▶ ◀ ⏮ ⏭ into color emoji.
+const RICON = {
+  play: 'M7 4.5 L19.5 12 L7 19.5 Z',
+  pause: 'M6.5 4.5 H10.5 V19.5 H6.5 Z M13.5 4.5 H17.5 V19.5 H13.5 Z',
+  back: 'M17 4.5 L4.5 12 L17 19.5 Z',
+  fwd: 'M7 4.5 L19.5 12 L7 19.5 Z',
+  prevBig: 'M4.5 4.5 H7.5 V19.5 H4.5 Z M20 4.5 L8.5 12 L20 19.5 Z',
+  nextBig: 'M16.5 4.5 H19.5 V19.5 H16.5 Z M4 4.5 L15.5 12 L4 19.5 Z',
+};
+function RIcon({ k, size = 18 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-0.15em' }}><path d={RICON[k]} fill="currentColor" strokeLinejoin="round" stroke="currentColor" strokeWidth="1.2" /></svg>;
 }
 
 function GamePage({ lg, id, feed, replayBar }) {
@@ -2086,7 +2099,7 @@ function GamePage({ lg, id, feed, replayBar }) {
               <>
                 <div className="gtabs" role="tablist" aria-label="Game sections">
                   {tabs.map(([k, label]) => <button key={k} role="tab" className="chipb" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>)}
-                  {!replayBar && g.state === 'final' && REPLAY_SPORTS.has(L.sport) ? <button className="chipb replaybtn" onClick={() => go(`replay/${lg}/${id}`)}>▶ Replay</button> : null}
+                  {!replayBar && g.state === 'final' && REPLAY_SPORTS.has(L.sport) ? <button className="chipb replaybtn" onClick={() => go(`replay/${lg}/${id}`)}><RIcon k="play" size={13} /> Replay</button> : null}
                 </div>
               </>
             ) : null}
