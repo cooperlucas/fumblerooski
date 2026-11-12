@@ -1207,14 +1207,14 @@ function LiveField({ drives, game, onAll }) {
     // Going right, the kicker's left is the top upright; going left, it is the bottom one.
     const yOf = (side) => ((side === 'left') === (s > 0) ? mid - P.hw : mid + P.hw);
     const away = (y) => (y < mid ? -1 : 1);
-    let end = P.gap, opts = { fade: true }, peak = mid - 40;
+    let end = P.gap, opts = {}, peak = mid - 40; // a make rests between the uprights until the next play
     const drop = { bounce: [s * 4, 0] };
     if (m.miss === 'left' || m.miss === 'right') { const y = yOf(m.miss); end = [P.x + s * 8, y + away(y) * 9]; opts = drop; }
     else if (m.miss === 'wide') { end = [P.x + s * 8, mid + P.hw + 9]; opts = drop; }
     else if (m.miss === 'leftpost' || m.miss === 'rightpost') { const y = yOf(m.miss.replace('post', '')); end = [P.x + s * 7, y]; opts = { bounce: [-s * 28, away(y) * 10] }; }
     else if (m.miss === 'short') { end = [P.x - s * 26, mid + 2]; peak = ly - 26; opts = {}; }
     else if (m.miss === 'blocked') { end = [x0 + s * 16, ly - 4]; peak = ly - 20; opts = { bounce: [-s * 10, 6] }; }
-    show = <g key={'fg' + lastKey} className="fshow">{flight('k', x0, ly, end[0], end[1], peak, opts)}</g>;
+    show = <g key={'fg' + lastKey}>{flight('k', x0, ly, end[0], end[1], peak, opts)}</g>; // stays drawn until the next play
   } else if (last && (m.kind === 'punt' || m.kind === 'kickoff') && last.from != null && (m.yards || m.touchback || m.blocked)) {
     // Punts and kickoffs: a high arc to where the ball came down, then the return as a line back.
     // A blocked punt pops off the block and skitters to where it ended up, forward or back.
