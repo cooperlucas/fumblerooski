@@ -2081,7 +2081,12 @@ function BoxScore({ box, game, sport }) {
                 {gr.rows.map((r, i) => (
                   <React.Fragment key={r.id || r.name + i}>
                     {i === bench ? <tr className="bench"><th scope="colgroup" className="who">Bench</th><td colSpan={gr.labels.length} /></tr> : null}
-                    <tr><th scope="row" className="who">{r.id && linkPlayers ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{r.name}</button> : r.name}{r.pos ? <small> {r.pos}</small> : null}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{pct1(gr.labels[j], v)}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
+                    <tr><th scope="row" className="who">{(() => {
+                      // Full name, free to wrap, but the last name and position stay together on one line.
+                      const words = String(r.name || '').split(' '), lastW = words.pop(), firstW = words.join(' ');
+                      const body = <>{firstW ? `${firstW} ` : ''}<span className="nowrap">{lastW}{r.pos ? <small className="bpos">{'\u00a0'}{r.pos}</small> : null}</span></>;
+                      return r.id && linkPlayers ? <button className="plink" onClick={() => go(`player/${game.lg}/${r.id}`)}>{body}</button> : body;
+                    })()}</th>{r.stats.map((v, j) => <td key={j} className={gr.labels[j] === '+/-' ? (parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : undefined) : undefined}>{pct1(gr.labels[j], v)}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr>
                   </React.Fragment>
                 ))}
                 {gr.totals ? <tr className="tot"><th scope="row" className="who">Team</th>{gr.totals.map((v, j) => <td key={j}>{pct1(gr.labels[j], v)}<Pct label={gr.labels[j]} v={v} skip={gr.labels.some((l) => /PCT|%/i.test(l))} /></td>)}</tr> : null}

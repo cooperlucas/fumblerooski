@@ -1429,7 +1429,7 @@ export function playerBox(box, awayId, homeId, sport, plusMinus, ff) {
       const order = [...first.map((l) => labels.indexOf(l)).filter((i) => i >= 0), ...labels.map((_, i) => i).filter((i) => !first.includes(labels[i]))];
       const rows = (g.athletes || []).filter((a) => !a.didNotPlay && (a.stats || []).length).map((a) => ({
         id: String(a.athlete?.id ?? ''),
-        name: cleanText(a.athlete?.shortName || a.athlete?.displayName || ''),
+        name: cleanText(a.athlete?.displayName || a.athlete?.shortName || ''),
         pos: a.athlete?.position?.abbreviation || '',
         starter: a.starter === true,
         stats: order.map((i) => (addPm && i === pmIdx ? pmText(a) : String(a.stats[i] ?? ''))),
