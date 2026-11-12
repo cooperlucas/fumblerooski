@@ -507,3 +507,14 @@ test('refresh timing: games are checked often around their start time', async ()
   assert.equal(gameRefresh({ state: 'final' }), 0);
   assert.equal(gameRefresh({ state: 'live' }), 10000);
 });
+
+test('live clock: a header clock far from the newest play falls back to the play clock', async () => {
+  const { gameFromSummary } = await import('../src/data/espn.js');
+  const team = (id, ha, abbr) => ({ homeAway: ha, score: '0', team: { id, abbreviation: abbr, displayName: abbr, shortDisplayName: abbr } });
+  const make = (clock) => ({
+    header: { id: '1', competitions: [{ date: '2026-11-12T00:00Z', status: { period: 1, displayClock: clock, type: { state: 'in', shortDetail: `${clock} - 1st` } }, competitors: [team('1', 'away', 'RMU'), team('2', 'home', 'ARK')] }] },
+    plays: [{ period: { number: 1 }, clock: { displayValue: '15:47' }, text: 'Rebound' }, { period: { number: 1 }, clock: { displayValue: '15:34' }, text: 'Official TV Timeout' }],
+  });
+  assert.equal(gameFromSummary('ncaam', '1', make('1:54')).game.statusText, '15:34 - 1H');
+  assert.equal(gameFromSummary('ncaam', '1', make('15:24')).game.statusText, '15:24 - 1H'); // a little past the last play is normal
+});

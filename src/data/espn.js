@@ -1947,6 +1947,27 @@ export function replayCut(data, sport, i) {
   return d;
 }
 
+// The feed's game clock now and then jumps to a value nothing else agrees with (1:54 while the newest play is at 15:34,
+// same half). During a live game in a sport whose clock runs down, if the header's clock and the newest play's clock in
+// the same period are further apart than play could explain, show the newest play's clock instead.
+const CLOCK_SLACK = { basketball: 180, hockey: 300, football: 420 };
+const clockSecs = (t) => { const m = /^(\d{1,2}):(\d{2})(?:\.\d)?$/.exec(String(t || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : (/^\d+(\.\d)?$/.test(String(t || '').trim()) ? Number(t) : null); };
+function sanityClock(game, comp, data, L) {
+  const slack = CLOCK_SLACK[L.sport];
+  if (game.state !== 'live' || !slack) return;
+  const st = comp.status || {};
+  const per = Number(st.period) || 0;
+  const plays = Array.isArray(data.plays) && data.plays.length ? data.plays : (data.drives?.current?.plays || data.drives?.previous?.slice(-1)[0]?.plays || []);
+  const last = [...plays].reverse().find((p) => p.clock?.displayValue && Number(p.period?.number) > 0);
+  if (!last || Number(last.period.number) !== per) return;
+  const hs = clockSecs(st.displayClock), ps = clockSecs(last.clock.displayValue);
+  if (hs == null || ps == null) return;
+  if (ps - hs > slack || hs - ps > 30) { // ran far ahead of the plays, or went backwards past the newest play
+    const fixed = String(last.clock.displayValue).trim();
+    game.statusText = /^\d{1,2}:\d{2}(\.\d)?/.test(game.statusText) ? game.statusText.replace(/^\d{1,2}:\d{2}(\.\d)?/, fixed) : `${fixed} - ${game.statusText}`;
+    game.clockFixed = true;
+  }
+}
 export function gameFromSummary(lg, id, data) {
   const L = LEAGUE[lg];
   const comp = data.header?.competitions?.[0];
@@ -1954,6 +1975,7 @@ export function gameFromSummary(lg, id, data) {
   const game = normEvent({ id: data.header.id || id, date: comp.date, competitions: [comp] }, lg);
   game.season = Number(data.header?.season?.year) || null; // the season this game belongs to, for links to that season's team pages
   const started = game.state === 'live' || game.state === 'final';
+  sanityClock(game, comp, data, L);
   const plays = (data.scoringPlays || []).map((p) => ({
     text: cleanText(p.text),
     kind: cleanText(p.type?.text || p.scoringType?.displayName || ''),
