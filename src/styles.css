@@ -749,3 +749,7 @@ button.pick.date { cursor: pointer; }
 .lead.me { background: rgba(255, 190, 46, 0.14); box-shadow: inset 4px 0 0 var(--yellow); }
 .lead.me .nm, .lead.me .pos { color: var(--yellow); }
 .gtab.solo > .sec > .sechead.icelist { display: flex; }
+/* Shot results on one line: three equal buttons that share the width. */
+.skeys .legend.kinds { flex-wrap: nowrap; gap: 8px; }
+.skeys .legend.kinds .lg { flex: 1 1 0; min-width: 0; white-space: nowrap; padding: 4px 4px; font-size: 10px; letter-spacing: 0.02em; text-align: center; }
+.skeys .legend.kinds .lg b { font-size: 13px; margin-left: 3px; }

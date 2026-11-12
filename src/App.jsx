@@ -1845,7 +1845,7 @@ function ShotKey({ kinds, kindOn, flipKind, game, teamOn, flipTeam }) {
   const dk = chartColors(game.away, game.home);
   return (
     <div className="skeys">
-      {kinds.length ? <div className="legend" role="group" aria-label="Show shots by result">
+      {kinds.length ? <div className="legend kinds" role="group" aria-label="Show shots by result">
         {kinds.map(([k, label, bg, n]) => (
           <button key={k} className="lg" aria-pressed={kindOn.has(k)} onClick={() => flipKind(k)} style={{ background: bg }}>{label}{n != null ? <b>{n}</b> : null}</button>
         ))}
@@ -1896,7 +1896,7 @@ export function IceChart({ ice, events = [], game, pbp = [], L }) {
   const [teamOn, flipTeam0] = useToggles([game.away.id, game.home.id]);
   const flipKind = (k) => { setSel(null); flipKind0(k); };
   const flipTeam = (k) => { setSel(null); flipTeam0(k); };
-  const modes = [['shots', 'Shots'], ...Object.entries(ICE_KINDS).filter(([k]) => events.some((e) => e.kind === k)).map(([k, v]) => [k, v.chip]), ...(pbp.length ? [['all', 'All Plays']] : [])];
+  const modes = [...(pbp.length ? [['all', 'All']] : []), ['shots', 'Shots'], ...Object.entries(ICE_KINDS).filter(([k]) => events.some((e) => e.kind === k)).map(([k, v]) => [k, v.chip])];
   const m = modes.some(([k]) => k === mode) ? mode : 'shots';
   const shots = m === 'shots', every = m === 'all';
   const shown = ice.filter((s) => !per || s.period === per);
