@@ -1565,8 +1565,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
                 {pc ? [0, 1, 2].map((n) => { const x = W / 2 + dir * (48 + n * 18); return <path key={poss + n} className="chev" style={{ animationDelay: `${n * 0.36}s` }} d={`M${x - dir * 7} ${H / 2 - 16} L${x + dir * 7} ${H / 2} L${x - dir * 7} ${H / 2 + 16}`} fill="none" stroke={pc} strokeWidth="5" />; }) : null}
                 {run ? (
                   <g key={'run' + run.side} transform={`translate(${W / 2} 22)`}><g className="runchip">
-                    <rect x="-74" y="-15" width="148" height="30" rx="9" fill={dk[run.side].main} stroke="#0C1124" strokeWidth="2.4" />
-                    <text y="1" textAnchor="middle" dominantBaseline="central" fill={inkOn(dk[run.side].main)}>{runT.abbr} {runTxt} RUN</text>
+                    <FitPill text={`${runT.abbr} ${runTxt} RUN`} fill={dk[run.side].main} ink={inkOn(dk[run.side].main)} />
                   </g></g>) : null}
                 {lt ? <g key={last.id} className="pop">{last.scoring
                   ? <><circle cx={lt.x} cy={lt.y} r="9" fill="#FFBE2E" stroke="#0C1124" strokeWidth="2" /><circle cx={lt.x} cy={lt.y} r="3.6" fill="#0C1124" /></>
@@ -1580,6 +1579,28 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
           </div>
         </div>
       </section>
+    </>
+  );
+}
+
+// A chip drawn on a court or rink, as wide as its words in the real font (it re-measures once the font loads).
+function FitPill({ text, fill, ink, h = 30, pad = 15, min = 90 }) {
+  const tref = useRef(null);
+  const [w, setW] = useState(null);
+  useLayoutEffect(() => {
+    const t = tref.current;
+    if (!t) return undefined;
+    let live = true;
+    const measure = () => { if (live && t.isConnected) { const n = t.getComputedTextLength(); if (n > 0) setW(n); } };
+    measure();
+    document.fonts?.ready?.then(measure);
+    return () => { live = false; };
+  }, [text]);
+  const width = Math.max(min, (w || 0) + pad * 2);
+  return (
+    <>
+      <rect x={-width / 2} y={-h / 2} width={width} height={h} rx="9" fill={fill} stroke="#0C1124" strokeWidth="2.4" style={{ visibility: w == null ? 'hidden' : undefined }} />
+      <text ref={tref} y="1" textAnchor="middle" dominantBaseline="central" fill={ink} style={{ visibility: w == null ? 'hidden' : undefined }}>{text}</text>
     </>
   );
 }
