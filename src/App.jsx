@@ -2300,7 +2300,14 @@ function GamePage({ lg, id, feed, replayBar }) {
                 <section className="sec">
                   <H2>Team Stats</H2>
                   <div className="card pad">
-                    {d.stats.map((s, i) => { const barC = chartColors(g.away, g.home); const max = Math.max(s.awayN, s.homeN) || 1; return (
+                    {[...d.stats, ...(() => {
+                      // Share of the game each side spent ahead, from the score timeline (timed sports only; ties count for nobody).
+                      const pts = d.chart?.stepped ? d.chart.points : null;
+                      if (!pts || pts.length < 2) return [];
+                      let a = 0, h = 0; pts.slice(0, -1).forEach((p, k) => { const dt = pts[k + 1].t - p.t; if (p.a > p.h) a += dt; else if (p.h > p.a) h += dt; });
+                      const span = Math.max(1e-9, pts[pts.length - 1].t - pts[0].t), A = Math.round((a / span) * 100), Hh = Math.round((h / span) * 100);
+                      return [{ label: 'Time Leading', away: `${A}%`, home: `${Hh}%`, awayN: A, homeN: Hh }];
+                    })()].map((s, i) => { const barC = chartColors(g.away, g.home); const max = Math.max(s.awayN, s.homeN) || 1; return (
                       <div className="statrow" key={s.label}>
                         <div className="lab"><span>{s.label}</span></div>
                         {[[g.away, s.away, s.awayN, barC.away.main, s.awayPct, s.awayDet], [g.home, s.home, s.homeN, barC.home.main, s.homePct, s.homeDet]].map(([t, v, n, c, pc, det]) => (
