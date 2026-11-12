@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
@@ -1091,6 +1091,27 @@ function LeadChart({ chart, game, L }) {
             <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
           </svg>
         </div>
+      </div>
+    </section>
+  );
+}
+
+// Halftime and intermissions: a countdown to when play should be back (break start by the feed's wall clock plus the
+// league's usual break). TV can stretch it, so past zero it just says play is starting soon.
+function BreakClock({ lg, game, lastWall }) {
+  const b = breakClock(lg, game, lastWall);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { if (!b) return undefined; const h = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(h); }, [!!b]);
+  if (!b) return null;
+  const left = Math.round((b.until - now) / 1000);
+  if (left > 45 * 60) return null; // a stale feed, not a real break
+  const mm = Math.floor(Math.max(0, left) / 60), ss = String(Math.max(0, left) % 60).padStart(2, '0');
+  return (
+    <section className="sec">
+      <div className="card breakclock" role="timer" aria-live="off">
+        <span className="bk-cap">{b.name}</span>
+        {left > 0 ? <b className="bk-t num">{mm}:{ss}</b> : <b className="bk-t soon">Starting soon</b>}
+        <span className="bk-sub">{left > 0 ? `until the ${b.next.toLowerCase()}, give or take` : `${b.next === 'Play' ? 'Play' : 'The ' + b.next} should be right around the corner`}</span>
       </div>
     </section>
   );
@@ -2190,6 +2211,7 @@ function GamePage({ lg, id, feed, replayBar }) {
 
             {tab === 'summary' ? (
               <div className="gtab">
+                <BreakClock lg={lg} game={g} lastWall={d.lastWall} />
                 {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} rink={d.rink} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}

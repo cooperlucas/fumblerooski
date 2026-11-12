@@ -549,3 +549,11 @@ test('breaks read as halftime and intermissions', async () => {
   assert.equal(breakName('nhl', 'End of 3rd'), 'End of 3rd');
   assert.equal(breakName('cfb', 'End of 3rd'), 'End of 3rd');
 });
+test('break countdown targets', async () => {
+  const { breakClock } = await import('../src/data/espn.js');
+  const t0 = Date.parse('2026-11-12T01:12:40Z');
+  assert.equal(breakClock('nba', { state: 'live', statusText: 'Halftime' }, t0).until, t0 + 15 * 60000);
+  assert.equal(breakClock('cfb', { state: 'live', statusText: 'Halftime' }, t0).until, t0 + 20 * 60000);
+  assert.equal(breakClock('nhl', { state: 'live', statusText: '1st Intermission' }, t0).next, '2nd period');
+  assert.equal(breakClock('nba', { state: 'live', statusText: '4:20 - 3rd' }, t0), null);
+});

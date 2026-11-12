@@ -182,6 +182,18 @@ const OFF = /POSTPONED|CANCEL|SUSPENDED|DELAYED|FORFEIT|ABANDONED/;
 const halves0 = (lg, t) => (LEAGUE[lg]?.periods === 2 && LEAGUE[lg]?.sport === 'basketball' ? t.replace(/\b1st( Half)?\b/i, '1H').replace(/\b2nd( Half)?\b/i, '2H') : t);
 // Breaks read the way a broadcast calls them: the end of the 2nd quarter (or 1st half) is Halftime,
 // the end of a hockey period is an intermission.
+// How long a league's halftime or intermission usually runs, in minutes. TV can stretch it, so this is a target.
+export const BREAK_MIN = { nfl: 13.5, cfb: 20, nba: 15, wnba: 15, ncaam: 15, ncaaw: 15, nhl: 18, epl: 15, mls: 15 };
+// The break this game is in right now, and when play should be back: { name, until } or null.
+export function breakClock(lg, game, lastWall) {
+  if (!game || game.state !== 'live' || !lastWall) return null;
+  const t = String(game.statusText || '');
+  const name = /halftime/i.test(t) ? 'Halftime' : /intermission/i.test(t) ? t : null;
+  const min = BREAK_MIN[lg];
+  if (!name || !min) return null;
+  const next = /halftime/i.test(t) ? (LEAGUE[lg]?.sport === 'hockey' ? '' : '2nd half') : /1st/i.test(t) ? '2nd period' : /2nd/i.test(t) ? '3rd period' : 'Play';
+  return { name, next: next || 'Play', until: lastWall + min * 60000 };
+}
 export function breakName(lg, t) {
   const L = LEAGUE[lg] || {};
   if (/^end of (the )?(2nd( quarter)?|q2)$/i.test(t) && L.periods === 4) return 'Halftime';
@@ -2011,8 +2023,12 @@ export function gameFromSummary(lg, id, data) {
   if (L.sport === 'basketball' && started) {
     try { plusMinus = plusMinusFromPlays(data.plays, startersOf(data.boxscore, [game.away.id, game.home.id]), game.away.id, game.home.id); } catch { plusMinus = null; }
   }
+  // When the latest play happened, by the wall clock: during a break, that's when the break started.
+  const walls = [...(Array.isArray(data.plays) ? data.plays : []), ...(data.drives?.previous || []).flatMap((d) => d.plays || []), ...(data.drives?.current?.plays || [])]
+    .map((p) => Date.parse(p.wallclock || '')).filter(Number.isFinite);
+  const lastWall = walls.length ? Math.max(...walls) : null;
   return {
-    game,
+    game, lastWall,
     stats: statRows(data.boxscore, game.away.id, game.home.id, L.sport, data.drives),
     box: playerBox(data.boxscore, game.away.id, game.home.id, L.sport, plusMinus, L.sport === 'football' && data.drives ? forcedFumbles(data.drives) : null),
     plays,

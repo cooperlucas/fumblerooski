@@ -698,3 +698,8 @@ button.pick.date { cursor: pointer; }
 .leadstats .ls i { width: 8px; height: 8px; border-radius: 2px; }
 .leadstats .ls b { color: var(--ink); font-weight: 900; font-variant-numeric: tabular-nums; }
 .leadnote { margin: -2px 0 8px; font-size: 12px; font-weight: 600; color: var(--mute); }
+.breakclock { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 16px 16px; text-align: center; }
+.breakclock .bk-cap { font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--pink); }
+.breakclock .bk-t { font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 52px; line-height: 1; color: var(--yellow); font-variant-numeric: tabular-nums; -webkit-text-stroke: 1px #0C1124; text-shadow: 3px 3px 0 #6E3AB5; }
+.breakclock .bk-t.soon { font-size: 30px; }
+.breakclock .bk-sub { font-size: 12px; font-weight: 700; color: var(--mute); }
