@@ -408,6 +408,7 @@ function CupGroups({ cup, lg, focus }) {
           ))}
         </div>
       ))}
+      <p className="cupnote">Ties go to head-to-head, then point differential, then points scored.</p>
     </>
   );
 }
