@@ -1566,7 +1566,14 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   const plays = pbp.filter((p) => !isSub(p));
   const recent = [...plays].reverse();
   // One play at a time: only the latest shot is marked on the floor.
-  const last = recent.find((p) => p.shot && p.xy && side(p.teamId));
+  // It clears once the ball changes hands after it: the other side rebounds, steals, shoots, or anyone turns it over.
+  const last0 = recent.find((p) => p.shot && p.xy && side(p.teamId));
+  const after = last0 ? recent.slice(0, recent.indexOf(last0)) : [];
+  const last = last0 && !after.some((p) => {
+    const t = `${p.type} ${p.text}`;
+    if (/turnover|lost ball|bad pass|traveling|offensive foul|out of bounds/i.test(t)) return true;
+    return side(p.teamId) && p.teamId !== last0.teamId && (p.shot || /rebound|steal/i.test(t));
+  }) ? last0 : null;
   const now = recent[0];
   // Who has the ball, worked out by walking the plays in order.
   const poss = useMemo(() => {
@@ -2149,7 +2156,7 @@ function GamePage({ lg, id, feed, replayBar }) {
                     <span ref={i === 0 ? pair.a : pair.b} className="nm" style={pair.style}>{t.name}</span>
                     <span className="rc">{t.record}</span>
                   </button>
-                ) : started ? <div key="s" className="score" aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
+                ) : started ? <div key="s" className="score" style={String(g.away.score).length + String(g.home.score).length > 4 ? { fontSize: 30 } : undefined} aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}
               </div>
               {g.state !== 'final' && (g.tv?.national?.length || g.tv?.home?.length || g.tv?.away?.length) ? (
