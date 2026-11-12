@@ -2060,7 +2060,7 @@ function MiniScore({ g, L, onTap }) {
   const side = (t, right) => (
     <span className={'ms-side' + (right ? ' r' : '')}>
       <Blob team={t} size={26} radius={8} />
-      <b className={'ms-sc' + (live || g.state !== 'final' || Number(t.score) >= Number((right ? g.away : g.home).score) ? '' : ' lose')}>{t.score}</b>
+      <b style={String(t.score).length > 2 ? { fontSize: 17 } : undefined} className={'ms-sc' + (live || g.state !== 'final' || Number(t.score) >= Number((right ? g.away : g.home).score) ? '' : ' lose')}>{t.score}</b>
       {has(t) ? <span className="ms-pos" aria-label={`${t.abbr} ball`} /> : null}
     </span>
   );
@@ -2068,7 +2068,8 @@ function MiniScore({ g, L, onTap }) {
     <button className="miniscore" onClick={onTap} aria-label={`${g.away.abbr} ${g.away.score}, ${g.home.abbr} ${g.home.score}, ${statusLabel(g)}. Back to top.`}>
       {side(g.away, false)}
       <span className="ms-mid">
-        <span className={'ms-clk' + (live ? ' live' : '')}>{statusLabel(g)}</span>
+        {/* "4:20 - 4th" stacks into two short lines so three-digit scores have room on either side. */}
+        {(() => { const st = statusLabel(g), m = /^(.+?)\s+-\s+(.+)$/.exec(st); return m ? <span className={'ms-clk two' + (live ? ' live' : '')}><span>{m[1]}</span><span>{m[2]}</span></span> : <span className={'ms-clk' + (live ? ' live' : '')}>{st}</span>; })()}
         {g.down ? <span className="ms-sit">{g.down} · {g.spot}</span> : null}
       </span>
       {side(g.home, true)}
