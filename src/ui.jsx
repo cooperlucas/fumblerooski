@@ -251,13 +251,33 @@ const GearIcon = () => (
     <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2.2" />
   </svg>
 );
+// The logo shrinks to the room it has, measured on the real font (the wide Archivo can take a beat to load).
+function FitBrand() {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const fit = () => {
+      el.style.fontSize = '22px';
+      const need = el.getBoundingClientRect().width + 6, have = el.parentElement.clientWidth; // a few px for the italic lean and shadow
+      if (need > have) el.style.fontSize = `${Math.max(13, Math.floor((22 * have / need) * 10) / 10)}px`;
+    };
+    fit();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    ro?.observe(el.parentElement);
+    document.fonts?.ready?.then(fit);
+    document.fonts?.addEventListener?.('loadingdone', fit);
+    return () => { ro?.disconnect(); document.fonts?.removeEventListener?.('loadingdone', fit); };
+  }, []);
+  return <h1 ref={ref} className="brand">Fumblerooski</h1>;
+}
 export function RootHeader() {
   return (
     <>
       <header className="head">
         <Mascot />
-        <div style={{ minWidth: 0 }}>
-          <h1 className="brand">Fumblerooski</h1>
+        <div className="brandbox">
+          <FitBrand />
           <div className="tagline"><span>Pure sports ·</span> <span>No odds ·</span> <span>No ads</span></div>
         </div>
         <div className="headbtns">
