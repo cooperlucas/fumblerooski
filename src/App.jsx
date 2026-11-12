@@ -248,7 +248,6 @@ function Scores() {
           ) : nextDay && sbNext.loading ? <Loading rows={2} /> : null}
         </>
       )}
-      {!favs.length && !pickL ? <p className="stamp">Pin a team from <button className="link" onClick={() => go('search')}>Search</button> and its games jump to the top.</p> : null}
       <Stamp at={q.updatedAt} live={(q.data?.games || []).some((g) => g.state === 'live')} />
     </>
   );
@@ -409,7 +408,6 @@ function CupGroups({ cup, lg, focus }) {
           ))}
         </div>
       ))}
-      <p className="cupnote">Ties go to head-to-head, then point differential, then points scored.</p>
     </>
   );
 }
@@ -748,7 +746,7 @@ function TeamStats({ lg }) {
     <>
       <div className="statbar" style={{ marginTop: 12 }}>
         {cats.length > 1 ? <Picker label="Stat group" value={cat.key} onChange={(v) => { setCat(v); setSort({ col: 0, dir: -1 }); }}>{cats.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}</Picker> : null}
-        <span className="stamp" style={{ margin: 0 }}>Sorted by {cat.names[sort.col] || cat.labels[sort.col]}, {sort.dir < 0 ? 'most first' : 'fewest first'}. Tap a column to sort.</span>
+        <span className="stamp" style={{ margin: 0 }}>Sorted by {cat.names[sort.col] || cat.labels[sort.col]}, {sort.dir < 0 ? 'most first' : 'fewest first'}</span>
       </div>
       <div className="card pbox" style={{ marginTop: 10 }}>
         <table>
@@ -786,7 +784,6 @@ function TeamPage({ lg, id, season }) {
     const up = (sd) => (sd.rank && sd.rank <= 25) || !rk[String(sd.id)] ? sd : { ...sd, rank: rk[String(sd.id)] };
     return { ...g, away: up(g.away), home: up(g.home) };
   }), [q.data, pr]);
-  const pollNote = pr?.note || null;
   // Long seasons (baseball, hoops, hockey) get split by month so the list is not one endless scroll.
   const monthKey = (g) => { const d = new Date(g.date); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
   const months = sched.length > 30 ? [...new Set(sched.map(monthKey).filter(Boolean))] : [];
@@ -885,7 +882,6 @@ function TeamPage({ lg, id, season }) {
                     {months.map((k) => <button key={k} className="chipb" aria-pressed={k === month} onClick={() => setMo(k)}>{monthName(k)}</button>)}
                   </div>
                 ) : null}
-                {pollNote && pollNote.weeks ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>Ranks from the {pollNote.name}, as of each game's week</p> : null}
                 {sched.length ? <div className="card">{shownSched.map(row)}</div> : <Empty>{q.data.scheduleMissing ? 'The schedule did not load. Pull up the team again in a bit.' : 'No games on the schedule yet.'}</Empty>}
               </section>
             ) : ro.loading && !ro.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : ro.error && !ro.data ? <div style={{ marginTop: 12 }}><Problem error={ro.error} retry={ro.reload} /></div>
@@ -1949,10 +1945,6 @@ export function IceChart({ ice, events = [], game }) {
         </Ice>
         <ShotKey game={game} kindOn={kindOn} flipKind={flipKind} teamOn={teamOn} flipTeam={flipTeam}
           kinds={shots ? [['goal', '◆ GOAL', '#FFBE2E', nk('goal')], ['save', '○ SAVED', '#CBD2EA', nk('save')], ['miss', '✕ MISSED', '#CBD2EA', nk('miss')]] : []} />
-        <p className="stamp" style={{ marginTop: 10, textAlign: 'left' }}>
-          {shots ? "Each team's shots are turned to face one goal, so the ends do not flip between periods."
-            : `Ends stay put all game: ${game.away.abbr} attacks right, ${game.home.abbr} attacks left.${m === 'block' ? ' Blocks show for the team that made the block.' : m === 'pen' ? ' Each box shows the penalty minutes.' : ''}`}
-        </p>
       </div>
     </section>
   );
@@ -2621,7 +2613,6 @@ function LeagueSettings() {
   return (
     <section className="sec">
       <H2>Leagues</H2>
-      <p className="stamp" style={{ textAlign: 'left', margin: '0 0 10px' }}>Drag to reorder. The order carries to Scores, the ticker and Leagues. Turning one off hides it from Scores and the ticker; it stays in Leagues, and your pinned teams always show.</p>
       <div className={'card setlist' + (drag ? ' dragging' : '')}>
         {list.map((l, i) => {
           const on = isLeagueOn(l.id, prefs);
@@ -2708,7 +2699,7 @@ function Search() {
         {!term ? (
           <>
             {favs.length ? <section className="sec"><H2>Your Teams</H2><div className="card">{favs.map((t) => <TeamRow key={favKey(t)} t={{ ...t, full: t.name }} />)}</div></section> : null}
-            <Empty>Type a team, player or league. Open a team and tap Pin to put its games on top.</Empty>
+            <Empty>Type a team, player or league.</Empty>
           </>
         ) : q.loading && !q.data ? <Loading /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !leagues.length && !players.length && !playersBusy ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
           <>
