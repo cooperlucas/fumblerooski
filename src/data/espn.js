@@ -263,11 +263,20 @@ export function normEvent(ev, lg) {
 // FCS, D-II and D-III coaches polls for one football week, as one team id → rank map (a team is only in its own division's poll).
 // ESPN's scoreboard and game feeds never tag these ranks, so they get filled in from here. Cached per season and week.
 const divPollCache = new Map();
+// Saved on the device too: a week's poll never changes once the next one is out, so after the first look it's instant.
+const stash = { get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* full or private: fine */ } } };
 function weekPoll(season, week, pid) {
   const key = `${season}:${week}:${pid}`;
   if (!divPollCache.has(key)) {
+    const saved = stash.get(`fr.poll.${key}`);
+    if (saved) { divPollCache.set(key, Promise.resolve(new Map(saved))); return divPollCache.get(key); }
     divPollCache.set(key, get(`https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${season}/types/2/weeks/${week}/rankings/${pid}`)
-      .then((r) => new Map((r.ranks || []).map((x) => [String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0], Number(x.current)]).filter(([id, n]) => id && n <= 25)))
+      .then((r) => {
+        const m = new Map((r.ranks || []).map((x) => [String(x.team?.$ref || '').split('/teams/')[1]?.split('?')[0], Number(x.current)]).filter(([id, n]) => id && n <= 25));
+        // Keep it once it's settled: an older week, or this week's once its games are a few days past.
+        if (m.size && r.date && Date.now() - Date.parse(r.date) > 8 * 864e5) stash.set(`fr.poll.${key}`, [...m]);
+        return m;
+      })
       .catch(() => new Map())); // that poll is not out for this week
   }
   return divPollCache.get(key);
@@ -283,7 +292,11 @@ export async function getSchedulePollRanks(lg, info) {
   if (!info) return null;
   let pid = info.pollId;
   if (!pid) { // ESPN did not say which division: find the team in the division standings (slow, so only then)
-    try { const me = (await getDivisionTeams(lg)).find((x) => String(x.id) === info.teamId); pid = { FCS: 20, 'D-II': 11, 'D-III': 12 }[me?.div] || null; } catch { /* unknown */ }
+    pid = stash.get(`fr.div.${info.teamId}`);
+    if (!pid) {
+      try { const me = (await getDivisionTeams(lg)).find((x) => String(x.id) === info.teamId); pid = { FCS: 20, 'D-II': 11, 'D-III': 12 }[me?.div] || null; } catch { /* unknown */ }
+      if (pid) stash.set(`fr.div.${info.teamId}`, pid); // a school's division rarely changes
+    }
   }
   if (!pid) return null;
   const weeks = [...new Set(Object.values(info.weeks).filter(Boolean))];
@@ -294,12 +307,30 @@ export async function getSchedulePollRanks(lg, info) {
   const latest = polls.get(Math.max(0, ...weeks));
   return { byGame, own: latest?.get(info.teamId) || null, note: { name: POLL_NAME[pid], weeks: got, asked: weeks.length } };
 }
-// Fill in division-poll ranks on games whose teams carry none.
+// FBS team ids, so a division-poll rank never sits beside an AP rank (an FCS #18 at FBS #24 reads like one poll).
+let fbsMemo = null;
+function fbsIds() {
+  if (!fbsMemo) {
+    const saved = stash.get('fr.fbsids');
+    fbsMemo = saved && Date.now() - saved.at < 30 * 864e5 ? Promise.resolve(new Set(saved.ids))
+      : get(`https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/${new Date().getFullYear() - (new Date().getMonth() < 6 ? 1 : 0)}/types/2/groups/80/teams?limit=300`).then((d) => {
+        const ids = (d.items || []).map((x) => String(x.$ref || '').split('/teams/')[1]?.split('?')[0]).filter(Boolean);
+        if (ids.length > 100) stash.set('fr.fbsids', { at: Date.now(), ids });
+        return new Set(ids);
+      }).catch(() => null);
+  }
+  return fbsMemo;
+}
+// Fill in division-poll ranks on games between two teams below FBS.
 async function addDivisionRanks(games, season, week) {
   const ranked = (r) => !!r && r <= 25; // (a blank rank must not pass as ranked: null <= 25 is true)
   if (!games.some((g) => !ranked(g.away.rank) || !ranked(g.home.rank))) return;
-  const ranks = await divisionRanks(season, week);
-  for (const g of games) for (const sd of [g.away, g.home]) if (!(sd.rank && sd.rank <= 25) && ranks.get(String(sd.id))) sd.rank = ranks.get(String(sd.id));
+  const [ranks, fbs] = await Promise.all([divisionRanks(season, week), fbsIds()]);
+  if (!fbs) return; // can't tell who's FBS: leave the feed's ranks alone
+  for (const g of games) {
+    if (fbs.has(String(g.away.id)) || fbs.has(String(g.home.id))) continue;
+    for (const sd of [g.away, g.home]) if (!ranked(sd.rank) && ranks.get(String(sd.id))) sd.rank = ranks.get(String(sd.id));
+  }
 }
 export async function getScoreboard(lg, day, week) {
   const L = LEAGUE[lg];
@@ -648,9 +679,11 @@ export async function getTeam(lg, id, season) {
   }
   // Below FBS, ESPN's schedule never tags a ranked opponent, but it keeps each week's FCS, D-II and D-III coaches polls.
   // Those ranks load separately (getSchedulePollRanks) so the schedule itself shows right away; this is what they need.
-  const groupsKnown = !!(t.groups?.parent?.id || t.groups?.id);
+  // Plainly FBS teams skip this. Anyone else gets it, even when the division code is one we don't know (the schedule's copy
+  // of a D-III team says parent 99); the division then gets looked up.
   const DIV = { 81: 20, 57: 11, 58: 12 }; // division group → poll id
-  const pollInfo = lg === 'cfb' && shown && !(rankNow && rankNow <= 25) && (!groupsKnown || DIV[Number(t.groups?.parent?.id)] || DIV[Number(t.groups?.id)])
+  const fbs = String(t.groups?.parent?.id || '') === '80' || String(t.groups?.id || '') === '80';
+  const pollInfo = lg === 'cfb' && shown && !(rankNow && rankNow <= 25) && !fbs
     ? { teamId: String(t.id || id), season: shown, pollId: DIV[Number(t.groups?.parent?.id)] || DIV[Number(t.groups?.id)] || null,
         weeks: Object.fromEntries((sched.status === 'fulfilled' ? (sched.value.events || []) : []).map((e) => [String(e.id), Number(e.seasonType?.type || e.season?.type) === 3 ? null : Number(e.week?.number) || null])) }
     : null;
