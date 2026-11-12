@@ -1647,44 +1647,87 @@ const made = (x, y, c, r = 5) => <><circle cx={x} cy={y} r={r} fill="none" strok
 const missed = (x, y, c, r = 3.6, w = 1.8) => <path d={`M${x - r} ${y - r} L${x + r} ${y + r} M${x + r} ${y - r} L${x - r} ${y + r}`} stroke={c} strokeWidth={w} strokeLinecap="round" />;
 
 /* ---------- basketball shot chart: both teams on one floor ---------- */
-function ShotChart({ shots, game, lg }) {
+// Court Chart: every shot on the floor with the plays underneath. Chips pick the plays (All, Shots, Rebounds...), the
+// period chips and team toggles filter both, and tapping a shot on the floor shows just that play below.
+function ShotChart({ shots, game, lg, pbp = [] }) {
+  const L = LEAGUE[lg];
   const [per, setPer] = useState(0);
+  const [mode, setMode] = useState('shots');
+  const [sel, setSel] = useState(null);
   const { place } = courtGeom(lg);
   const cc = chartColors(game.away, game.home, true);
   const sides = [['away', game.away, cc.away.main], ['home', game.home, cc.home.main]];
-  const periods = [...new Set(shots.map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
-  const [kindOn, flipKind] = useToggles(['made', 'miss']);
-  const [teamOn, flipTeam] = useToggles([game.away.id, game.home.id]);
+  const periods = [...new Set([...shots, ...pbp].map((s) => s.period))].filter(Boolean).sort((a, b) => a - b);
+  const [kindOn, flipKind0] = useToggles(['made', 'miss']);
+  const [teamOn, flipTeam0] = useToggles([game.away.id, game.home.id]);
+  const flipKind = (k) => { setSel(null); flipKind0(k); };
+  const flipTeam = (k) => { setSel(null); flipTeam0(k); };
+  const others = (PLAY_KINDS.basketball || []).filter(([k]) => k !== 'made' && k !== 'miss').filter(([, , re]) => pbp.some((p) => re.test(`${p.type} ${p.text}`)));
+  const modes = [...(pbp.length ? [['all', 'All']] : []), ['shots', 'Shots'], ...others.map(([k, t]) => [k, t])];
+  const m = modes.some(([k]) => k === mode) ? mode : 'shots';
+  const floorOn = m === 'shots' || m === 'all';
   const shown = shots.filter((s) => !per || s.period === per);
-  const onFloor = shown.filter((s) => kindOn.has(s.made ? 'made' : 'miss') && teamOn.has(s.teamId));
-  const pctTxt = (m, n) => (n ? ` · ${((100 * m) / n).toFixed(1)}%` : '');
+  const onFloor = floorOn ? shown.filter((s) => kindOn.has(s.made ? 'made' : 'miss') && teamOn.has(s.teamId)) : [];
+  const pctTxt = (mm, n) => (n ? ` · ${((100 * mm) / n).toFixed(1)}%` : '');
+  // The plays list follows the floor: the shots on it, every play for All, or the picked kind.
+  const onIds = new Set(onFloor.map((s) => s.id).filter(Boolean));
+  const kre = others.find(([k]) => k === m)?.[2];
+  let rows = pbp.filter((p) => (!per || p.period === per) && (m === 'shots' ? onIds.has(p.id) : (!p.teamId || teamOn.has(p.teamId)) && (!kre || kre.test(`${p.type} ${p.text}`))));
+  if (game.state === 'live') rows = [...rows].reverse();
+  const picked = sel ? pbp.find((p) => p.id === sel) : null;
+  if (picked) rows = [picked];
+  const pick = (id) => setSel(sel === id ? null : id);
+  const reset = (fn) => (v) => { setSel(null); fn(v); };
+  const marks = sides.flatMap(([sd, t, c]) => {
+    const mine = onFloor.filter((s) => s.teamId === t.id);
+    return [...mine.filter((s) => !s.made), ...mine.filter((s) => s.made)].map((s) => ({ s, q: place(s, sd), c }));
+  });
+  if (sel) marks.sort((x, y) => (x.s.id === sel) - (y.s.id === sel));
+  const pickedMark = sel ? marks.find((x) => x.s.id === sel) : null;
   return (
     <section className="sec">
-      <H2>Shot Chart</H2>
+      <H2>Court Chart</H2>
+      {modes.length > 1 ? (
+        <div className="chips" role="group" aria-label="Plays to show" style={{ marginTop: 8 }}>
+          {modes.map(([k, l]) => <button key={k} className="chipb" aria-pressed={m === k} onClick={() => reset(setMode)(k)}>{l}</button>)}
+        </div>
+      ) : null}
       {periods.length > 1 ? (
-        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 10 }}>
-          <button className="chipb" aria-pressed={per === 0} onClick={() => setPer(0)}>All</button>
-          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => setPer(p)}>{p <= (LEAGUE[lg].periods || 4) ? perName(LEAGUE[lg], p) : 'OT'}</button>)}
+        <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>
+          <button className="chipb" aria-pressed={per === 0} onClick={() => reset(setPer)(0)}>All</button>
+          {periods.map((p) => <button key={p} className="chipb" aria-pressed={per === p} onClick={() => reset(setPer)(p)}>{p <= (L.periods || 4) ? perName(L, p) : periods.filter((x) => x > (L.periods || 4)).length > 1 ? `OT${p - (L.periods || 4)}` : 'OT'}</button>)}
         </div>
       ) : null}
       <div className="card pad shotbox">
         <Hardwood lg={lg} game={game} label={`Shot chart: ${game.away.name} on the left, ${game.home.name} on the right.`}>
-          {{ over: sides.flatMap(([sd, t, c]) => {
-            const mine = onFloor.filter((s) => s.teamId === t.id);
-            return [...mine.filter((s) => !s.made), ...mine.filter((s) => s.made)].map((s, i) => { const q = place(s, sd); return <g key={sd + i}>{s.made ? made(q.x, q.y, c, 4.6) : missed(q.x, q.y, c, 3.2, 1.6)}</g>; });
-          }) }}
+          {{ over: [
+            ...marks.map(({ s, q, c }, i) => <g key={'m' + (s.id || i)} opacity={sel && s.id !== sel ? 0.22 : 1} style={{ transition: 'opacity .2s' }}>{s.made ? made(q.x, q.y, c, 4.6) : missed(q.x, q.y, c, 3.2, 1.6)}</g>),
+            pickedMark ? <circle key="ring" cx={pickedMark.q.x} cy={pickedMark.q.y} r="10" fill="none" stroke="#0C1124" strokeWidth="2.2" pointerEvents="none" /> : null,
+            ...marks.map(({ s, q }, i) => (s.id ? <circle key={'h' + (s.id || i)} cx={q.x} cy={q.y} r="8" fill="transparent" style={{ cursor: 'pointer' }} onClick={() => pick(s.id)}><title>{s.text}</title></circle> : null)),
+          ] }}
         </Hardwood>
         <div className="shotkey">
-          {sides.map(([sd, t, c]) => { const mine = shown.filter((s) => s.teamId === t.id), m = mine.filter((s) => s.made).length, th = mine.filter((s) => s.three), m3 = th.filter((s) => s.made).length; return (
+          {sides.map(([sd, t]) => { const mine = shown.filter((s) => s.teamId === t.id), mm = mine.filter((s) => s.made).length, th = mine.filter((s) => s.three), m3 = th.filter((s) => s.made).length; return (
             <div key={sd} className="sk">
               <span className="who"><Blob team={t} size={22} /><b>{t.abbr}</b></span>
-              <span>FG {m}-{mine.length}{pctTxt(m, mine.length)}</span>
+              <span>FG {mm}-{mine.length}{pctTxt(mm, mine.length)}</span>
               <span>3PT {m3}-{th.length}{pctTxt(m3, th.length)}</span>
             </div>); })}
         </div>
         <ShotKey game={game} kindOn={kindOn} flipKind={flipKind} teamOn={teamOn} flipTeam={flipTeam}
-          kinds={[['made', '◎ MADE', '#FFBE2E', shown.filter((s) => s.made && teamOn.has(s.teamId)).length], ['miss', '✕ MISSED', '#CBD2EA', shown.filter((s) => !s.made && teamOn.has(s.teamId)).length]]} />
+          kinds={floorOn ? [['made', '◎ MADE', '#FFBE2E', shown.filter((s) => s.made && teamOn.has(s.teamId)).length], ['miss', '✕ MISSED', '#CBD2EA', shown.filter((s) => !s.made && teamOn.has(s.teamId)).length]] : []} />
       </div>
+      {pbp.length ? (
+        <>
+          <div className="sechead icelist" style={{ marginTop: 14 }}>
+            <span className="stamp" style={{ margin: 0, textAlign: 'left' }}>{picked ? '1 play' : `${rows.length} ${rows.length === 1 ? 'play' : 'plays'}`}</span>
+            {picked ? <button className="link" onClick={() => setSel(null)}>Show all</button> : null}
+          </div>
+          <div className="card feed">
+            {rows.length ? rows.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />) : <p className="stamp" style={{ padding: '16px' }}>Nothing that matches.</p>}
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -2369,10 +2412,10 @@ function GamePage({ lg, id, feed, replayBar }) {
   const tabs = !d || !started ? [] : [
     ['summary', g.state === 'live' ? 'Live' : 'Summary'],
     d.drives.length ? ['drives', 'Drives'] : null,
-    d.shots.length ? ['shots', 'Shot Chart'] : null,
+    d.shots.length ? ['shots', 'Court Chart'] : null,
     d.ice?.length ? ['ice', 'Ice Chart'] : null,
     d.pitch?.length ? ['pitch', 'Shot Map'] : null,
-    d.pbp.length && !d.ice?.length ? ['plays', 'Plays'] : null, // hockey's plays live under the Ice Chart
+    d.pbp.length && !d.ice?.length && !d.shots.length ? ['plays', 'Plays'] : null, // hockey and hoops plays live under their charts
     d.box.length ? ['box', 'Box Score'] : null,
     d.stats.length ? ['stats', 'Team Stats'] : null,
   ].filter(Boolean);
@@ -2424,7 +2467,7 @@ function GamePage({ lg, id, feed, replayBar }) {
                 <BreakClock lg={lg} game={g} lastWall={d.lastWall} />
                 {g.state === 'live' && L.sport === 'hockey' && d.pbp.length ? <LiveRink ice={d.ice || []} pbp={d.pbp} game={g} L={L} rink={d.rink} onAll={() => { setTab(d.ice?.length ? 'ice' : 'plays'); window.scrollTo(0, 0); }} /> : null}
                 {g.state === 'live' && L.sport === 'football' && d.drives.length ? <LiveField drives={d.drives} game={g} lg={lg} onAll={() => { setTab('drives'); window.scrollTo(0, 0); }} /> : null}
-                {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab('plays'); window.scrollTo(0, 0); }} /> : null}
+                {g.state === 'live' && L.sport === 'basketball' && d.pbp.length ? <LiveCourt pbp={d.pbp} game={g} L={L} lg={lg} onAll={() => { setTab(d.shots.length ? 'shots' : 'plays'); window.scrollTo(0, 0); }} /> : null}
                 {started && periods > 0 ? (
                   <section className="card pad linesbox" style={{ marginTop: 12 }}>
                     <table className="lines">
@@ -2450,7 +2493,7 @@ function GamePage({ lg, id, feed, replayBar }) {
               </div>
             ) : null}
             {tab === 'drives' ? <div className="gtab solo"><Drives drives={d.drives} game={g} /></div> : null}
-            {tab === 'shots' ? <div className="gtab solo"><ShotChart shots={d.shots} game={g} lg={lg} /></div> : null}
+            {tab === 'shots' ? <div className="gtab solo"><ShotChart shots={d.shots} game={g} lg={lg} pbp={d.pbp} /></div> : null}
             {tab === 'ice' ? <div className="gtab solo"><IceChart ice={d.ice} events={d.iceEvents || []} game={g} pbp={d.pbp} L={L} /></div> : null}
             {tab === 'pitch' ? <div className="gtab solo"><PitchChart shots={d.pitch} game={g} /></div> : null}
             {tab === 'plays' ? <div className="gtab solo"><PlayByPlay pbp={d.pbp} game={g} L={L} /></div> : null}

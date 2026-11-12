@@ -1917,7 +1917,7 @@ export function normShots(rawPlays) {
     x: Number(p.coordinate.x), y: Number(p.coordinate.y),
     made: p.scoringPlay === true,
     three: Number(p.scoreValue) === 3 || /three point|3-pt|3pt/i.test(`${p.type?.text || ''} ${p.text || ''}`),
-    period: p.period?.number || 0,
+    period: p.period?.number || 0, id: String(p.id ?? ''), text: cleanText(p.text || ''),
   })).filter((sh) => sh.teamId && Number.isFinite(sh.x) && Number.isFinite(sh.y) && sh.x >= -2 && sh.x <= 52 && sh.y >= -6 && sh.y <= 95);
 }
 

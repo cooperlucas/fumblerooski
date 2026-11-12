@@ -190,7 +190,8 @@ test('football drives: field position, results, plays, and the live drive', asyn
 test('basketball shots and play-by-play', async () => {
   const g = await getGame('nba', 'g10');
   assert.equal(g.shots.length, 5, 'free throws are left off the shot chart');
-  assert.deepEqual(g.shots[0], { teamId: g.game.away.id, x: 25, y: 24, made: true, three: true, period: 1 });
+  const { id: _i, text: _t, ...shot0 } = g.shots[0];
+  assert.deepEqual(shot0, { teamId: g.game.away.id, x: 25, y: 24, made: true, three: true, period: 1 });
   assert.equal(g.shots[1].made, false);
   assert.equal(g.pbp.length, 7);
   assert.equal(g.pbp[0].scoring, true); assert.equal(g.pbp[1].scoring, false); assert.equal(g.pbp[5].period, 2);
