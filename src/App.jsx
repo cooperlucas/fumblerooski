@@ -624,7 +624,8 @@ const BOARD_ALIAS = { avgPoints: 'pointsPerGame', avgRebounds: 'reboundsPerGame'
 // A tile's stat → its qualified board, if it has one (a QB's INT is picks thrown).
 function qualKey(lg, key, items) {
   if (key === 'interceptions' && items.some((x) => /^passing/.test(x.key))) return qualifiedRule(lg, 'interceptionsThrown') ? 'interceptionsThrown' : null;
-  return qualifiedRule(lg, key) ? key : null;
+  const k = LEAGUE[lg]?.sport === 'basketball' ? BOARD_ALIAS[key] || key : key;
+  return qualifiedRule(lg, k) ? k : null;
 }
 function boardFor(key, items, cats, lg) {
   if (qualKey(lg, key, items)) return qualKey(lg, key, items);
@@ -639,7 +640,8 @@ function LeaderPage({ lg, cat, focus }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   if (q.loading && !q.data) return <Loading rows={8} />;
   if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
-  const c = q.data.cats.find((x) => x.key === cat) || (qualifiedRule(lg, cat) ? { key: cat, title: qualifiedRule(lg, cat).title, abbr: qualifiedRule(lg, cat).min, rows: [] } : EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
+  const feedCard = q.data.cats.find((x) => x.key === cat);
+  const c = (feedCard && qualifiedRule(lg, cat) ? { ...feedCard, abbr: qualifiedRule(lg, cat).min } : feedCard) || (qualifiedRule(lg, cat) ? { key: cat, title: qualifiedRule(lg, cat).title, abbr: qualifiedRule(lg, cat).min, rows: [] } : EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
   if (!c) return <Empty>No {LEAGUE[lg].short} leader board for that stat right now.</Empty>;
   return (
     <>
@@ -989,6 +991,7 @@ function PlayerPage({ lg, id }) {
     const i = board.findIndex((r) => r.player?.id === String(id));
     if (i < 0) return null;
     const pl = places(board.map((r) => r.value))[i];
+    if (Number(pl.replace(/^T/, '')) > 150) return null; // same cutoff as the feed's ranks: deep in the pack says little
     return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
   };
   const color = p?.team?.color || '#2B3352';
