@@ -1040,6 +1040,11 @@ function LeadChart({ chart, game, L }) {
   const bigA = Math.max(0, ...pts.map((p) => p.m)), bigH = Math.max(0, ...pts.map((p) => -p.m));
   let changes = 0, prev = 0; for (const p of pts) { const sg = Math.sign(p.m); if (sg && prev && sg !== prev) changes++; if (sg) prev = sg; }
   const end = pts[pts.length - 1];
+  // Share of the game so far each team spent ahead (ties count for nobody).
+  let upA = 0, upH = 0; pts.slice(0, -1).forEach((p, i) => { const dt = pts[i + 1].t - p.t; if (p.m > 0) upA += dt; else if (p.m < 0) upH += dt; });
+  const span = Math.max(1e-9, end.t - (pts[0]?.t || 0));
+  const lead = upA >= upH ? [game.away, upA] : [game.home, upH];
+  const share = Math.round((lead[1] / span) * 100);
   const gl = [top, -top].concat(top / step >= 2 ? [step * Math.floor(top / step / 2), -step * Math.floor(top / step / 2)] : []);
   const stat = (t, c, n) => <span className="ls"><i style={{ background: c }} />{t.abbr} <b>{n ? `+${n}` : '—'}</b></span>;
   return (
@@ -1050,8 +1055,8 @@ function LeadChart({ chart, game, L }) {
           <span className="lscap">Biggest lead</span>
           {stat(game.away, cc.away.main, bigA)}
           {stat(game.home, cc.home.main, bigH)}
-          <span className="lsch"><b>{changes}</b> lead {changes === 1 ? 'change' : 'changes'}</span>
         </div>
+        <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>
         <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
           <svg className="flow" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
             {gl.map((v) => <g key={v}><path d={`M${x0} ${y(v)} H${x1}`} style={{ stroke: 'var(--rule)' }} strokeWidth="1" /><text x={x0 - 6} y={y(v) + 3.5} textAnchor="end" className="ax">+{Math.abs(v)}</text></g>)}
@@ -1061,7 +1066,7 @@ function LeadChart({ chart, game, L }) {
             {pts.slice(0, -1).map((p, i) => p.m ? <rect key={i} shapeRendering="crispEdges" x={x(p.t)} y={Math.min(y(p.m), mid)} width={Math.max(0, x(pts[i + 1].t) - x(p.t))} height={Math.abs(y(p.m) - mid)} fill={p.m > 0 ? cc.away.main : cc.home.main} /> : null)}
             <path d={`M${x0} ${mid} H${x1}`} style={{ stroke: 'var(--soft)' }} strokeWidth="1.5" />
             <text x={x0 - 6} y={mid + 3.5} textAnchor="end" className="ax">0</text>
-            {end.m ? <rect x={x(end.t) - 4.5} y={y(end.m) - 4.5} width="9" height="9" fill={end.m > 0 ? cc.away.main : cc.home.main} stroke="#0C1124" strokeWidth="2" /> : null}
+            <rect x={x(end.t) - 4.5} y={y(end.m) - 4.5} width="9" height="9" fill={end.m > 0 ? cc.away.main : end.m < 0 ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" />
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={'p' + i} x={x((a + b) / 2)} y={H - 16} textAnchor="middle" className="per">{label(i)}</text>; })}
             <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
           </svg>

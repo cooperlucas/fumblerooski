@@ -695,3 +695,4 @@ button.pick.date { cursor: pointer; }
 .leadstats .ls { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--panel2); font-size: 11px; font-weight: 700; color: var(--mute); white-space: nowrap; }
 .leadstats .ls i { width: 8px; height: 8px; border-radius: 2px; }
 .leadstats .ls b { color: var(--ink); font-weight: 900; font-variant-numeric: tabular-nums; }
+.leadnote { margin: -2px 0 8px; font-size: 12px; font-weight: 600; color: var(--mute); }
