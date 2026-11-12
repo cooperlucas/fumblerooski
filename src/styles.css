@@ -748,3 +748,4 @@ button.pick.date { cursor: pointer; }
 .trank.tlink { margin: 5px auto 0; padding: 2px 2px; white-space: nowrap; font-family: inherit; background: transparent; border: none; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: pointer; }
 .lead.me { background: rgba(255, 190, 46, 0.14); box-shadow: inset 4px 0 0 var(--yellow); }
 .lead.me .nm, .lead.me .pos { color: var(--yellow); }
+.gtab.solo > .sec > .sechead.icelist { display: flex; }

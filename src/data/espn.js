@@ -1995,13 +1995,14 @@ export function normIce(rawPlays, awayId, homeId) {
     if (p.scoringPlay === true || /^goal\b/.test(t)) return 'goal';
     if (/block/.test(t)) return null; // credited to the blocker, so the spot says nothing about the shooter
     if (/miss/.test(t)) return 'miss';
-    if (/shot|save/.test(t) || p.shootingPlay === true) return 'save';
+    // Type text only: the feed now marks every hockey play (faceoffs, hits...) as a "shooting play".
+    if (/shot|save/.test(t)) return 'save';
     return null;
   };
   let ev = (rawPlays || []).map((p) => ({
     kind: p.coordinate ? kindOf(p) : null, teamId: String(p.team?.id ?? ''),
     x: Number(p.coordinate?.x), y: Number(p.coordinate?.y), period: p.period?.number || 0,
-    text: cleanText(p.text || ''),
+    text: cleanText(p.text || ''), id: String(p.id ?? ''),
   })).filter((e) => e.kind && (e.teamId === String(awayId) || e.teamId === String(homeId)) && Number.isFinite(e.x) && Number.isFinite(e.y));
   if (!ev.length) return [];
   // Some feeds count from a corner (0..200, 0..85) instead of from center ice.
@@ -2036,7 +2037,7 @@ export function normIceEvents(rawPlays, awayId, homeId) {
   let all = (rawPlays || []).filter((p) => p.coordinate).map((p) => ({
     kind: kindOf(p), shot: kindOf(p) ? false : shotOf(p), teamId: String(p.team?.id ?? ''),
     x: Number(p.coordinate?.x), y: Number(p.coordinate?.y), period: p.period?.number || 0,
-    text: cleanText(p.text || ''), mins: Number(p.type?.penaltyMinutes) || null,
+    text: cleanText(p.text || ''), mins: Number(p.type?.penaltyMinutes) || null, id: String(p.id ?? ''),
   })).filter((e) => (e.kind || e.shot) && (e.teamId === A || e.teamId === Hm) && Number.isFinite(e.x) && Number.isFinite(e.y));
   if (!all.some((e) => e.kind)) return [];
   // Some feeds count from a corner (0..200, 0..85) instead of from center ice.
