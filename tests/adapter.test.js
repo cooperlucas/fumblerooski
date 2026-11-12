@@ -583,7 +583,16 @@ test('headliners follow each sport\'s rhythm', async () => {
   assert.equal(footballModes(at(2, 14), 'Postseason').cfb, null);
   // NFL: last week Tuesday and Wednesday; the new week from Thursday
   assert.equal(footballModes(at(2, 10)).nfl, 'done');
-  assert.equal(footballModes(at(3, 23)).nfl, 'done');
-  assert.equal(footballModes(at(4, 0)).nfl, 'next');
+  assert.equal(footballModes(at(3, 2)).nfl, 'done'); // 2am Wednesday is still Tuesday night
+  assert.equal(footballModes(at(3, 3)).nfl, 'next'); // 3am Wednesday: the new week
+  assert.equal(footballModes(at(2, 1)).nfl, 'next'); // 1am Tuesday: Monday night's game still going
   assert.equal(footballModes(at(1, 20)).nfl, 'next');
+  // 1am Sunday is still Saturday's slate; 3am Sunday is results
+  assert.equal(footballModes(at(0, 1)).cfb, null);
+  assert.equal(footballModes(at(0, 3)).cfb, 'done');
+  // A weekend noon tip: last night's results give way to today's slate two hours ahead
+  const sat = new Date(2026, 10, 14, 10, 30), tip = new Date(2026, 10, 14, 12).toISOString();
+  const day = [{ lg: 'ncaam', id: 'n1', state: 'pre', date: tip, away: {}, home: {} }], night = [{ lg: 'ncaam', id: 'f1', state: 'final', date: '', away: {}, home: {} }];
+  assert.deepEqual(headlineGames({ now: sat, today: day, yest: night }).map((x) => x.id), ['n1']);
+  assert.deepEqual(headlineGames({ now: new Date(2026, 10, 14, 9), today: day, yest: night }).map((x) => x.id), ['f1']);
 });

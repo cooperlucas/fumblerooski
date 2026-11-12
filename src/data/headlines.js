@@ -3,16 +3,24 @@
 // Soccer: today (matches start in the morning).
 // College football: Saturday's slate on Saturday; the weekend's results Sunday through Tuesday morning; weekdays follow the
 //   morning/afternoon rule on days with games (MACtion), otherwise the upcoming week's slate. Bowl season runs day by day.
-// NFL: last week's results Tuesday and Wednesday; this week's games Thursday through Monday.
+// NFL: last week's results on Tuesday (3am Tuesday to 3am Wednesday); the new week from then on.
+// Evening sports and weeknight football flip early when today's first game is close (weekend noon tips and kickoffs).
 export const MORNING_UNTIL = 12;
+// A sports day runs 3am to 3am: a game that ends at 1am still belongs to the night before.
+export const DAY_TURNS = 3;
+const sportsDay = (now) => new Date(now.getTime() - DAY_TURNS * 3600000);
 const EVENING = new Set(['nba', 'nhl', 'mlb', 'wnba', 'ncaam', 'ncaaw']);
+// Last night's results give way to today's slate at noon, or two hours before today's first game if that's earlier.
+const LEAD = 2 * 3600000;
 
 // What each football league needs fetched as a week: 'done' (results), 'next' (upcoming) or null (day boards will do).
 export function footballModes(now, cfbSeason = '') {
-  const dow = now.getDay(), morning = now.getHours() < MORNING_UNTIL;
+  const day = sportsDay(now), dow = day.getDay(), morning = now.getHours() < MORNING_UNTIL;
   const bowls = /post/i.test(cfbSeason);
+  // CFB: Saturday's slate (3am Sat to 3am Sun); results 3am Sunday through Tuesday morning; then the week ahead.
   const cfb = bowls || dow === 6 ? null : dow === 0 || dow === 1 || (dow === 2 && morning) ? 'done' : 'next';
-  const nfl = dow === 2 || dow === 3 ? 'done' : 'next';
+  // NFL: last week's results from 3am Tuesday; the new week from 3am Wednesday.
+  const nfl = dow === 2 ? 'done' : 'next';
   return { cfb, nfl };
 }
 
@@ -25,8 +33,12 @@ export function headlineGames({ now, today = [], yest = [], weeks = {}, seasons 
   const out = [];
   const daily = (lg) => {
     const t = of(today, lg), y = of(yest, lg);
-    // Morning: last night's games (some may still be going), plus today's that have started.
-    return morning && y.length ? [...y, ...t.filter((g) => g.state !== 'pre')] : t;
+    const first = Math.min(...t.map((g) => Date.parse(g.date || '')).filter(Number.isFinite));
+    const early = Number.isFinite(first) && now.getTime() >= first - LEAD;
+    // Morning: last night's games (some may still be going), plus today's that have started, until today's slate is near.
+    if (morning && y.length && !early) return [...y, ...t.filter((g) => g.state !== 'pre')];
+    // Today's slate, plus last night's games still going past midnight.
+    return morning ? [...y.filter((g) => g.state === 'live'), ...t] : t;
   };
   for (const lg of lgs) {
     if (lg === 'nfl') out.push(...(weeks.nfl || of(today, lg)));
