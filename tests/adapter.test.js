@@ -493,3 +493,16 @@ test('hockey ice chart: hits, blocks, takeaways, giveaways and penalties turn wi
   assert.equal(ev[2].mins, 2);
   assert.equal(ev[3].x, 50); // period 2 left alone
 });
+
+test('refresh timing: games are checked often around their start time', async () => {
+  const { preRefresh, boardRefresh, gameRefresh } = await import('../src/data/store.js');
+  const at = (mins) => new Date(Date.now() + mins * 60000).toISOString();
+  assert.equal(preRefresh({ date: at(5) }), 15000); // about to start
+  assert.equal(preRefresh({ date: at(-2) }), 15000); // past start, feed not live yet
+  assert.equal(preRefresh({ date: at(30) }), 60000);
+  assert.equal(preRefresh({ date: at(300) }), 300000);
+  assert.equal(preRefresh({ date: at(5), tbd: true }), 300000);
+  assert.equal(boardRefresh({ games: [{ state: 'pre', date: at(3) }, { state: 'final' }] }), 20000);
+  assert.equal(boardRefresh({ games: [{ state: 'live' }, { state: 'pre', date: at(300) }] }), 30000);
+  assert.equal(gameRefresh({ state: 'final' }), 0);
+});

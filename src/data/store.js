@@ -85,7 +85,13 @@ export function useQuery(key, fn, refresh) {
       const ms = refreshRef.current ? refreshRef.current(cache.get(key)?.data) : 0;
       if (ms > 0) timer = setTimeout(() => { if (document.visibilityState === 'visible') run(); else timer = null; }, ms);
     };
-    const onVis = () => { if (document.visibilityState === 'visible' && !timer) run(); };
+    // Back in the app (phone unlocked, tab switched back): look again now if this is due, instead of waiting out a stale timer.
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return;
+      const ms = refreshRef.current ? refreshRef.current(cache.get(key)?.data) : 0;
+      const age = Date.now() - (cache.get(key)?.at || 0);
+      if (!timer || (ms > 0 && age >= ms)) { clearTimeout(timer); timer = null; run(); }
+    };
     run();
     document.addEventListener('visibilitychange', onVis);
     const repaint = () => { if (alive) bump((n) => n + 1); };
@@ -116,7 +122,26 @@ export async function loadDay(day) {
   };
 }
 // Poll fast while anything is live, slowly otherwise.
-export const dayRefresh = (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000);
+// How soon to look again at a game that has not started: often once it is close to (or past) its start time,
+// so the page flips to live within seconds of the opening tip, faceoff or kickoff instead of minutes later.
+export function preRefresh(g, near = 15000) {
+  const t = Date.parse(g?.date || '');
+  if (!Number.isFinite(t) || g?.tbd) return 300000;
+  const left = t - Date.now();
+  if (left < -3 * 3600000) return 300000; // hours late: a delay, not a start
+  if (left <= 10 * 60000) return near;
+  if (left <= 60 * 60000) return 60000;
+  return 300000;
+}
+// A board of games: every 30 seconds while any is live, faster still as the next one is about to start.
+export const boardRefresh = (d) => {
+  const gs = d?.games || [];
+  const pre = Math.min(300000, ...gs.filter((g) => g.state === 'pre').map((g) => preRefresh(g, 20000)));
+  return gs.some((g) => g.state === 'live') ? Math.min(30000, pre) : pre;
+};
+// One game's page.
+export const gameRefresh = (g) => (g?.state === 'live' ? 20000 : g?.state === 'pre' ? preRefresh(g) : 0);
+export const dayRefresh = boardRefresh;
 export function useDay(offset) {
   const day = ymd(dayOffset(offset));
   return useQuery(`day:${day}`, () => loadDay(day), dayRefresh);

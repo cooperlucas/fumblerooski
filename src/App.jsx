@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
-import { useQuery, useDay, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
+import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
 
@@ -162,12 +162,12 @@ function Scores() {
   const day = useDay(0);
   const pickL = LEAGUE[lg] ? lg : null;
   // A league's own slate: today, or this week for football.
-  const sb0 = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const sb0 = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), boardRefresh);
   // The feed's default slate is its latest match day, which can be finished. When it is, add the next game day underneath.
   const todayKey = ymdOf(new Date());
   const baseDay = sb0.data?.current?.day ? sb0.data.current.day.replace(/-/g, '') : null;
   const nextDay = sb0.data?.dates && baseDay && baseDay < todayKey ? [...sb0.data.dates].map((x) => x.replace(/-/g, '')).sort().find((x) => x >= todayKey) : null;
-  const sbNext = useQuery(pickL && nextDay ? `board:${pickL}:d${nextDay}` : null, () => getScoreboard(pickL, nextDay), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const sbNext = useQuery(pickL && nextDay ? `board:${pickL}:d${nextDay}` : null, () => getScoreboard(pickL, nextDay), boardRefresh);
   const sb = sb0;
   const today = day.data?.games || [];
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
@@ -239,7 +239,7 @@ function LeagueScores({ lg, startDay }) {
   const L = LEAGUE[lg];
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const base = useQuery(`board:${lg}`, () => getScoreboard(lg), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 300000));
+  const base = useQuery(`board:${lg}`, () => getScoreboard(lg), boardRefresh);
   const [wk, setWk] = useSticky('wk', null); // 'type:week'
   const [yr, setYr] = useSticky('yr', null); // football season year; null = this season
   const [day, setDay] = useSticky('day', startDay || null); // 'YYYYMMDD'
@@ -1965,7 +1965,7 @@ function ReplayPage({ lg, id, start = 0 }) {
 
 function GamePage({ lg, id, feed, replayBar }) {
   const L = LEAGUE[lg];
-  const q0 = useQuery(feed ? null : `game:${lg}:${id}`, () => getGame(lg, id), (d) => (d?.game?.state === 'live' ? 20000 : d?.game?.state === 'pre' ? 120000 : 0));
+  const q0 = useQuery(feed ? null : `game:${lg}:${id}`, () => getGame(lg, id), (d) => gameRefresh(d?.game));
   const q = feed ? { data: feed, loading: false, error: null } : q0;
   const d = q.data, g = d?.game;
   const title = g ? `${replayBar ? 'Replay: ' : ''}${g.away.abbr} at ${g.home.abbr}` : L.name;
