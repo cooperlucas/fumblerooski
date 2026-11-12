@@ -186,7 +186,6 @@ function Scores() {
       <div className="chips" role="group" aria-label="League">
         <button className="chipb" aria-pressed={!pickL} onClick={() => setLg('top')}>Headliners</button>
         {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
-        <button className="chipb" aria-label="Edit leagues" onClick={() => go('settings')} style={{ color: 'var(--mute)' }}>Edit</button>
       </div>
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
         !today.length ? <Empty>No games on the board today.</Empty> : (

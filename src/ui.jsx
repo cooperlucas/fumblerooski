@@ -245,6 +245,12 @@ export function Mascot() {
   );
 }
 
+const GearIcon = () => (
+  <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.7c.1.6.1 1.3 0 1.9l2 1.7-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.7c-.1-.6-.1-1.3 0-1.9l-2-1.7 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" transform="translate(0 1.4)" />
+    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2.2" />
+  </svg>
+);
 export function RootHeader() {
   return (
     <>
@@ -252,9 +258,12 @@ export function RootHeader() {
         <Mascot />
         <div style={{ minWidth: 0 }}>
           <h1 className="brand">Fumblerooski</h1>
-          <div className="tagline">Pure sports · No odds · No ads</div>
+          <div className="tagline"><span>Pure sports ·</span> <span>No odds ·</span> <span>No ads</span></div>
         </div>
-        <button className="round" style={{ marginLeft: 'auto' }} aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
+        <div className="headbtns">
+          <button className="round" aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
+          <button className="round" aria-label="Settings" onClick={() => go('settings')}><GearIcon /></button>
+        </div>
       </header>
       <div className="stripes" aria-hidden="true" />
     </>
