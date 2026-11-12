@@ -1263,6 +1263,7 @@ export const QUALIFIED = {
     yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', per: 1.875, title: 'Yards Per Catch', min: 'MIN 1.875 REC/G' },
     completionPct: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Completion %', min: 'MIN 14 ATT/G' },
     yardsPerPassAttempt: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Yards Per Pass', min: 'MIN 14 ATT/G' },
+    adjQBR: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'QBR', min: 'MIN 14 ATT/G' },
     fieldGoalPct: { group: 'kicking', cat: 'specialTeams:kicking', vol: 'fieldGoalAttempts', per: 1, title: 'Field Goal %', min: 'MIN 1 FGA/G' },
     grossAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Punting Average', min: 'MIN 2.5 PUNTS/G' },
     netAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Net Punting Average', min: 'MIN 2.5 PUNTS/G' },
