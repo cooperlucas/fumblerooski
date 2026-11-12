@@ -829,7 +829,7 @@ function TeamPage({ lg, id, season }) {
                       ))}
                     </div>
                   </section>
-                ))}</>
+                ))}</>}
           </>
         )}
       </Page>
