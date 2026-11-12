@@ -62,8 +62,9 @@ h1, h2, h3, p { margin: 0; }
 .stripes { flex: none; height: 10px; background: linear-gradient(to bottom, var(--teal) 0 2px, transparent 2px 4px, var(--ink) 4px 6px, transparent 6px 8px, var(--purple) 8px 10px); }
 .page { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px max(18px, env(safe-area-inset-right, 0px)) 28px max(18px, env(safe-area-inset-left, 0px)); }
 .enter { animation: frEnter 340ms cubic-bezier(.2, .8, .2, 1) both; }
-.tabs { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--bg); border-top: 1px solid var(--line2); }
-.tab { height: 54px; border: none; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-weight: 800; font-size: 11px; background: transparent; color: var(--mute); }
+/* The tab bar tucks down into the home-indicator strip (like the phone's own apps) so the page gets the room. */
+.tabs { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 5px 10px max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)); background: var(--bg); border-top: 1px solid var(--line2); }
+.tab { height: 48px; border: none; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-weight: 800; font-size: 11px; background: transparent; color: var(--mute); }
 .tab[aria-current="page"] { background: var(--chip); color: var(--yellow); }
 .demo { flex: none; text-align: center; padding: 5px 10px; background: var(--yellow); color: var(--on-accent); font-size: 11px; font-weight: 900; letter-spacing: 0.08em; }
 .demo button { background: none; border: none; text-decoration: underline; font-weight: 900; padding: 0 0 0 6px; color: inherit; }
