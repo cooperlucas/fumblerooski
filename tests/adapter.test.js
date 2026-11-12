@@ -516,3 +516,12 @@ test('live clock: the scoreboard clock wins when the game feed is far off in the
   assert.equal(pickClock(g('19:50 - 2H'), g('0:00 - 1H')).statusText, '19:50 - 2H'); // different periods: leave it
   assert.equal(pickClock(g('Final', 'final'), g('0:03 - 2H')).statusText, 'Final');
 });
+
+test('football: a touchdown nullified by penalty is not a touchdown', async () => {
+  const { fieldMoment } = await import('../src/data/espn.js');
+  const play = { type: 'Kickoff', text: '(10:32) #93 R.Griffith kickoff 63 yards to the UMASS02 #7 T.Magee return 98 yards to the TOLEDO00 TOUCHDOWN nullified by penalty, clock 10:20 PENALTY UMASS Holding (#20 K.Sarkodieh) 10 yards from UMASS25 to UMASS15', from: 35, kept: false };
+  const m = fieldMoment(play);
+  assert.notEqual(m.kind, 'td');
+  assert.equal(m.nulled, true);
+  assert.equal(fieldMoment({ type: 'Kickoff', text: 'kickoff 65 yards, returned 100 yards for a TOUCHDOWN' }).kind, 'td');
+});

@@ -1512,8 +1512,12 @@ export function fixSpot(from, to, yards) {
 }
 // What the newest football play is, for the live field's little shows. Pure text and numbers in, a plain description out.
 // kind: 'fg' | 'td' | 'safety' | 'turnover' | 'punt' | 'kickoff' | 'big' | ''.
+// A score the officials took away: "TOUCHDOWN nullified by penalty", "touchdown called back", "safety negated".
+export const CALLED_BACK = /\b(touchdown|td|safety)\b[\s,]*(?:was\s+|is\s+)?(?:nullified|negated|wiped out|called back|overturned|reversed|taken off the board)\b/i;
 export function fieldMoment(p) {
   if (!p) return { kind: '' };
+  // Read a called-back score as the play it really was (a kickoff, a run...) and flag it, so nothing celebrates a score that did not count.
+  if (CALLED_BACK.test(String(p.text || ''))) return { ...fieldMoment({ ...p, text: String(p.text).replace(new RegExp(CALLED_BACK.source, 'gi'), 'score called back') }), nulled: true };
   const type = String(p.type || ''), text = String(p.text || ''), both = `${type} ${text}`;
   if (/field goal/i.test(type) && !/fake/i.test(both)) {
     const blocked = /block/i.test(both);

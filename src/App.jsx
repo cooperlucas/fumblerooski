@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock } from './data/espn.js';
+import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
@@ -1095,6 +1095,7 @@ function DriveField({ d, game }) {
 /* ---------- football, live: the current drive marching down a bright cartoon field ---------- */
 export function fbHead(p) {
   const t = `${p.type} ${p.text}`, y = p.yards, yd = y != null ? `${Math.abs(y)}-yd ` : '';
+  if (CALLED_BACK.test(p.text) && !/touchdown/i.test(p.type)) return /safety/i.test(p.text) ? 'Safety Called Back' : 'TD Called Back';
   if (/touchdown/i.test(p.type) || /\btouchdown\b/i.test(p.text) && !/extra point|two-point/i.test(p.type)) return 'Touchdown!';
   if (/field goal/i.test(p.type)) return /good|made/i.test(t) && !/no good|missed/i.test(t) ? 'Field Goal Good' : 'Field Goal Missed';
   if (/extra point/i.test(p.type)) return /good/i.test(p.type) ? 'Extra Point Good' : 'Extra Point Missed';
@@ -1140,7 +1141,7 @@ function LiveField({ drives, game, onAll }) {
   // A punt the kicking team got back (a muff) moves the ball to where they recovered it.
   const puntBack = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
   // A defensive or return touchdown (pick six, scoop and score) ends in the drive team's own end zone.
-  const defTd = !!last && /touchdown|\bfor a td\b/i.test(`${last.type} ${last.text}`) && !last.kept;
+  const defTd = !!last && /touchdown|\bfor a td\b/i.test(`${last.type} ${last.text}`) && !last.kept && !CALLED_BACK.test(last.text);
   // The return on a pick six or scoop and score: from where the defense got the ball back to the offense's own goal line.
   // A turnover the defense ran back without scoring: they took it from the spot of the turnover to where the play ended.
   const m0 = fieldMoment(last);
@@ -1169,6 +1170,7 @@ function LiveField({ drives, game, onAll }) {
   const pts = scorer ? gain[scorer] : 0;
   const scoreT = scorer ? game[scorer] : t;
   const call = !last ? null
+    : m.nulled ? { text: `Flag · ${/safety/i.test(last.text) ? 'Safety' : 'TD'} Called Back`, bad: true }
     : m.kind === 'td' ? { text: `${scoreT.abbr} ${pts ? `+${pts} · ` : ''}${m.how || 'Touchdown'}`, team: scoreT, hot: true }
       : m.kind === 'fg' && m.good ? { text: `${t.abbr} +3 · Field Goal`, team: t, hot: true }
         : m.kind === 'fg' ? { text: m.miss === 'blocked' ? 'Field Goal Blocked' : `No Good${m.label ? ` · ${m.label}` : ''}`, team: t, bad: true }
@@ -1241,7 +1243,8 @@ function LiveField({ drives, game, onAll }) {
   }
   // Stamps: touchdown, turnover, safety. They slam in, sit a few seconds, and clear.
   let stamp = null;
-  if (last && m.kind === 'td') {
+  if (last && m.nulled) stamp = { text: 'CALLED BACK', color: '#FFD23F', x: 60 * K }; // flag yellow, and no confetti
+  else if (last && m.kind === 'td') {
     const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
     stamp = { text: m.how === 'Pick Six' ? 'PICK SIX!' : m.how === 'Scoop & Score' ? 'SCOOP & SCORE!' : 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
     if (defTd) turned = true; // the ball changed hands on the way to the end zone
