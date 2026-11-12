@@ -229,18 +229,18 @@ const RooSearch = () => (
 function gearPath(cx, cy, R, r, n, base = 0.95, top = 0.5) {
   const pts = [];
   for (let i = 0; i < n; i++) {
-    const a = (i * 2 * Math.PI) / n, w = Math.PI / n;
+    const a = (i * 2 * Math.PI) / n - Math.PI / 2, w = Math.PI / n; // first tooth points straight up
     [[a - w * base, r], [a - w * top, R], [a + w * top, R], [a + w * base, r]].forEach(([t, rad]) => pts.push(`${(cx + rad * Math.cos(t)).toFixed(2)},${(cy + rad * Math.sin(t)).toFixed(2)}`));
   }
   return `M${pts.join(' L')} Z`;
 }
-const GEAR = gearPath(12, 12, 11, 7.6, 6, 0.62, 0.36);
+const GEAR = gearPath(12, 12, 11, 8, 6, 0.6, 0.36);
 const RooGear = () => (
   <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
     <path d={GEAR} fill="#0C1124" strokeLinejoin="round" />
     {/* a baseball for the hub: reads like a gear's hole, with red stitches */}
-    <circle cx="12" cy="12" r="4.6" fill="#F4FAFF" />
-    <path d="M9.6 8.7 Q11.4 12 9.6 15.3 M14.4 8.7 Q12.6 12 14.4 15.3" fill="none" stroke="#E0263C" strokeWidth="1.1" strokeLinecap="round" />
+    <circle cx="12" cy="12" r="3.5" fill="#F4FAFF" />
+    <path d="M10.2 9.5 Q11.5 12 10.2 14.5 M13.8 9.5 Q12.5 12 13.8 14.5" fill="none" stroke="#E0263C" strokeWidth="0.9" strokeLinecap="round" />
   </svg>
 );
 
