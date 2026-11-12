@@ -226,15 +226,15 @@ const RooSearch = () => (
     <path d="M6.9 9.2 A3.4 3.4 0 0 1 9.4 6.6" fill="none" stroke="#22D3D6" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
-function gearPath(cx, cy, R, r, n) {
+function gearPath(cx, cy, R, r, n, base = 0.95, top = 0.5) {
   const pts = [];
   for (let i = 0; i < n; i++) {
     const a = (i * 2 * Math.PI) / n, w = Math.PI / n;
-    [[a - w * 0.95, r], [a - w * 0.5, R], [a + w * 0.5, R], [a + w * 0.95, r]].forEach(([t, rad]) => pts.push(`${(cx + rad * Math.cos(t)).toFixed(2)},${(cy + rad * Math.sin(t)).toFixed(2)}`));
+    [[a - w * base, r], [a - w * top, R], [a + w * top, R], [a + w * base, r]].forEach(([t, rad]) => pts.push(`${(cx + rad * Math.cos(t)).toFixed(2)},${(cy + rad * Math.sin(t)).toFixed(2)}`));
   }
   return `M${pts.join(' L')} Z`;
 }
-const GEAR = gearPath(12, 12, 10.4, 7.8, 8);
+const GEAR = gearPath(12, 12, 11, 7.6, 6, 0.62, 0.36);
 const RooGear = () => (
   <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
     <path d={GEAR} fill="#0C1124" strokeLinejoin="round" />
