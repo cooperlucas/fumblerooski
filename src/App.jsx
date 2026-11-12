@@ -1026,7 +1026,7 @@ const perName = (L, n) => (L.periods === 2 || L.sport === 'soccer' ? `${n}H` : `
 // Score chart: both teams' scores climbing through the game. Chunky stepped lines with a purple drop shadow,
 // like a late-80s broadcast graphic. Each line is the team's primary color with its secondary as the drop shadow.
 function niceStep(max) { const raw = max / 3, pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1)))); const f = raw / pow; return Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow); }
-// Lead tracker: the margin as filled steps around a center line. Above it the away team leads, below it the home team does,
+// Lead tracker: the margin as a line with its area shaded to a center line. Above it the away team leads, below it the home team does,
 // in that team's color, so every lead change and how big each lead got reads at a glance.
 function LeadChart({ chart, game, L }) {
   const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 10, y1 = 160, mid = (y0 + y1) / 2;
@@ -1063,10 +1063,30 @@ function LeadChart({ chart, game, L }) {
             {chart.bounds.slice(0, -1).map((b, i) => <path key={i} d={`M${x(b)} ${y0} V${y1}`} style={{ stroke: 'var(--line3)' }} strokeDasharray="2 4" />)}
             <text x={x1} y={y0 + 9} textAnchor="end" className="per" style={{ fill: cc.away.main }}>{game.away.abbr} AHEAD</text>
             <text x={x1} y={y1 - 3} textAnchor="end" className="per" style={{ fill: cc.home.main }}>{game.home.abbr} AHEAD</text>
-            {pts.slice(0, -1).map((p, i) => p.m ? <rect key={i} shapeRendering="crispEdges" x={x(p.t)} y={Math.min(y(p.m), mid)} width={Math.max(0, x(pts[i + 1].t) - x(p.t))} height={Math.abs(y(p.m) - mid)} fill={p.m > 0 ? cc.away.main : cc.home.main} /> : null)}
+            {(() => {
+              // The margin as one stepped line (it only moves when someone scores), shaded back to the center line.
+              // Above the line it's the away team's color, below it the home team's, so it changes color as the lead flips.
+              const line = pts.map((p, i) => (i ? `H${x(p.t).toFixed(1)} V${y(p.m).toFixed(1)}` : `M${x(p.t).toFixed(1)} ${y(p.m).toFixed(1)}`)).join(' ');
+              const area = `${line} V${mid} H${x(pts[0].t).toFixed(1)} Z`;
+              const id = `lead${game.id}`;
+              return (
+                <>
+                  <defs>
+                    <clipPath id={id + 'a'}><rect x={x0} y={0} width={x1 - x0 + 6} height={mid} /></clipPath>
+                    <clipPath id={id + 'h'}><rect x={x0} y={mid} width={x1 - x0 + 6} height={H} /></clipPath>
+                  </defs>
+                  {[['a', cc.away.main], ['h', cc.home.main]].map(([k, c]) => (
+                    <g key={k} clipPath={`url(#${id + k})`}>
+                      <path d={area} fill={c} fillOpacity="0.28" />
+                      <path d={line} fill="none" stroke={c} strokeWidth="2.75" strokeLinejoin="round" strokeLinecap="round" />
+                    </g>
+                  ))}
+                </>
+              );
+            })()}
             <path d={`M${x0} ${mid} H${x1}`} style={{ stroke: 'var(--soft)' }} strokeWidth="1.5" />
             <text x={x0 - 6} y={mid + 3.5} textAnchor="end" className="ax">0</text>
-            <rect x={x(end.t) - 4.5} y={y(end.m) - 4.5} width="9" height="9" fill={end.m > 0 ? cc.away.main : end.m < 0 ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" />
+            <circle cx={x(end.t)} cy={y(end.m)} r="4.5" fill={end.m > 0 ? cc.away.main : end.m < 0 ? cc.home.main : '#F5F5F7'} stroke="#0C1124" strokeWidth="2" />
             {chart.bounds.map((b, i) => { const a = i ? chart.bounds[i - 1] : 0; return <text key={'p' + i} x={x((a + b) / 2)} y={H - 16} textAnchor="middle" className="per">{label(i)}</text>; })}
             <path d={`M${x0} ${H - 7} H${x1}`} stroke="#22D3D6" strokeWidth="2" /><path d={`M${x0} ${H - 4} H${x1}`} stroke="#F5F5F7" strokeWidth="2" /><path d={`M${x0} ${H - 1} H${x1}`} stroke="#8B5CF6" strokeWidth="2" />
           </svg>
