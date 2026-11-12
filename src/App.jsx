@@ -991,6 +991,7 @@ function PlayerPage({ lg, id }) {
     const i = board.findIndex((r) => r.player?.id === String(id));
     if (i < 0) return null;
     const pl = places(board.map((r) => r.value))[i];
+    if (Number(pl.replace(/^T/, '')) > 150) return '150+'; // like ESPN: past 150th it's just "150+"
     return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
   };
   const color = p?.team?.color || '#2B3352';
@@ -1060,7 +1061,7 @@ function PlayerPage({ lg, id }) {
               <>
                 {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : x.rank) ? (() => {
                   const qr = qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : null;
-                  const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.tied ? 'T' : ''}${ordinal(x.rank)} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
+                  const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.rank > 150 ? '150+' : `${x.tied ? 'T' : ''}${ordinal(x.rank)}`} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
                   return k ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className={'trank' + (txt.length >= 12 ? ' long' : '')}>{txt}</em>;
                 })() : null}</div>)}</div> : null}

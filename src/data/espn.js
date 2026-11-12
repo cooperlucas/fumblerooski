@@ -1007,7 +1007,7 @@ export async function getPlayer(lg, id) {
     },
     summary: {
       title: cleanText(sum.displayName || ''),
-      // The feed ranks each headline stat against the league ("12th"). Shown however deep it is: each one links to its list.
+      // The feed ranks each headline stat against the league ("12th"); past 150th the tile says "150+", like ESPN.
       items: (sum.statistics || []).map((x) => {
         const rank = Number(x.rank) || Number(/(\d+)/.exec(String(x.rankDisplayValue || ''))?.[1]) || 0;
         return { key: String(x.name || ''), label: cleanText(x.abbreviation || x.shortDisplayName || x.displayName || ''), value: String(x.displayValue ?? ''), rank: rank > 0 ? rank : 0, tied: /^T/i.test(String(x.rankDisplayValue || '')) };
@@ -1291,13 +1291,28 @@ const HOOPS_Q = {
 };
 QUALIFIED.basketball = Object.fromEntries(Object.entries(HOOPS_Q).map(([k, v]) => [k, { hoops: v, title: v[3], min: v[4] }]));
 export const qualifiedRule = (lg, key) => QUALIFIED[LEAGUE[lg]?.sport]?.[key] || null;
+// Division I team ids for college hoops: the D-I standings plus the league's team list. Throws if neither answers, so a
+// board is never built (and kept) with small-college players mixed in.
+const d1P = new Map();
+function d1Ids(lg) {
+  if (!d1P.has(lg)) {
+    d1P.set(lg, Promise.allSettled([getStandings(lg), listTeams(lg)]).then(([st, ts]) => {
+      const ids = new Set();
+      if (st.status === 'fulfilled') st.value.groups.forEach((g) => g.rows.forEach((r) => ids.add(String(r.team.id))));
+      if (ts.status === 'fulfilled') ts.value.forEach((t) => ids.add(String(t.id)));
+      if (ids.size < 200) throw new FeedError('Could not read the Division I team list.', 0);
+      return ids;
+    }).catch((e) => { d1P.delete(lg); throw e; }));
+  }
+  return d1P.get(lg);
+}
 // Every qualified hoops board from one read of the league's players (pros: everyone; college: the 2,000 busiest).
 const hoopsP = new Map();
 function hoopsBoards(lg) {
   if (!hoopsP.has(lg)) {
     const pages = LEAGUE[lg].college ? [1, 2, 3, 4] : [1];
-    // College: the feed mixes in NAIA and small-college players, so keep Division I teams only (the league's team list).
-    const d1 = LEAGUE[lg].college ? listTeams(lg).then((ts) => new Set(ts.map((t) => String(t.id)))).catch(() => null) : Promise.resolve(null);
+    // College: the feed mixes in NAIA and small-college players, so keep Division I teams only.
+    const d1 = LEAGUE[lg].college ? d1Ids(lg) : Promise.resolve(null);
     hoopsP.set(lg, Promise.all([d1, ...pages.map((pg) => get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500', ...(pg > 1 ? { page: String(pg) } : {}) })).catch(() => null))]).then(([ids, ...ds]) => {
       const rows = ds.filter(Boolean).flatMap(byAthleteRows).filter((x) => !ids || ids.has(String(x.a.teamId ?? '')));
       const tg = new Map();
@@ -1498,7 +1513,7 @@ export async function getTeamStats(lg) {
   // College hoops: the feed mixes in small-college teams. Keep the league's own (Division I) list.
   if (LEAGUE[lg].college && LEAGUE[lg].sport === 'basketball') {
     try {
-      const ids = new Set((await listTeams(lg)).map((t) => String(t.id)));
+      const ids = await d1Ids(lg);
       const kept = teams.filter((t) => ids.has(String(t.team.id)));
       if (kept.length) teams.splice(0, teams.length, ...kept);
     } catch { /* keep them all */ }
