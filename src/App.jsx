@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS } from './data/espn.js';
-import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme } from './data/store.js';
+import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
 
@@ -43,6 +43,7 @@ export default function App() {
   else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
   else if (name === 'about') { title = 'About'; tab = 'leagues'; body = <About />; }
+  else if (name === 'settings') { title = 'Settings'; tab = 'leagues'; body = <Settings />; }
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
 
   // Team, game and search screens draw their own header (they know the title or own the search box).
@@ -66,11 +67,15 @@ function Ticker() {
   const yest = useDay(morning ? -1 : 0);
   const track = useRef(null);
   const [secs, setSecs] = useState(60);
+  const prefs = useLeaguePrefs();
+  const favs = useFavs();
   const groups = useMemo(() => {
+    const favSet = new Set(favs.map(favKey));
     const rank = { live: 0, final: 1, pre: 2, off: 3 };
     const pool = [...(morning ? (yest.data?.games || []) : []), ...(today.data?.games || [])];
-    return LEAGUES.map((l) => ({ l, games: pool.filter((g) => g.lg === l.id).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
-  }, [today.data, yest.data, morning]);
+    // Leagues switched off in Settings stay off the crawl, except games with a pinned team.
+    return orderLeagues(prefs).map((l) => ({ l, games: pool.filter((g) => g.lg === l.id && (isLeagueOn(l.id, prefs) || isFavGame(g, favSet))).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
+  }, [today.data, yest.data, morning, prefs, favs]);
   const count = groups.reduce((n, x) => n + x.games.length, 0);
   // Constant crawl speed no matter how many games are on.
   useLayoutEffect(() => { if (track.current) setSecs(Math.max(20, Math.round(track.current.scrollWidth / 2 / 55))); }, [count]);
@@ -124,7 +129,8 @@ const isMorning = () => new Date().getHours() < MORNING_UNTIL;
 function Board({ games, pick, favSet, title }) {
   const shown = games.filter((g) => pick === 'all' || g.lg === pick);
   const mine = sortGames(shown.filter((g) => isFavGame(g, favSet)), favSet);
-  const leagues = LEAGUES.filter((l) => shown.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+  const prefs = useLeaguePrefs();
+  const leagues = orderLeagues(prefs).filter((l) => shown.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
   return (
     <>
       {title ? <div className="sechead" style={{ marginTop: 22 }}><H2>{title}</H2></div> : null}
@@ -160,7 +166,8 @@ function Scores() {
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
   const day = useDay(0);
-  const pickL = LEAGUE[lg] ? lg : null;
+  const prefs = useLeaguePrefs();
+  const pickL = LEAGUE[lg] && isLeagueOn(lg, prefs) ? lg : null;
   // A league's own slate: today, or this week for football.
   const sb0 = useQuery(pickL ? `board:${pickL}` : null, () => getScoreboard(pickL), boardRefresh);
   // The feed's default slate is its latest match day, which can be finished. When it is, add the next game day underneath.
@@ -171,14 +178,15 @@ function Scores() {
   const sb = sb0;
   const today = day.data?.games || [];
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
-  const leagues = LEAGUES.filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+  const leagues = shownLeagues(prefs).filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
   const q = pickL ? sb : day;
   const gf = useGameFilter(pickL || 'top');
   return (
     <>
       <div className="chips" role="group" aria-label="League">
         <button className="chipb" aria-pressed={!pickL} onClick={() => setLg('top')}>Headliners</button>
-        {LEAGUES.map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
+        {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
+        <button className="chipb" aria-label="Edit leagues" onClick={() => go('settings')} style={{ color: 'var(--mute)' }}>Edit</button>
       </div>
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
         !today.length ? <Empty>No games on the board today.</Empty> : (
@@ -339,20 +347,21 @@ function LeagueScores({ lg, startDay }) {
 function Leagues() {
   const q = useDay(0);
   const count = (id) => (q.data?.games || []).filter((g) => g.lg === id).length;
+  const prefs = useLeaguePrefs();
   return (
     <>
       <section className="sec">
         <H2>Leagues</H2>
         <div className="card">
-          {LEAGUES.map((l) => { const n = count(l.id), season = q.data?.seasons?.[l.id]; return (
+          {orderLeagues(prefs).map((l) => { const n = count(l.id), season = q.data?.seasons?.[l.id]; return (
             <button key={l.id} className="lrow" onClick={() => go(`league/${l.id}`)}>
               <span className="blob" aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 12, background: l.color, color: '#0C1124', overflow: 'hidden', fontStretch: l.short.length > 4 ? '100%' : undefined, fontSize: l.short.length > 4 ? 9 : l.short.length > 3 ? 10 : 11 }}>{l.short}</span>
-              <span className="nm">{l.name}<span className="sub">{n ? `${n} ${n === 1 ? 'game' : 'games'} today` : season || 'No games today'}</span></span>
+              <span className="nm">{l.name}<span className="sub">{n ? `${n} ${n === 1 ? 'game' : 'games'} today` : season || 'No games today'}{isLeagueOn(l.id, prefs) ? '' : ' · Hidden on Scores'}</span></span>
               <span className="chev" aria-hidden="true">›</span>
             </button>); })}
         </div>
       </section>
-      <div style={{ textAlign: 'center', marginTop: 18 }}><button className="link" onClick={() => go('about')}>About Fumblerooski</button></div>
+      <div style={{ textAlign: 'center', marginTop: 18, display: 'flex', justifyContent: 'center', gap: 22 }}><button className="link" onClick={() => go('settings')}>Settings</button><button className="link" onClick={() => go('about')}>About Fumblerooski</button></div>
     </>
   );
 }
@@ -517,6 +526,7 @@ const Picker = ({ label, value, onChange, children, shown }) => (
 );
 const remember = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* fine */ } } };
 function Stats({ start }) {
+  const prefs = useLeaguePrefs();
   const [lg, setLgRaw] = useSticky('lg', () => start || (LEAGUE[remember.get('fr.stats.lg', '')] ? remember.get('fr.stats.lg', '') : 'nfl'));
   const setLg = (v) => { setLgRaw(v); remember.set('fr.stats.lg', v); };
   const [view, setView] = useSticky('view', 'leaders');
@@ -524,7 +534,7 @@ function Stats({ start }) {
     <>
       <div className="sechead" style={{ marginTop: 4 }}>
         <H2>Stats</H2>
-        <Picker label="League" value={lg} onChange={setLg}>{LEAGUES.map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}</Picker>
+        <Picker label="League" value={lg} onChange={setLg}>{orderLeagues(prefs).map((l) => <option key={l.id} value={l.id}>{l.short}</option>)}</Picker>
       </div>
       <div className="seg" role="group" aria-label="Stats view" style={{ marginTop: 12 }}>
         <button aria-pressed={view === 'leaders'} onClick={() => setView('leaders')}>Leaders</button>
@@ -2222,6 +2232,69 @@ function Preview({ p, game, lg }) {
   );
 }
 
+/* ---------- Settings ---------- */
+function Settings() {
+  return (
+    <>
+      <LeagueSettings />
+      <Appearance />
+    </>
+  );
+}
+// League order and on/off. Drag a row by its grip (or use the arrow keys on it) to move it.
+function LeagueSettings() {
+  const prefs = useLeaguePrefs();
+  const list = orderLeagues(prefs);
+  const [drag, setDrag] = useState(null); // { id, from, startY, dy, rowH }
+  const to = drag ? Math.max(0, Math.min(list.length - 1, drag.from + Math.round(drag.dy / drag.rowH))) : -1;
+  const move = (from, dest) => {
+    if (from === dest) return;
+    const ids = list.map((l) => l.id);
+    const [x] = ids.splice(from, 1); ids.splice(dest, 0, x);
+    setLeagueOrder(ids);
+  };
+  const down = (e, i, id) => {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setDrag({ id, from: i, startY: e.clientY, dy: 0, rowH: e.currentTarget.closest('.setrow').getBoundingClientRect().height });
+  };
+  const moveP = (e) => { if (drag) setDrag({ ...drag, dy: e.clientY - drag.startY }); };
+  const up = () => { if (drag) { move(drag.from, to); setDrag(null); } };
+  const shift = (i) => {
+    if (!drag || i === drag.from) return 0;
+    if (drag.from < to && i > drag.from && i <= to) return -drag.rowH;
+    if (to < drag.from && i >= to && i < drag.from) return drag.rowH;
+    return 0;
+  };
+  const offCount = (prefs.off || []).length;
+  return (
+    <section className="sec">
+      <H2>Leagues</H2>
+      <p className="stamp" style={{ textAlign: 'left', margin: '0 0 10px' }}>Drag to reorder. The order carries to Scores, the ticker and Leagues. Turning one off hides it from Scores and the ticker; it stays in Leagues, and your pinned teams always show.</p>
+      <div className={'card setlist' + (drag ? ' dragging' : '')}>
+        {list.map((l, i) => {
+          const on = isLeagueOn(l.id, prefs);
+          const me = drag?.id === l.id;
+          return (
+            <div key={l.id} className={'setrow' + (me ? ' lift' : '')} style={{ transform: `translateY(${me ? drag.dy : shift(i)}px)` }}>
+              <button className="grip" aria-label={`Move ${l.name}, ${i + 1} of ${list.length}. Use arrow keys.`}
+                onPointerDown={(e) => down(e, i, l.id)} onPointerMove={moveP} onPointerUp={up} onPointerCancel={() => setDrag(null)}
+                onKeyDown={(e) => { if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); move(i, i - 1); } if (e.key === 'ArrowDown' && i < list.length - 1) { e.preventDefault(); move(i, i + 1); } }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+              </button>
+              <span className="blob" aria-hidden="true" style={{ width: 34, height: 34, borderRadius: 10, background: l.color, color: '#0C1124', opacity: on ? 1 : 0.4, fontStretch: l.short.length > 4 ? '100%' : undefined, fontSize: l.short.length > 4 ? 8 : l.short.length > 3 ? 9 : 10 }}>{l.short}</span>
+              <span className="nm" style={{ opacity: on ? 1 : 0.55 }}>{l.name}</span>
+              <button className="switch" role="switch" aria-checked={on} aria-label={`Show ${l.name} on Scores and the ticker`} onClick={() => toggleLeague(l.id)} disabled={on && list.length - offCount <= 1}><span /></button>
+            </div>
+          );
+        })}
+      </div>
+      {(prefs.order || []).length || offCount ? <div style={{ textAlign: 'center', marginTop: 12 }}><button className="link" onClick={resetLeagues}>Reset to default</button></div> : null}
+    </section>
+  );
+}
+
 /* ---------- Appearance ---------- */
 function Appearance() {
   const [t, setT] = useState(getTheme);
@@ -2350,7 +2423,6 @@ function About() {
           ))}</div> : null}
         </div>
       </section>
-      <Appearance />
       <section className="sec">
         <H2>Demo Mode</H2>
         <div className="card pad">

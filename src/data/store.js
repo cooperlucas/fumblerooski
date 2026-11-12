@@ -44,6 +44,30 @@ export function useFavs() {
 }
 export const isFavGame = (g, set) => set.has(`${g.lg}:${g.home.id}`) || set.has(`${g.lg}:${g.away.id}`);
 
+/* ---------- league settings: which leagues show on Scores and the ticker, and in what order ---------- */
+// A league that is off still lives in the Leagues tab and search, and a pinned team's games always show.
+let leaguePrefs = ls.get('fr.leagues.v1', { order: [], off: [] });
+const lpSubs = new Set();
+const lpEmit = () => { ls.set('fr.leagues.v1', leaguePrefs); lpSubs.forEach((f) => f()); };
+export function useLeaguePrefs() {
+  return useSyncExternalStore((cb) => { lpSubs.add(cb); return () => lpSubs.delete(cb); }, () => leaguePrefs, () => leaguePrefs);
+}
+// Every league in the picked order. Leagues added to the app later land at the end, in their default spot.
+export function orderLeagues(prefs = leaguePrefs) {
+  const rank = new Map((prefs.order || []).map((id, i) => [id, i]));
+  return LEAGUES.map((l, i) => ({ l, r: rank.has(l.id) ? rank.get(l.id) : 1000 + i })).sort((a, b) => a.r - b.r).map((x) => x.l);
+}
+export const isLeagueOn = (id, prefs = leaguePrefs) => !(prefs.off || []).includes(id);
+export const shownLeagues = (prefs = leaguePrefs) => orderLeagues(prefs).filter((l) => isLeagueOn(l.id, prefs));
+export function setLeagueOrder(ids) { leaguePrefs = { ...leaguePrefs, order: [...ids] }; lpEmit(); }
+export function toggleLeague(id) {
+  const off = new Set(leaguePrefs.off || []);
+  if (off.has(id)) off.delete(id);
+  else if (LEAGUES.length - off.size > 1) off.add(id); // at least one league stays on
+  leaguePrefs = { ...leaguePrefs, off: [...off] }; lpEmit();
+}
+export function resetLeagues() { leaguePrefs = { order: [], off: [] }; lpEmit(); }
+
 /* ---------- cached reads ---------- */
 const cache = new Map(); // key -> { data, at }
 const inflight = new Map(); // key -> promise, so two screens asking for the same thing share one read
