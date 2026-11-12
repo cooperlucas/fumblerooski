@@ -1483,8 +1483,10 @@ export async function getLeaguePlusMinus(lg) {
 // Every team's season numbers, one table per stat group (passing, rushing, defense...).
 export async function getTeamStats(lg) {
   const d = await get(url(COMMON, lg, '/statistics/byteam', { region: 'us', lang: 'en', contentorigin: 'espn', limit: '400' }));
+  // The feed sometimes names groups in lowercase ("general"): give them a capital.
+  const cap = (t) => t.replace(/^[a-z]/, (ch) => ch.toUpperCase());
   const cats = (d.categories || []).map((c) => ({
-    key: String(c.name || ''), title: cleanText(c.displayName || c.name || ''),
+    key: String(c.name || ''), title: cap(cleanText(c.displayName || c.name || '')),
     labels: (c.labels || c.names || []).map((l) => cleanText(l)),
     names: (c.displayNames || c.names || []).map((l) => cleanText(l)),
   })).filter((c) => c.key && c.labels.length);
@@ -1493,6 +1495,14 @@ export async function getTeamStats(lg) {
     (t.categories || []).forEach((c) => { const v = c.totals || c.displayValues || c.values; if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); }); // raw numbers come with long tails, so trim them
     return { team: normTeam(t.team || {}, lg), stats };
   }).filter((t) => t.team.id);
+  // College hoops: the feed mixes in small-college teams. Keep the league's own (Division I) list.
+  if (LEAGUE[lg].college && LEAGUE[lg].sport === 'basketball') {
+    try {
+      const ids = new Set((await listTeams(lg)).map((t) => String(t.id)));
+      const kept = teams.filter((t) => ids.has(String(t.team.id)));
+      if (kept.length) teams.splice(0, teams.length, ...kept);
+    } catch { /* keep them all */ }
+  }
   return { lg, cats: cats.filter((c) => teams.some((t) => t.stats[c.key]?.length)), teams };
 }
 
