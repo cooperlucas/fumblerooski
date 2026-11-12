@@ -179,7 +179,18 @@ const OFF = /POSTPONED|CANCEL|SUSPENDED|DELAYED|FORFEIT|ABANDONED/;
 // Where to watch. The scoreboard has geoBroadcasts and the game summary has the same shape under broadcasts;
 // older payloads use { market, names }. National TV comes first, then national streaming, then each team's local channel.
 // Men's college hoops plays halves: "18:40 - 1st" reads "18:40 - 1H".
-const halves = (lg, t) => (LEAGUE[lg]?.periods === 2 && LEAGUE[lg]?.sport === 'basketball' ? t.replace(/\b1st( Half)?\b/i, '1H').replace(/\b2nd( Half)?\b/i, '2H') : t);
+const halves0 = (lg, t) => (LEAGUE[lg]?.periods === 2 && LEAGUE[lg]?.sport === 'basketball' ? t.replace(/\b1st( Half)?\b/i, '1H').replace(/\b2nd( Half)?\b/i, '2H') : t);
+// Breaks read the way a broadcast calls them: the end of the 2nd quarter (or 1st half) is Halftime,
+// the end of a hockey period is an intermission.
+export function breakName(lg, t) {
+  const L = LEAGUE[lg] || {};
+  if (/^end of (the )?(2nd( quarter)?|q2)$/i.test(t) && L.periods === 4) return 'Halftime';
+  if (/^end of (the )?1st half$|^end of 1h$/i.test(t) && L.periods === 2 && L.sport === 'basketball') return 'Halftime';
+  const hk = /^end of (the )?(1st|2nd)( period)?$/i.exec(t);
+  if (hk && L.sport === 'hockey') return `${hk[2]} Intermission`;
+  return t;
+}
+const halves = (lg, t) => halves0(lg, breakName(lg, t));
 export function normTv(comp) {
   const list = [];
   for (const b of (comp?.geoBroadcasts?.length ? comp.geoBroadcasts : comp?.broadcasts) || []) {

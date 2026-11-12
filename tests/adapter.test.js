@@ -540,3 +540,12 @@ test('football drives: a pick six on the offense\'s drive is the defense\'s touc
   assert.equal(d.scoreSide, 'home');
   assert.notEqual(d.x1, 100); // the offense did not reach the end zone
 });
+test('breaks read as halftime and intermissions', async () => {
+  const { breakName } = await import('../src/data/espn.js');
+  assert.equal(breakName('cfb', 'End of 2nd'), 'Halftime');
+  assert.equal(breakName('nba', 'End of 2nd Quarter'), 'Halftime');
+  assert.equal(breakName('ncaam', 'End of 1st Half'), 'Halftime');
+  assert.equal(breakName('nhl', 'End of 1st'), '1st Intermission');
+  assert.equal(breakName('nhl', 'End of 3rd'), 'End of 3rd');
+  assert.equal(breakName('cfb', 'End of 3rd'), 'End of 3rd');
+});
