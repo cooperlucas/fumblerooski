@@ -742,3 +742,5 @@ button.pick.date { cursor: pointer; }
 .shead .vh { width: 56px; }
 /* W-L-OT records (hockey) need a wider column so they never wrap. */
 .rec3 .srow .v, .rec3 .shead .vh { width: 74px; white-space: nowrap; }
+/* "See all" sits in the league header without making it taller than Your Teams (bigger tap area, no extra height). */
+.lghead .link { height: auto; line-height: inherit; padding: 10px 6px; margin: -10px -6px -10px auto; }
