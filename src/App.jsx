@@ -478,7 +478,7 @@ function LeaguePage({ lg, focus, start, startDay }) {
 /* ---------- College polls ---------- */
 function Rankings({ lg, focus }) {
   const q = useQuery(`rankings:${lg}`, () => getRankings(lg), () => 1800000);
-  const [pid, setPid] = useState(null);
+  const [pid, setPid] = useSticky(`poll:${lg}`, null); // the picked poll survives a trip to a team and back
   if (q.loading && !q.data) return <Loading rows={8} />;
   if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
   const polls = q.data.polls;
