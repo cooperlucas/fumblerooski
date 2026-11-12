@@ -3,7 +3,7 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
-import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
+import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
@@ -951,7 +951,7 @@ function PlayerPage({ lg, id }) {
             {d.other ? (
               <div className="seg" role="group" aria-label="College or pro career" style={{ marginTop: 12 }}>
                 {[['college', 'College'], ['pro', 'Pro']].map(([k, label]) => { const here = d.other.kind !== k; return (
-                  <button key={k} aria-pressed={here} onClick={() => { if (!here) go(`player/${d.other.lg}/${d.other.id}`); }}>{label}<small style={{ marginLeft: 6, opacity: 0.7 }}>{LEAGUE[here ? lg : d.other.lg].short}</small></button>); })}
+                  <button key={k} aria-pressed={here} onClick={() => { if (!here) swap(`player/${d.other.lg}/${d.other.id}`); }}>{label}<small style={{ marginLeft: 6, opacity: 0.7 }}>{LEAGUE[here ? lg : d.other.lg].short}</small></button>); })}
               </div>
             ) : null}
             <div className="gtabs" role="tablist" aria-label="Player sections">

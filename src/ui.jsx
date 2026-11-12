@@ -34,6 +34,8 @@ export const saveScroll = (top) => { if (lastPath != null) bucket(lastPath).scro
 export const savedScroll = (path) => sticky.get(path)?.scroll || 0;
 const tell = () => mem.subs.forEach((f) => f());
 export const go = (path) => { if (demoLocked) { mem.stack.push(path); tell(); } else { forward = true; location.hash = '#/' + path; } };
+// Swap the current screen for another without adding a history step (a toggle, not a trip): Back skips past it.
+export const swap = (path) => { if (demoLocked) { mem.stack[mem.stack.length - 1] = path; tell(); } else { forward = true; location.replace('#/' + path); } };
 export const back = () => {
   if (demoLocked) { wentBack = true; if (mem.stack.length > 1) mem.stack.pop(); else mem.stack = ['']; tell(); }
   else if (history.length > 1) history.back(); else go('');
