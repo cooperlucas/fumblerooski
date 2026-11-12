@@ -1252,7 +1252,11 @@ function LiveField({ drives, game, onAll }) {
   const scorer = gain && gain.away > 0 ? 'away' : gain && gain.home > 0 ? 'home' : null;
   const pts = scorer ? gain[scorer] : 0;
   const scoreT = scorer ? game[scorer] : t;
+  // A defensive two: the try (PAT or two-point) got blocked or picked and the defense ran it all the way back for 2.
+  const defTwo = !!last && /defensive (pat|2pt|two)|return for (a )?defensive (pat|2)/i.test(`${last.type} ${last.text}`);
+  const twoBy = defTwo ? (scorer || other) : null; // the side that scored the 2
   const call = !last ? null
+    : defTwo ? { text: `${game[twoBy].abbr} +2 · Defensive 2-Pt`, team: game[twoBy], hot: true }
     : m.nulled ? { text: `Flag · ${/safety/i.test(last.text) ? 'Safety' : 'TD'} Called Back`, bad: true }
     : m.kind === 'td' ? { text: `${scoreT.abbr} ${pts ? `+${pts} · ` : ''}${m.how || 'Touchdown'}`, team: scoreT, hot: true }
       : m.kind === 'fg' && m.good ? { text: `${t.abbr} +3 · Field Goal`, team: t, hot: true }
@@ -1331,7 +1335,8 @@ function LiveField({ drives, game, onAll }) {
   }
   // Stamps: touchdown, turnover, safety. They slam in, sit a few seconds, and clear.
   let stamp = null;
-  if (last && m.nulled) stamp = null; // a called-back score gets the flag banner only: no stamp, no confetti
+  if (last && defTwo) stamp = { text: 'DEFENSIVE 2!', color: GOLD, x: 60 * K, confetti: [(twoBy === 'away' ? 110 : 0) * K + 5 * K, cc[twoBy].main] };
+  else if (last && m.nulled) stamp = null; // a called-back score gets the flag banner only: no stamp, no confetti
   else if (last && m.kind === 'td') {
     const zone = (scorer || d.side) === 'away' ? 110 * K : 0;
     stamp = { text: m.how === 'Pick Six' ? 'PICK SIX!' : m.how === 'Scoop & Score' ? 'SCOOP & SCORE!' : 'TOUCHDOWN!', color: GOLD, x: 60 * K, confetti: [zone + 5 * K, cc[scorer || d.side].main] };
@@ -1388,7 +1393,7 @@ function LiveField({ drives, game, onAll }) {
                   <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
                 </g>
               </g>
-            ) : start != null && at != null ? (
+            ) : !defTwo && start != null && at != null ? (
               <>
                 <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
@@ -1407,7 +1412,16 @@ function LiveField({ drives, game, onAll }) {
                 </g>
               </>
             ) : null}
-            {handoff ? null : show}
+            {handoff || defTwo ? null : show}
+            {defTwo ? (() => {
+              const kick = twoBy === 'away' ? 'home' : 'away', a = Xs(kick, 3), b = Xs(kick, 100);
+              return (
+                <g key={'d2' + lastKey}>
+                  {[['#fff', 5.5], [cc[twoBy].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${a} ${ly} H${b}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': b < a ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
+                  {/block/i.test(`${last.text} ${prev?.text || ''}`) ? <text className="ktag" x={a} y={ly - 12} textAnchor="middle">BLOCK</text> : null}
+                  <g transform={`translate(${b} ${ly - 19})`}>{ball(8)}</g>
+                </g>);
+            })() : null}
             {retEnd != null && retFrom != null && !noRet ? (
               <g key={'ret' + lastKey}>{/* the return stays drawn until the next play; only the stamp fades */}
                 {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
