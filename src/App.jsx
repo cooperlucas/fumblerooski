@@ -194,7 +194,11 @@ function Scores() {
   const sb = sb0;
   const hl = useHeadlines(prefs);
   const today = hl.games;
-  const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
+  // Your Teams: whatever Headliners shows for them, plus any game of theirs today, always (even in the morning results window).
+  const mine = useMemo(() => {
+    const seen = new Set();
+    return sortGames([...today, ...(hl.q.data?.games || [])].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
+  }, [today, hl.q.data, favSet]);
   const leagues = shownLeagues(prefs).filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
   const q = pickL ? sb : hl.q;
   const gf = useGameFilter(pickL || 'top');
@@ -205,7 +209,7 @@ function Scores() {
         {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
-        !today.length ? <Empty>No games on the board right now.</Empty> : (
+        !today.length && !mine.length ? <Empty>No games on the board right now.</Empty> : (
           <>
             {mine.length ? (
               <div className="card" style={{ marginTop: 14 }}>
