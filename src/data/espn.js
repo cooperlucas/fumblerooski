@@ -1296,8 +1296,10 @@ const hoopsP = new Map();
 function hoopsBoards(lg) {
   if (!hoopsP.has(lg)) {
     const pages = LEAGUE[lg].college ? [1, 2, 3, 4] : [1];
-    hoopsP.set(lg, Promise.all(pages.map((pg) => get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500', ...(pg > 1 ? { page: String(pg) } : {}) })).catch(() => null))).then((ds) => {
-      const rows = ds.filter(Boolean).flatMap(byAthleteRows);
+    // College: the feed mixes in NAIA and small-college players, so keep Division I teams only (the league's team list).
+    const d1 = LEAGUE[lg].college ? listTeams(lg).then((ts) => new Set(ts.map((t) => String(t.id)))).catch(() => null) : Promise.resolve(null);
+    hoopsP.set(lg, Promise.all([d1, ...pages.map((pg) => get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500', ...(pg > 1 ? { page: String(pg) } : {}) })).catch(() => null))]).then(([ids, ...ds]) => {
+      const rows = ds.filter(Boolean).flatMap(byAthleteRows).filter((x) => !ids || ids.has(String(x.a.teamId ?? '')));
       const tg = new Map();
       rows.forEach((x) => { const t = String(x.a.teamId ?? ''), gp = x.at('general', 'gamesPlayed'); if (t && gp > (tg.get(t) || 0)) tg.set(t, gp); });
       const out = {};
