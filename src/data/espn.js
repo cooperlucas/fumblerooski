@@ -332,6 +332,20 @@ async function addDivisionRanks(games, season, week) {
     for (const sd of [g.away, g.home]) if (!ranked(sd.rank) && ranks.get(String(sd.id))) sd.rank = ranks.get(String(sd.id));
   }
 }
+// A football league's week for Headliners: wantDone asks for the latest week that has been played (results), otherwise
+// the week with games still to come. ESPN's default week flips on its own schedule, so step one week either way when needed.
+export async function getFootballSlate(lg, wantDone) {
+  const sb = await getScoreboard(lg);
+  const cur = sb.current || {};
+  const all = sb.games;
+  const allPre = all.length && all.every((g) => g.state === 'pre');
+  const allDone = all.length && all.every((g) => g.state === 'final' || g.state === 'off');
+  const i = (sb.weeks || []).findIndex((w) => w.week === cur.week && w.type === cur.type);
+  const step = async (d) => { const w = i >= 0 ? sb.weeks[i + d] : null; return w ? getScoreboard(lg, null, { week: w.week, type: w.type, year: sb.year || undefined }) : null; };
+  if (wantDone && allPre) return (await step(-1)) || sb;
+  if (!wantDone && allDone) return (await step(1)) || sb;
+  return sb;
+}
 export async function getScoreboard(lg, day, week) {
   const L = LEAGUE[lg];
   const wk = week ? { week: String(week.week), seasontype: String(week.type), ...(week.year ? { dates: String(week.year) } : {}) } : {};

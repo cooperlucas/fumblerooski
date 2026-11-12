@@ -557,3 +557,33 @@ test('break countdown targets', async () => {
   assert.equal(breakClock('nhl', { state: 'live', statusText: '1st Intermission' }, t0).next, '2nd period');
   assert.equal(breakClock('nba', { state: 'live', statusText: '4:20 - 3rd' }, t0), null);
 });
+
+test('headliners follow each sport\'s rhythm', async () => {
+  const { headlineGames, footballModes } = await import('../src/data/headlines.js');
+  const g = (lg, id, state) => ({ lg, id, state, away: { id: 'a' }, home: { id: 'h' }, date: '' });
+  const at = (dow, hour) => { const d = new Date(2026, 10, 8 + dow, hour); return d; }; // Nov 8 2026 is a Sunday
+  const today = [g('nba', 't1', 'pre'), g('nba', 't2', 'live')], yest = [g('nba', 'y1', 'final')];
+  // NBA morning: last night's finals plus today's games already going; afternoon: today's slate
+  assert.deepEqual(headlineGames({ now: at(3, 9), today, yest }).map((x) => x.id), ['y1', 't2']);
+  assert.deepEqual(headlineGames({ now: at(3, 15), today, yest }).map((x) => x.id), ['t1', 't2']);
+  // Soccer: always today
+  assert.deepEqual(headlineGames({ now: at(6, 8), today: [g('epl', 'e1', 'pre')], yest: [g('epl', 'e0', 'final')] }).map((x) => x.id), ['e1']);
+  // College football: Saturday's slate; weekend results Sunday through Tuesday morning; then the week ahead
+  assert.equal(footballModes(at(6, 9)).cfb, null);
+  assert.equal(footballModes(at(0, 20)).cfb, 'done');
+  assert.equal(footballModes(at(2, 9)).cfb, 'done');
+  assert.equal(footballModes(at(2, 14)).cfb, 'next');
+  const wk = [g('cfb', 's1', 'pre'), g('cfb', 's2', 'pre')];
+  // A Wednesday with no MACtion yesterday or today: the upcoming slate
+  assert.deepEqual(headlineGames({ now: at(3, 15), today: [], yest: [], weeks: { cfb: wk } }).map((x) => x.id), ['s1', 's2']);
+  // Thursday morning after Wednesday MACtion: those results; Thursday afternoon with games: Thursday's
+  assert.deepEqual(headlineGames({ now: at(4, 9), today: [g('cfb', 'th', 'pre')], yest: [g('cfb', 'we', 'final')], weeks: { cfb: wk } }).map((x) => x.id), ['we']);
+  assert.deepEqual(headlineGames({ now: at(4, 15), today: [g('cfb', 'th', 'pre')], yest: [g('cfb', 'we', 'final')], weeks: { cfb: wk } }).map((x) => x.id), ['th']);
+  // Bowl season runs day by day
+  assert.equal(footballModes(at(2, 14), 'Postseason').cfb, null);
+  // NFL: last week Tuesday and Wednesday; the new week from Thursday
+  assert.equal(footballModes(at(2, 10)).nfl, 'done');
+  assert.equal(footballModes(at(3, 23)).nfl, 'done');
+  assert.equal(footballModes(at(4, 0)).nfl, 'next');
+  assert.equal(footballModes(at(1, 20)).nfl, 'next');
+});

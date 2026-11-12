@@ -1,8 +1,9 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
+import { headlineGames, footballModes, freshFinal, MORNING_UNTIL } from './data/headlines.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
 
 /* ---------- router ---------- */
@@ -122,7 +123,6 @@ function useCovered(lg) {
 }
 const isCovered = (set, id) => !set || set.has(String(id));
 // Until noon the ticker leads with last night's finals (the Scores board shows only the day you pick).
-const MORNING_UNTIL = 12;
 const isMorning = () => new Date().getHours() < MORNING_UNTIL;
 
 // One day's games: your teams first, then each league in its own card.
@@ -155,17 +155,33 @@ function Board({ games, pick, favSet, title }) {
 }
 
 // The day's best games per league for Headliners: your teams, then live, then ranked matchups, then by start time.
-const RANKED = (g) => (g.away.rank ? 1 : 0) + (g.home.rank ? 1 : 0);
+const RANKED = (g) => (g.away.rank && g.away.rank <= 25 ? 1 : 0) + (g.home.rank && g.home.rank <= 25 ? 1 : 0);
 function topOf(games, favSet, n) {
-  const order = { live: 0, pre: 1, final: 2, off: 3 };
-  return [...games].sort((a, b) => (isFavGame(b, favSet) - isFavGame(a, favSet)) || (order[a.state] - order[b.state]) || (RANKED(b) - RANKED(a)) || String(a.date).localeCompare(String(b.date))).slice(0, n);
+  const now = new Date();
+  // Live first; in the morning, last night's finals next; then what's coming up; then older finals.
+  const order = (g) => (g.state === 'live' ? 0 : freshFinal(g, now) ? 1 : g.state === 'pre' ? 2 : g.state === 'final' ? 3 : 4);
+  return [...games].sort((a, b) => (isFavGame(b, favSet) - isFavGame(a, favSet)) || (order(a) - order(b)) || (RANKED(b) - RANKED(a)) || String(a.date).localeCompare(String(b.date))).slice(0, n);
+}
+// Headliners' games: each league's slate by the rhythm of its sport (see data/headlines.js).
+function useHeadlines(prefs) {
+  const now = new Date();
+  const today = useDay(0);
+  const morning = now.getHours() < MORNING_UNTIL;
+  const yest = useDay(morning ? -1 : 0); // same query as today's when not needed
+  const modes = footballModes(now, today.data?.seasons?.cfb || '');
+  const cfbW = useQuery(isLeagueOn('cfb', prefs) && modes.cfb ? `hl:cfb:${modes.cfb}` : null, () => getFootballSlate('cfb', modes.cfb === 'done'), boardRefresh);
+  const nflW = useQuery(isLeagueOn('nfl', prefs) && modes.nfl ? `hl:nfl:${modes.nfl}` : null, () => getFootballSlate('nfl', modes.nfl === 'done'), boardRefresh);
+  const games = useMemo(() => headlineGames({
+    now: new Date(), today: today.data?.games || [], yest: morning ? (yest.data?.games || []) : [],
+    weeks: { cfb: cfbW.data?.games, nfl: nflW.data?.games }, seasons: today.data?.seasons || {},
+  }), [today.data, yest.data, cfbW.data, nflW.data, morning]);
+  return { games, q: today };
 }
 
 function Scores() {
   const [lg, setLg] = useSticky('lg', 'top');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const day = useDay(0);
   const prefs = useLeaguePrefs();
   const pickL = LEAGUE[lg] && isLeagueOn(lg, prefs) ? lg : null;
   // A league's own slate: today, or this week for football.
@@ -176,10 +192,11 @@ function Scores() {
   const nextDay = sb0.data?.dates && baseDay && baseDay < todayKey ? [...sb0.data.dates].map((x) => x.replace(/-/g, '')).sort().find((x) => x >= todayKey) : null;
   const sbNext = useQuery(pickL && nextDay ? `board:${pickL}:d${nextDay}` : null, () => getScoreboard(pickL, nextDay), boardRefresh);
   const sb = sb0;
-  const today = day.data?.games || [];
+  const hl = useHeadlines(prefs);
+  const today = hl.games;
   const mine = sortGames(today.filter((g) => isFavGame(g, favSet)), favSet);
   const leagues = shownLeagues(prefs).filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
-  const q = pickL ? sb : day;
+  const q = pickL ? sb : hl.q;
   const gf = useGameFilter(pickL || 'top');
   return (
     <>
@@ -188,7 +205,7 @@ function Scores() {
         {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
-        !today.length ? <Empty>No games on the board today.</Empty> : (
+        !today.length ? <Empty>No games on the board right now.</Empty> : (
           <>
             {mine.length ? (
               <div className="card" style={{ marginTop: 14 }}>
