@@ -2512,7 +2512,7 @@ function Appearance() {
     <section className="sec">
       <H2>Appearance</H2>
       <div className="seg" role="group" aria-label="Appearance" style={{ marginTop: 10 }}>
-        {[['dark', 'Dark'], ['light', 'Light'], ['system', 'Match phone']].map(([k, label]) => <button key={k} aria-pressed={t === k} onClick={() => pick(k)}>{label}</button>)}
+        {[['dark', 'Dark'], ['light', 'Light'], ['system', 'Device Settings']].map(([k, label]) => <button key={k} aria-pressed={t === k} onClick={() => pick(k)}>{label}</button>)}
       </div>
     </section>
   );
