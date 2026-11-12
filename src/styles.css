@@ -720,3 +720,4 @@ button.pick.date { cursor: pointer; }
 .grow .nm, .grow .nm .nmt, .srow .nm, .lrow .nm, .shead .nm, .lead .nm, .vslead .who, .srow .cupnm .cn, .setrow .nm { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }
 .tick .st, .grow .gtv, .titem .ttv { overflow: visible; text-overflow: clip; max-width: none; }
 .pick.masked .shown { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.1; }
+.chipb.tchip { display: inline-flex; align-items: center; gap: 6px; }

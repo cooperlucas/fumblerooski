@@ -1043,7 +1043,12 @@ function LeadChart({ chart, game, L }) {
   const W = 340, H = 196, x0 = 30, x1 = 332, y0 = 10, y1 = 160, mid = (y0 + y1) / 2;
   const pts = chart.points.map((p) => ({ t: p.t, m: p.a - p.h, a: p.a, h: p.h }));
   const most = Math.max(1, ...pts.map((p) => Math.abs(p.m)));
-  const step = niceStep(most * 1.5), top = Math.max(step, Math.ceil((most * 1.15) / step) * step);
+  // The scale fits the game's biggest lead snugly (a 5-goal hockey lead should look huge), with a floor per sport so a
+  // one-goal game doesn't fill the chart either.
+  const FLOOR = { hockey: 3, soccer: 3, baseball: 4, football: 14, basketball: 10 };
+  const NICE = [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 15, 20, 21, 25, 28, 30, 35, 40, 50, 60, 70, 80, 100];
+  const top = NICE.find((n) => n >= Math.max(FLOOR[L.sport] || 4, most * 1.12)) || Math.ceil(most * 1.12);
+  const step = top / 2;
   const x = (t) => x0 + t * (x1 - x0), y = (m) => mid - (m / top) * (mid - y0);
   const cc = chartColors(game.away, game.home);
   const reg = L.periods || chart.periods;
@@ -1057,7 +1062,7 @@ function LeadChart({ chart, game, L }) {
   // The note follows whoever leads right now; when it's tied, whoever has led longer.
   const lead = end.m > 0 ? [game.away, upA] : end.m < 0 ? [game.home, upH] : upA >= upH ? [game.away, upA] : [game.home, upH];
   const share = Math.round((lead[1] / span) * 100);
-  const gl = [top, -top].concat(top / step >= 2 ? [step * Math.floor(top / step / 2), -step * Math.floor(top / step / 2)] : []);
+  const gl = [top, -top].concat(Number.isInteger(top / 2) ? [top / 2, -top / 2] : []);
   const stat = (t, c, n) => <span className="ls"><i style={{ background: c }} />{t.abbr} <b>{n ? `+${n}` : '—'}</b></span>;
   // Touch and drag across the chart to read the score and game clock at any moment.
   const [scrub, setScrub] = useState(null);
@@ -2042,13 +2047,23 @@ function PitchChart({ shots, game }) {
 }
 
 /* ---------- play-by-play (not football) ---------- */
+// Play filters, by sport: the same kinds the ice chart and shot chart sort by.
+const PLAY_KINDS = {
+  hockey: [['goal', 'Goals', /\bgoal\b/i], ['shot', 'Shots', /shot/i], ['hit', 'Hits', /\bhit\b/i], ['block', 'Blocks', /blocked/i], ['take', 'Takeaways', /takeaway/i], ['give', 'Giveaways', /giveaway/i], ['pen', 'Penalties', /penalty/i], ['fo', 'Faceoffs', /face ?off/i]],
+  basketball: [['made', 'Made', /\bmakes?\b|\bmade\b/i], ['miss', 'Missed', /\bmiss/i], ['reb', 'Rebounds', /rebound/i], ['to', 'Turnovers', /turnover|steal/i], ['foul', 'Fouls', /foul/i]],
+};
 function PlayByPlay({ pbp, game, L }) {
   const periods = [...new Set(pbp.map((p) => p.period))].sort((a, b) => a - b);
   const [per, setPer] = useState(null);
   const [show, setShow] = useState(true);
+  const [kind, setKind] = useState('all');
+  const [teamOn, flipTeam] = useToggles([game.away.id, game.home.id]);
   const cur = per ?? periods[periods.length - 1];
   const live = game.state === 'live';
-  let rows = pbp.filter((p) => p.period === cur);
+  const kinds = (PLAY_KINDS[L.sport] || []).filter(([, , re]) => pbp.some((p) => re.test(`${p.type} ${p.text}`)));
+  const kre = kinds.find(([k]) => k === kind)?.[2];
+  const teamFilter = teamOn.size < 2;
+  let rows = pbp.filter((p) => p.period === cur && (!kre || kre.test(`${p.type} ${p.text}`)) && (!teamFilter || teamOn.has(p.teamId)));
   if (live) rows = [...rows].reverse();
   const reg = L.periods || 4, word = PERIOD_WORD[L.sport] ?? '';
   const label = (p) => (!p ? 'Game' : p <= reg || L.sport === 'baseball' ? (L.sport === 'baseball' ? String(p) : perName(L, p)) : periods.filter((x) => x > reg).length > 1 ? `OT${p - reg}` : 'OT');
@@ -2058,9 +2073,15 @@ function PlayByPlay({ pbp, game, L }) {
       <div className="sechead"><H2>Play-by-Play</H2><button className="link" aria-expanded={show} onClick={() => setShow(!show)}>{show ? 'Hide' : `Show ${pbp.length} plays`}</button></div>
       {show ? (
         <>
+          {kinds.length ? <div className="chips" role="group" aria-label="Plays to show" style={{ marginTop: 8 }}>
+            {[['all', 'All'], ...kinds].map(([k, t]) => <button key={k} className="chipb" aria-pressed={kind === k} onClick={() => setKind(k)}>{t}</button>)}
+          </div> : null}
           {periods.length > 1 ? <div className="chips" role="group" aria-label="Period" style={{ marginTop: 8 }}>{periods.map((p) => <button key={p} className="chipb" aria-pressed={cur === p} onClick={() => setPer(p)}>{label(p)}</button>)}</div> : null}
+          {kinds.length ? <div className="chips" role="group" aria-label="Teams" style={{ marginTop: 8 }}>
+            {[game.away, game.home].map((t) => <button key={t.id} className="chipb tchip" aria-pressed={teamOn.has(t.id)} onClick={() => flipTeam(t.id)}><Blob team={t} size={18} /> {t.abbr}</button>)}
+          </div> : null}
           <div className="card feed">
-            {rows.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />)}
+            {rows.length ? rows.map((p, i) => <FeedRow key={p.id || i} p={p} game={game} L={L} />) : <p className="stamp" style={{ padding: '16px' }}>Nothing that matches in this {L.sport === 'hockey' ? 'period' : 'stretch'}.</p>}
           </div>
         </>
       ) : null}
