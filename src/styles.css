@@ -714,3 +714,9 @@ button.pick.date { cursor: pointer; }
 .pbox .who { white-space: normal; text-overflow: clip; overflow-wrap: normal; word-break: normal; line-height: 1.2; } /* full names wrap to a second line, never cut off */
 .pbox .who .nowrap { white-space: nowrap; }
 .pbox .who .bpos { display: inline-block; text-decoration: none; }
+
+/* No "…" anywhere: text that runs long wraps to another line instead of getting cut off. */
+.subtitle { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.1; overflow-wrap: anywhere; }
+.grow .nm, .grow .nm .nmt, .srow .nm, .lrow .nm, .shead .nm, .lead .nm, .vslead .who, .srow .cupnm .cn, .setrow .nm { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }
+.tick .st, .grow .gtv, .titem .ttv { overflow: visible; text-overflow: clip; max-width: none; }
+.pick.masked .shown { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.1; }
