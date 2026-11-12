@@ -1661,7 +1661,7 @@ function LiveCourt({ pbp, game, L, lg, onAll }) {
   // At a break (halftime, end of a period) nobody has the ball: no arrows, no possession glow, and the banner names the break.
   const atBreak = /halftime|^end of|intermission/i.test(String(game.statusText || ''));
   const possT = atBreak ? null : poss === 'away' ? game.away : poss === 'home' ? game.home : null;
-  const lt = last ? place(last.xy, side(last.teamId)) : null;
+  const lt = last && !atBreak ? place(last.xy, side(last.teamId)) : null;
   const head = now ? playHead(now, L) : '';
   // A 10-0 run (or better) gets called out while it lasts.
   const run = scoringRun(plays);
