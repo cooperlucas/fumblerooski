@@ -628,6 +628,12 @@ export async function getStandings(lg, div, season) {
         if (n <= PO.per) { placed.set(d, n); r.tag = { text: d[0].toUpperCase() + (PO.per > 1 ? n : ''), kind: 'div', title: PO.per > 1 ? `${n === 1 ? '1st' : n === 2 ? '2nd' : '3rd'} in the ${d}` : `Leads the ${d}` }; }
         else if (wc < PO.wc) { wc++; r.tag = { text: 'WC', kind: 'wc', title: 'Wild card spot' }; }
       }
+      // NFL: list the conference by record (a 3-5 division leader sits where 3-5 belongs); the tags still show the seeds.
+      // Ties keep seed order, which already has the tiebreakers in it.
+      if (lg === 'nfl') {
+        const pct = (rec) => { const [w = 0, l = 0, t = 0] = String(rec || '').split('-').map(Number); const n = w + l + t; return n ? (w + t / 2) / n : 0; };
+        g.rows.sort((x, y) => pct(y.overall) - pct(x.overall) || x.seed - y.seed);
+      }
     }
   }
   const views = divisions.length > groups.length
