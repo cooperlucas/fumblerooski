@@ -765,7 +765,7 @@ function TeamPage({ lg, id, season }) {
         <span className="res">{fin ? (<><b style={{ background: w ? 'var(--win-bg)' : 'var(--rule)', color: w ? 'var(--lime)' : 'var(--soft)' }}>{tie ? 'T' : w ? 'W' : 'L'}</b>{me.score}-{them.score}</>)
           : g.state === 'live' ? <span className="livesc"><b>{me.score !== '' && me.score != null ? `${me.score}-${them.score}` : 'LIVE'}</b><small>{g.statusText || 'Live'}</small></span>
             : g.state === 'off' ? <span style={{ color: 'var(--mute)' }}>{g.statusText || 'Postponed'}</span>
-              : <span style={{ color: 'var(--teal)' }}>{g.tbd ? 'TBD' : fmtTime(g.date)}</span>}</span>
+              : <span className="uptime"><span style={{ color: 'var(--teal)' }}>{g.tbd ? 'TBD' : fmtTime(g.date)}</span>{(() => { const n = g.tv?.national?.[0] || g.tv?.home?.[0] || g.tv?.away?.[0]; return n ? <small className="uptv">{shortTv(n)}</small> : null; })()}</span>}</span>
       </button>
     );
   };

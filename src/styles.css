@@ -709,3 +709,5 @@ button.pick.date { cursor: pointer; }
 @media (hover: hover) { .leadnote .scrubhint { display: none; } }
 .field .lfwait { animation: lfwait 0.3s var(--wait, 1.4s) both; }
 @keyframes lfwait { from { opacity: 0; } to { opacity: 1; } }
+.lrow .uptime { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.lrow .uptv { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--mute); white-space: nowrap; }
