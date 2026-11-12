@@ -2019,6 +2019,22 @@ export function gameFromSummary(lg, id, data) {
   if (!comp) throw new FeedError('That game is not in the feed.', 404);
   const game = normEvent({ id: data.header.id || id, date: comp.date, competitions: [comp] }, lg);
   game.season = Number(data.header?.season?.year) || null; // the season this game belongs to, for links to that season's team pages
+  // The feed's header (status and score) sometimes sticks, say on "Halftime", while its play-by-play keeps going.
+  // When the newest play is past the header (a later period, or more points), the plays win.
+  if (game.state === 'live' && Array.isArray(data.plays) && data.plays.length) {
+    const lp = data.plays[data.plays.length - 1];
+    const per = Number(lp.period?.number) || 0, la = Number(lp.awayScore), lh = Number(lp.homeScore);
+    const ga = Number(game.away.score) || 0, gh = Number(game.home.score) || 0;
+    const later = per > (Number(game.period) || 0) && !/^end/i.test(String(lp.type?.text || ''));
+    if (Number.isFinite(la) && Number.isFinite(lh) && (later || la + lh > ga + gh)) {
+      game.away.score = String(Math.max(la, ga)); game.home.score = String(Math.max(lh, gh));
+      if (later || /halftime|^end of|intermission/i.test(game.statusText || '')) {
+        const nth = (n) => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) || n % 10 > 3 ? 0 : n % 10]}`;
+        game.period = per;
+        game.statusText = halves(lg, `${lp.clock?.displayValue || ''} - ${nth(per)}`);
+      }
+    }
+  }
   const started = game.state === 'live' || game.state === 'final';
   const plays = (data.scoringPlays || []).map((p) => ({
     text: cleanText(p.text),
