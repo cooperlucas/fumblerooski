@@ -478,3 +478,18 @@ test('college kick text gives yards', async () => {
   assert.equal(fieldMoment({ type: 'Kickoff', text: 'Brock Travelstead kickoff for 65 yds for a touchback' }).yards, 65);
   assert.equal(fieldMoment({ type: 'Punt', text: 'J.Araiza punts 45 yards to KC 20' }).yards, 45);
 });
+
+test('hockey ice chart: hits, blocks, takeaways, giveaways and penalties turn with their period', async () => {
+  const { normIceEvents } = await import('../src/data/espn.js');
+  const play = (team, type, x, y, period, extra = {}) => ({ team: { id: team }, type: { text: type, ...extra }, coordinate: { x, y }, period: { number: period } });
+  const ev = normIceEvents([
+    play('A', 'Shot', -70, 10, 1), play('H', 'Shot', 75, 0, 1), // period 1 is backwards: away shooting left
+    play('A', 'Hit', -40, 30, 1), play('H', 'Blocked', 60, 5, 1), play('A', 'Hooking', 10, -20, 1, { penaltyMinutes: '2', penaltyType: 'Minor' }),
+    play('A', 'Takeaway', 50, 0, 2), play('H', 'Giveaway', -20, 3, 2), play('H', 'Face Off', 0, 0, 2), // no shots in period 2: it swaps from period 1
+  ], 'A', 'H');
+  assert.deepEqual(ev.map((e) => e.kind), ['hit', 'block', 'pen', 'take', 'give']);
+  assert.equal(ev[0].x, 40); // turned
+  assert.equal(ev[1].x, -60);
+  assert.equal(ev[2].mins, 2);
+  assert.equal(ev[3].x, 50); // period 2 left alone
+});

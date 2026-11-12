@@ -1768,6 +1768,39 @@ export function normIce(rawPlays, awayId, homeId) {
   return ev;
 }
 
+// Everything else with a spot on the ice: hits, blocks, takeaways, giveaways and penalties, credited to the team that made
+// the play (a block goes to the blocker's team, a penalty to the team that took it). Teams swap ends every period, so each
+// period gets one turn, read from that period's shots (away shoots right), and every play in it turns with it.
+export const ICE_EVENTS = ['hit', 'block', 'take', 'give', 'pen'];
+export function normIceEvents(rawPlays, awayId, homeId) {
+  const A = String(awayId), Hm = String(homeId);
+  const kindOf = (p) => {
+    const t = `${p.type?.text || ''}`.toLowerCase();
+    if (p.type?.penaltyMinutes != null || p.type?.penaltyType || /penalty/.test(t)) return 'pen';
+    if (/^hit/.test(t)) return 'hit';
+    if (/block/.test(t)) return 'block';
+    if (/takeaway/.test(t)) return 'take';
+    if (/giveaway/.test(t)) return 'give';
+    return null;
+  };
+  const shotOf = (p) => { const t = `${p.type?.text || ''}`.toLowerCase(); return p.scoringPlay === true || /^goal\b|shot|save|miss/.test(t) ? !/block/.test(t) : false; };
+  let all = (rawPlays || []).filter((p) => p.coordinate).map((p) => ({
+    kind: kindOf(p), shot: kindOf(p) ? false : shotOf(p), teamId: String(p.team?.id ?? ''),
+    x: Number(p.coordinate?.x), y: Number(p.coordinate?.y), period: p.period?.number || 0,
+    text: cleanText(p.text || ''), mins: Number(p.type?.penaltyMinutes) || null,
+  })).filter((e) => (e.kind || e.shot) && (e.teamId === A || e.teamId === Hm) && Number.isFinite(e.x) && Number.isFinite(e.y));
+  if (!all.some((e) => e.kind)) return [];
+  // Some feeds count from a corner (0..200, 0..85) instead of from center ice.
+  if (!all.some((e) => e.x < 0) && all.some((e) => e.x > 100)) all = all.map((e) => ({ ...e, x: e.x - 100, y: e.y - 42.5 }));
+  // Which periods to turn: away shots should sit right of center, home shots left.
+  const lean = new Map();
+  all.filter((e) => e.shot).forEach((e) => lean.set(e.period, (lean.get(e.period) || 0) + (e.teamId === A ? e.x : -e.x)));
+  const flip = new Map([...lean].map(([p, v]) => [p, v < 0]));
+  const turn = (p) => (flip.has(p) ? flip.get(p) : flip.has(p - 1) ? !flip.get(p - 1) : flip.has(p + 1) ? !flip.get(p + 1) : false); // ends swap each period
+  return all.filter((e) => e.kind && Math.abs(e.x) <= 101 && Math.abs(e.y) <= 44)
+    .map(({ shot, ...e }) => (turn(e.period) ? { ...e, x: -e.x, y: -e.y } : e));
+}
+
 /* ---------- play-by-play (everything that is not football, which reads by drive) ---------- */
 export function normPlays(rawPlays) {
   let pa = 0, ph = 0;
@@ -1945,6 +1978,7 @@ export function gameFromSummary(lg, id, data) {
     drives: L.sport === 'football' ? normDrives(data.drives, game.away.id, game.home.id, game.state === 'live', { lg, season: game.season }) : [],
     shots: L.sport === 'basketball' ? normShots(data.plays) : [],
     ice: L.sport === 'hockey' ? normIce(data.plays, game.away.id, game.home.id) : [],
+    iceEvents: L.sport === 'hockey' ? normIceEvents(data.plays, game.away.id, game.home.id) : [],
     rink: L.sport === 'hockey' && game.state === 'live' ? rinkState(data, game.away.id, game.home.id) : null,
     pitch: L.sport === 'soccer' ? normPitch(data, game) : [],
     pbp: L.sport === 'football' ? [] : normPlays(Array.isArray(data.plays) && data.plays.length ? data.plays : data.keyEvents),
