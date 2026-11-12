@@ -1129,8 +1129,7 @@ function BreakClock({ lg, game, lastWall }) {
     <section className="sec">
       <div className="card breakclock" role="timer" aria-live="off">
         <span className="bk-cap">{b.name}</span>
-        {left > 0 ? <b className="bk-t num">{mm}:{ss}</b> : <b className="bk-t soon">Starting soon</b>}
-        <span className="bk-sub">{left > 0 ? `until the ${b.next.toLowerCase()}, give or take` : `${b.next === 'Play' ? 'Play' : 'The ' + b.next} should be right around the corner`}</span>
+        <span className="bk-sub">{left > 0 ? <>{b.next} in <b className="bk-t num">{mm}:{ss}</b></> : `${b.next} starting soon`}</span>
       </div>
     </section>
   );
