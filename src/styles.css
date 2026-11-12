@@ -688,3 +688,5 @@ button.pick.date { cursor: pointer; }
 .ms-clk.live { color: var(--pink); }
 .ms-sit { font-size: 10px; font-weight: 800; color: var(--mute); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .subswap .subtitle, .subswap .subMini { transition: none; } }
+.leadstats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--mute); }
+.leadstats b { color: var(--ink); font-weight: 900; }
