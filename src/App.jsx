@@ -1441,7 +1441,7 @@ function LiveField({ drives, game, onAll }) {
             <div className="lflast" key={lastKey}>
               <span className="hd"><b style={last.scoring ? { color: 'var(--yellow)' } : undefined}>{fbHead(last)}</b><small>Last play{last.clock ? ` · ${last.period ? 'Q' + last.period : ''} ${last.clock}` : ''}</small></span>
               <span className="tx">{last.text}</span>
-              {going && last.next ? <span className="nx">{last.next}</span> : null}
+              {last.down ? <span className="nx">{last.down}</span> : null /* the down it was run on; what's next is in the box above */}
             </div>
           ) : null}
         </div>
