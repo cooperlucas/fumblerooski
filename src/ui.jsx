@@ -217,6 +217,34 @@ export function Stamp({ at, live }) {
 
 /* ---------- chrome ---------- */
 const SearchIcon = () => (<svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.6" /><path d="M15.5 15.5 L21 21" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>);
+// Home header buttons: chunky sticker icons in the app's throwback colors.
+const RooSearch = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M15.2 15.2 L20.6 20.6" stroke="#0C1124" strokeWidth="4.6" strokeLinecap="round" />
+    <path d="M15.6 15.6 L20.2 20.2" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="10" cy="10" r="6.6" fill="#F4FAFF" stroke="#0C1124" strokeWidth="2.6" />
+    <path d="M6.9 9.2 A3.4 3.4 0 0 1 9.4 6.6" fill="none" stroke="#22D3D6" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+function gearPath(cx, cy, R, r, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i * 2 * Math.PI) / n, w = Math.PI / n;
+    [[a - w * 0.95, r], [a - w * 0.5, R], [a + w * 0.5, R], [a + w * 0.95, r]].forEach(([t, rad]) => pts.push(`${(cx + rad * Math.cos(t)).toFixed(2)},${(cy + rad * Math.sin(t)).toFixed(2)}`));
+  }
+  return `M${pts.join(' L')} Z`;
+}
+const GEAR = gearPath(12, 12, 10.4, 7.8, 8);
+const RooGear = () => (
+  <svg className="gearsvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+    <path d={GEAR} fill="#0C1124" strokeLinejoin="round" />
+    {/* a little football for the hub */}
+    <g transform="rotate(-35 12 12)">
+      <ellipse cx="12" cy="12" rx="5.3" ry="3.3" fill="#A0522D" stroke="#F4FAFF" strokeWidth="1" />
+      <path d="M9.6 12 H14.4 M10.7 10.9 V13.1 M12 10.9 V13.1 M13.3 10.9 V13.1" stroke="#F4FAFF" strokeWidth="0.85" strokeLinecap="round" />
+    </g>
+  </svg>
+);
 
 export function Mascot() {
   return (
@@ -245,12 +273,6 @@ export function Mascot() {
   );
 }
 
-const GearIcon = () => (
-  <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.7c.1.6.1 1.3 0 1.9l2 1.7-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.7c-.1-.6-.1-1.3 0-1.9l-2-1.7 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" transform="translate(0 1.4)" />
-    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2.2" />
-  </svg>
-);
 // Text that shrinks to the room it has, measured on the real font (the wide Archivo can take a beat to load).
 function useFit(base, floor, slack = 0) {
   const ref = useRef(null);
@@ -289,8 +311,8 @@ export function RootHeader() {
           <FitTagline />
         </div>
         <div className="headbtns">
-          <button className="round" aria-label="Search" onClick={() => go('search')}><SearchIcon /></button>
-          <button className="round" aria-label="Settings" onClick={() => go('settings')}><GearIcon /></button>
+          <button className="roobtn srch" aria-label="Search" onClick={() => go('search')}><RooSearch /></button>
+          <button className="roobtn gear" aria-label="Settings" onClick={() => go('settings')}><RooGear /></button>
         </div>
       </header>
       <div className="stripes" aria-hidden="true" />
