@@ -1383,7 +1383,9 @@ const titleOf = (g, sport) => {
   if (!t && /^batting$/i.test(g.type || '')) return 'Hitting';
   if (!t && /^pitching$/i.test(g.type || '')) return 'Pitching';
   if (!t) return sport === 'basketball' ? 'Players' : 'Stats';
-  return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/([a-z])([A-Z])/g, '$1 $2');
+  // Short enough for the table's name column: "Kick Returns" reads "Kick Ret".
+  return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^(Kick|Punt) Returns?$/i, '$1 Ret').replace(/^Interceptions$/i, 'INTs');
 };
 // plusMinus: optional { athleteId: number } worked out from the play-by-play, used when the feed has no +/- column.
 export function playerBox(box, awayId, homeId, sport, plusMinus, ff) {
