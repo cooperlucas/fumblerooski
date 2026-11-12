@@ -3,7 +3,7 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, DIVISIONS, FULL_DIVISIONS, getTeam, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
-import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob } from './ui.jsx';
+import { go, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
@@ -92,7 +92,7 @@ function Ticker() {
             <span className={fin && a < h ? 'dim' : undefined}>{g.away.abbr}{g.poss && g.poss === String(g.away.id) ? <Ball red={g.redZone} /> : null}{pre ? '' : <b> {g.away.score}</b>}</span>
             <span className="at">{pre ? 'at' : ''}</span>
             <span className={fin && h < a ? 'dim' : undefined}>{g.home.abbr}{g.poss && g.poss === String(g.home.id) ? <Ball red={g.redZone} /> : null}{pre ? '' : <b> {g.home.score}</b>}</span>
-            <span className="tstk"><span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{statusLabel(g).toUpperCase()}</span>
+            <span className="tstk"><span className="tst" style={{ color: g.state === 'live' ? 'var(--pink)' : g.state === 'pre' ? 'var(--teal)' : 'var(--mute)' }}>{shortStatus(statusLabel(g)).toUpperCase()}</span>
               {!fin && g.tv?.national?.length ? <span className="ttv">{shortTv(g.tv.national[0])}</span> : null}
             </span>
           </button>
@@ -2142,7 +2142,7 @@ function MiniScore({ g, L, onTap }) {
       {side(g.away, false)}
       <span className="ms-mid">
         {/* "4:20 - 4th" stacks into two short lines so three-digit scores have room on either side. */}
-        {(() => { const st = statusLabel(g), m = /^(.+?)\s+-\s+(.+)$/.exec(st); return m ? <span className={'ms-clk two' + (live ? ' live' : '')}><span>{m[1]}</span><span>{m[2]}</span></span> : <span className={'ms-clk' + (live ? ' live' : '')}>{st}</span>; })()}
+        {(() => { const st = shortStatus(statusLabel(g)), m = /^(.+?)\s+-\s+(.+)$/.exec(st); return m ? <span className={'ms-clk two' + (live ? ' live' : '')}><span>{m[1]}</span><span>{m[2]}</span></span> : <span className={'ms-clk' + (live ? ' live' : '')}>{st}</span>; })()}
         {g.down ? <span className="ms-sit">{g.down} · {g.spot}</span> : null}
       </span>
       {side(g.home, true)}

@@ -54,6 +54,8 @@ export function useRoute() {
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 export const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
 export const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' }); };
+// Tight spots (score rows, ticker, sticky bar) say "1st Int" for "1st Intermission".
+export const shortStatus = (t) => String(t || '').replace(/\bIntermission\b/i, 'Int');
 export function statusLabel(g) {
   if (g.state === 'live') return g.statusText || 'Live';
   if (g.state === 'final') return g.statusText || 'Final';
@@ -173,7 +175,7 @@ export function GameRow({ g, showLg = true }) {
       <span className="sc">{pre ? '' : t.score}</span>
     </span>
   );
-  const label = statusLabel(g);
+  const label = shortStatus(statusLabel(g));
   return (
     <button className="grow" onClick={() => go(`game/${g.lg}/${g.id}`)}
       aria-label={`${g.away.name} ${pre ? 'at' : g.away.score + ','} ${g.home.name}${pre ? '' : ' ' + g.home.score}, ${label}`}>
