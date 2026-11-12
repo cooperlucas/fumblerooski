@@ -1043,7 +1043,8 @@ function LeadChart({ chart, game, L }) {
   // Share of the game so far each team spent ahead (ties count for nobody).
   let upA = 0, upH = 0; pts.slice(0, -1).forEach((p, i) => { const dt = pts[i + 1].t - p.t; if (p.m > 0) upA += dt; else if (p.m < 0) upH += dt; });
   const span = Math.max(1e-9, end.t - (pts[0]?.t || 0));
-  const lead = upA >= upH ? [game.away, upA] : [game.home, upH];
+  // The note follows whoever leads right now; when it's tied, whoever has led longer.
+  const lead = end.m > 0 ? [game.away, upA] : end.m < 0 ? [game.home, upH] : upA >= upH ? [game.away, upA] : [game.home, upH];
   const share = Math.round((lead[1] / span) * 100);
   const gl = [top, -top].concat(top / step >= 2 ? [step * Math.floor(top / step / 2), -step * Math.floor(top / step / 2)] : []);
   const stat = (t, c, n) => <span className="ls"><i style={{ background: c }} />{t.abbr} <b>{n ? `+${n}` : '—'}</b></span>;
