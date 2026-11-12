@@ -1255,12 +1255,12 @@ const DEEP = {
     penaltyMinutes: ['penalties', 'penaltyMinutes'], wins: ['general', 'wins'], shutouts: ['defensive', 'shutouts'],
   },
 };
-// Average boards with our own minimum, so a rank on a player's tile can be checked against a list.
+// Average boards with the NFL's minimum (per TEAM game: 6.25 carries, 1.875 catches), so a tile's rank can be checked.
 // The feed's own average lists let in players with a handful of tries, and its ranks don't match any cutoff.
 export const QUALIFIED = {
   football: {
-    yardsPerRushAttempt: { group: 'rushing', cat: 'offense:rushing', vol: 'rushingAttempts', num: 'rushingYards', per: 10, title: 'Yards Per Carry', min: 'MIN 10 CAR/G' },
-    yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', num: 'receivingYards', per: 3, title: 'Yards Per Catch', min: 'MIN 3 REC/G' },
+    yardsPerRushAttempt: { group: 'rushing', cat: 'offense:rushing', vol: 'rushingAttempts', num: 'rushingYards', per: 6.25, title: 'Yards Per Carry', min: 'MIN 6.25 CAR/G' },
+    yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', num: 'receivingYards', per: 1.875, title: 'Yards Per Catch', min: 'MIN 1.875 REC/G' },
   },
 };
 export const qualifiedRule = (lg, key) => QUALIFIED[LEAGUE[lg]?.sport]?.[key] || null;
@@ -1270,10 +1270,14 @@ async function qualifiedBoard(lg, q) {
   const names = (g) => (d.categories || []).find((c) => c.name === g)?.names || [];
   const num = (v) => Number(String(v ?? '').replace(/,/g, ''));
   const at = (x, g, n) => num((x.categories || []).find((c) => c.name === g)?.totals?.[names(g).indexOf(n)]);
-  return (d.athletes || []).map((x) => {
+  const list = (d.athletes || []).map((x) => {
     const a = x.athlete || {}, vol = at(x, q.group, q.vol), tot = at(x, q.group, q.num), gp = at(x, 'general', 'gamesPlayed');
     return { a, vol, gp, avg: vol ? tot / vol : 0 };
-  }).filter((r) => r.gp > 0 && r.vol >= q.per * r.gp && r.a.displayName)
+  });
+  // A team's games: the most any of its players on the list has played.
+  const teamGames = new Map();
+  list.forEach((r) => { const t = String(r.a.teamId ?? ''); if (t && r.gp > (teamGames.get(t) || 0)) teamGames.set(t, r.gp); });
+  return list.filter((r) => { const tg = teamGames.get(String(r.a.teamId ?? '')) || r.gp; return tg > 0 && r.vol >= q.per * tg && r.a.displayName; })
     .sort((x, y) => y.avg - x.avg)
     .map((r) => ({
       value: r.avg.toFixed(1),
