@@ -622,6 +622,7 @@ function useGameFilter(lg) {
 // A player's headline stat → the leader board it ranks on (the names differ for some hoops stats).
 const BOARD_ALIAS = { avgPoints: 'pointsPerGame', avgRebounds: 'reboundsPerGame', avgAssists: 'assistsPerGame', fieldGoalPct: 'fieldGoalPercentage' };
 function boardFor(key, items, cats, lg) {
+  if (qualifiedRule(lg, key)) return key;
   const k = BOARD_ALIAS[key] || key;
   if (EXTRA_BOARDS[k] && canGoDeep(lg, k)) return k;
   // A quarterback's INT is picks thrown; the INT board is picks made.
@@ -633,7 +634,7 @@ function LeaderPage({ lg, cat, focus }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   if (q.loading && !q.data) return <Loading rows={8} />;
   if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
-  const c = q.data.cats.find((x) => x.key === cat) || (EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: qualifiedRule(lg, cat)?.min || '', rows: [] } : null);
+  const c = q.data.cats.find((x) => x.key === cat) || (qualifiedRule(lg, cat) ? { key: cat, title: qualifiedRule(lg, cat).title, abbr: qualifiedRule(lg, cat).min, rows: [] } : EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
   if (!c) return <Empty>No {LEAGUE[lg].short} leader board for that stat right now.</Empty>;
   return (
     <>
@@ -975,13 +976,14 @@ function PlayerPage({ lg, id }) {
   const lq = useQuery(d?.summary?.items?.some((x) => x.rank) ? `leaders:${lg}` : null, () => getLeaders(lg), () => 600000);
   const leaderCats = lq.data?.cats || [];
   // Averages rank on our own qualified board (ESPN's average ranks don't match any minimum). Not qualified: no rank.
-  const qKey = d?.summary?.items?.find((x) => qualifiedRule(lg, x.key))?.key || null;
-  const qb = useQuery(qKey ? `deep:${lg}:${qKey}` : null, () => getDeepLeader(lg, qKey), () => 600000);
+  const qKeys = (d?.summary?.items || []).map((x) => x.key).filter((k) => qualifiedRule(lg, k));
+  const qb = useQuery(qKeys.length ? `qual:${lg}:${qKeys.join(',')}` : null, async () => Object.fromEntries(await Promise.all(qKeys.map(async (k) => [k, await getDeepLeader(lg, k)]))), () => 600000);
   const qRank = (key) => {
-    if (key !== qKey || !qb.data) return null;
-    const i = qb.data.findIndex((r) => r.player?.id === String(id));
+    const board = qb.data?.[key];
+    if (!board) return null;
+    const i = board.findIndex((r) => r.player?.id === String(id));
     if (i < 0) return null;
-    const pl = places(qb.data.map((r) => r.value))[i];
+    const pl = places(board.map((r) => r.value))[i];
     return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
   };
   const color = p?.team?.color || '#2B3352';

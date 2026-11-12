@@ -1259,37 +1259,60 @@ const DEEP = {
 // The feed's own average lists let in players with a handful of tries, and its ranks don't match any cutoff.
 export const QUALIFIED = {
   football: {
-    yardsPerRushAttempt: { group: 'rushing', cat: 'offense:rushing', vol: 'rushingAttempts', num: 'rushingYards', per: 6.25, title: 'Yards Per Carry', min: 'MIN 6.25 CAR/G' },
-    yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', num: 'receivingYards', per: 1.875, title: 'Yards Per Catch', min: 'MIN 1.875 REC/G' },
+    yardsPerRushAttempt: { group: 'rushing', cat: 'offense:rushing', vol: 'rushingAttempts', per: 6.25, title: 'Yards Per Carry', min: 'MIN 6.25 CAR/G' },
+    yardsPerReception: { group: 'receiving', cat: 'offense:receiving', vol: 'receptions', per: 1.875, title: 'Yards Per Catch', min: 'MIN 1.875 REC/G' },
+    completionPct: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Completion %', min: 'MIN 14 ATT/G' },
+    yardsPerPassAttempt: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Yards Per Pass', min: 'MIN 14 ATT/G' },
+    fieldGoalPct: { group: 'kicking', cat: 'specialTeams:kicking', vol: 'fieldGoalAttempts', per: 1, title: 'Field Goal %', min: 'MIN 1 FGA/G' },
+    grossAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Punting Average', min: 'MIN 2.5 PUNTS/G' },
+    netAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Net Punting Average', min: 'MIN 2.5 PUNTS/G' },
+    yardsPerKickReturn: { group: 'returning', cat: 'specialTeams:returning', vol: 'kickReturns', per: 1.25, title: 'Kick Return Average', min: 'MIN 1.25 RET/G' },
+    yardsPerPuntReturn: { group: 'returning', cat: 'specialTeams:returning', vol: 'puntReturns', per: 1.25, title: 'Punt Return Average', min: 'MIN 1.25 RET/G' },
   },
 };
 export const qualifiedRule = (lg, key) => QUALIFIED[LEAGUE[lg]?.sport]?.[key] || null;
-async function qualifiedBoard(lg, q) {
-  // Everyone with real volume, then keep those over the minimum and sort by the average.
-  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat }));
+const nOf = (v) => Number(String(v ?? '').replace(/,/g, ''));
+function byAthleteRows(d) {
   const names = (g) => (d.categories || []).find((c) => c.name === g)?.names || [];
-  const num = (v) => Number(String(v ?? '').replace(/,/g, ''));
-  const at = (x, g, n) => num((x.categories || []).find((c) => c.name === g)?.totals?.[names(g).indexOf(n)]);
-  const list = (d.athletes || []).map((x) => {
-    const a = x.athlete || {}, vol = at(x, q.group, q.vol), tot = at(x, q.group, q.num), gp = at(x, 'general', 'gamesPlayed');
-    return { a, vol, gp, avg: vol ? tot / vol : 0 };
-  });
-  // A team's games: the most any of its players on the list has played.
-  const teamGames = new Map();
-  list.forEach((r) => { const t = String(r.a.teamId ?? ''); if (t && r.gp > (teamGames.get(t) || 0)) teamGames.set(t, r.gp); });
-  return list.filter((r) => { const tg = teamGames.get(String(r.a.teamId ?? '')) || r.gp; return tg > 0 && r.vol >= q.per * tg && r.a.displayName; })
-    .sort((x, y) => y.avg - x.avg)
+  return (d.athletes || []).map((x) => ({ a: x.athlete || {}, at: (g, n) => nOf((x.categories || []).find((c) => c.name === g)?.totals?.[names(g).indexOf(n)]), raw: (g, n) => (x.categories || []).find((c) => c.name === g)?.totals?.[names(g).indexOf(n)] }));
+}
+// A team's games: the most any of its players has played. Read off the busiest rushers and passers (every team's
+// QB and backs), so a kicker or returner who sat out some games still counts against all of his team's games.
+const teamGamesP = new Map();
+function teamGames(lg) {
+  if (!teamGamesP.has(lg)) {
+    const lim = LEAGUE[lg].college ? '400' : '200';
+    teamGamesP.set(lg, Promise.allSettled([
+      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'rushing.rushingAttempts:desc', limit: lim, category: 'offense:rushing' })),
+      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'passing.passingAttempts:desc', limit: lim, category: 'offense:passing' })),
+    ]).then((rs) => {
+      const m = new Map();
+      rs.filter((r) => r.status === 'fulfilled').forEach((r) => byAthleteRows(r.value).forEach((x) => { const t = String(x.a.teamId ?? ''), gp = x.at('general', 'gamesPlayed'); if (t && gp > (m.get(t) || 0)) m.set(t, gp); }));
+      return m;
+    }).catch(() => { teamGamesP.delete(lg); return new Map(); }));
+  }
+  return teamGamesP.get(lg);
+}
+async function qualifiedBoard(lg, key, q) {
+  // Everyone with real volume, then keep those over the minimum and sort by the stat.
+  const [d, tgs] = await Promise.all([
+    get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat })),
+    teamGames(lg),
+  ]);
+  return byAthleteRows(d).map((x) => ({ a: x.a, vol: x.at(q.group, q.vol), gp: x.at('general', 'gamesPlayed'), v: x.at(q.group, key), shown: String(x.raw(q.group, key) ?? '') }))
+    .filter((r) => { const tg = Math.max(tgs.get(String(r.a.teamId ?? '')) || 0, r.gp || 0); return tg > 0 && r.vol >= q.per * tg && Number.isFinite(r.v) && r.a.displayName; })
+    .sort((x, y) => y.v - x.v)
     .map((r) => ({
-      value: r.avg.toFixed(1),
+      value: r.shown || String(r.v),
       player: { id: String(r.a.id ?? ''), name: cleanText(r.a.displayName || ''), pos: r.a.position?.abbreviation || '' },
       team: r.a.teamId ? normTeam({ id: r.a.teamId, abbreviation: r.a.teamShortName, displayName: r.a.teamName, shortDisplayName: r.a.teamShortName }, lg) : null,
     }));
 }
-export const EXTRA_BOARDS = { yardsPerRushAttempt: 'Yards Per Carry', yardsPerReception: 'Yards Per Catch', rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
+export const EXTRA_BOARDS = { rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
 export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key] || !!qualifiedRule(lg, key);
 export async function getDeepLeader(lg, key) {
   const q = qualifiedRule(lg, key);
-  if (q) return qualifiedBoard(lg, q);
+  if (q) return qualifiedBoard(lg, key, q);
   const m = DEEP[LEAGUE[lg]?.sport]?.[key];
   if (!m) return null;
   const [group, stat, cat] = m;
