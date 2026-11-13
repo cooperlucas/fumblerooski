@@ -31,7 +31,7 @@ export default function App() {
   }, []);
   const [, repaint] = useState(0);
   useEffect(() => onColors(() => repaint((n) => n + 1)), []);
-  const [name = '', a, b, c] = parts;
+  const [name = '', a, b, c, e4] = parts;
   const root = ROOTS.has(name);
   let title = '', body, tab = name;
   if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
@@ -39,7 +39,7 @@ export default function App() {
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
-  else if (name === 'leaders' && LEAGUE[a] && b) { tab = 'stats'; body = <LeaderPage key={a + b + (c || '')} lg={a} cat={b} focus={c} />; }
+  else if (name === 'leaders' && LEAGUE[a] && b) { tab = 'stats'; body = <LeaderPage key={a + b + (c || '') + (e4 || '')} lg={a} cat={b} focus={c} season={/^\d{4}$/.test(e4 || '') ? Number(e4) : null} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
@@ -633,6 +633,13 @@ function qualKey(lg, key, items) {
   const k = LEAGUE[lg]?.sport === 'basketball' ? BOARD_ALIAS[key] || key : key;
   return qualifiedRule(lg, k) ? k : null;
 }
+// A tile's stat → the full list it ranks on in a past season (qualified boards, or the plain full lists).
+function pastBoard(lg, key, items) {
+  const q = qualKey(lg, key, items);
+  if (q) return q;
+  const k = BOARD_ALIAS[key] || key;
+  return canGoDeep(lg, k) ? k : null;
+}
 function boardFor(key, items, cats, lg) {
   if (qualKey(lg, key, items)) return qualKey(lg, key, items);
   const k = BOARD_ALIAS[key] || key;
@@ -642,30 +649,46 @@ function boardFor(key, items, cats, lg) {
   return cats.some((c) => c.key === k) ? k : null;
 }
 // One stat's full leader board, opened from a player's rank tile, with that player lit up and in view.
-function LeaderPage({ lg, cat, focus }) {
+function LeaderPage({ lg, cat, focus, season }) {
   const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
   if (q.loading && !q.data) return <Loading rows={8} />;
   if (q.error && !q.data) return <Problem error={q.error} retry={q.reload} />;
-  const feedCard = q.data.cats.find((x) => x.key === cat);
+  // A past season: that year's full list for the stat (the title from this season's board when there is one).
+  const now = q.data.cats.find((x) => x.key === cat);
+  const feedCard = season ? (now || qualifiedRule(lg, cat) || canGoDeep(lg, cat) ? { key: cat, title: now?.title || qualifiedRule(lg, cat)?.title || EXTRA_BOARDS[cat] || cat, abbr: qualifiedRule(lg, cat)?.min || now?.abbr || '', rows: [] } : null) : now;
   const c = (feedCard && qualifiedRule(lg, cat) ? { ...feedCard, abbr: qualifiedRule(lg, cat).min } : feedCard) || (qualifiedRule(lg, cat) ? { key: cat, title: qualifiedRule(lg, cat).title, abbr: qualifiedRule(lg, cat).min, rows: [] } : EXTRA_BOARDS[cat] && canGoDeep(lg, cat) ? { key: cat, title: EXTRA_BOARDS[cat], abbr: '', rows: [] } : null);
   if (!c) return <Empty>No {LEAGUE[lg].short} leader board for that stat right now.</Empty>;
   return (
     <>
-      <div className="sechead" style={{ marginTop: 4 }}><H2>{LEAGUE[lg].short} Leaders</H2></div>
-      <LeaderCard lg={lg} c={c} focus={focus} />
+      <div className="sechead" style={{ marginTop: 4 }}><H2>{season ? `${seasonLabel(lg, season)} ` : ''}{LEAGUE[lg].short} Leaders</H2></div>
+      <LeaderCard lg={lg} c={c} focus={focus} season={season} />
       <div style={{ textAlign: 'center', marginTop: 14 }}><button className="btn" onClick={() => go(`stats/${lg}`)}>All {LEAGUE[lg].short} leaders</button></div>
     </>
   );
 }
+// A season as people say it: football and baseball by year, winter sports by both years ("2018-19").
+export const seasonLabel = (lg, y) => (LEAGUE[lg].sport === 'football' || LEAGUE[lg].sport === 'baseball' || lg === 'mls' || lg === 'wnba' ? String(y) : `${y - 1}-${String(y).slice(2)}`);
+// How far back each league's full stat lists hold up (checked live); soccer's leaders feed has no past seasons.
+const LEADER_FROM = { mlb: 2003, nba: 2003, nhl: 2003, nfl: 2003, cfb: 2004, ncaam: 2006, ncaaw: 2020, wnba: 2019 };
 function Leaders({ lg }) {
-  const q = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
+  const [yr, setYr] = useSticky('lyr:' + lg, null);
+  const base = useQuery(`leaders:${lg}`, () => getLeaders(lg), () => 600000);
+  const past = useQuery(yr ? `leaders:${lg}:${yr}` : null, () => getLeaders(lg, yr), () => 0);
+  const q = yr ? past : base;
   const filters = useLeaderFilters(lg);
   const [fid, setFid] = useSticky('filter:' + lg, 'all');
-  // Pro hoops: +/- has no feed board, so it is built separately and slots in after blocks once it lands.
-  const pmq = useQuery(hasLeaguePlusMinus(lg) ? `leaguepm:${lg}` : null, () => getLeaguePlusMinus(lg), () => 1800000);
-  if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
-  if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
-  if (!q.data.cats.length) return <Empty>No leaders listed for {LEAGUE[lg].name} right now.</Empty>;
+  // Pro hoops: +/- has no feed board, so it is built separately and slots in after blocks once it lands. This season only.
+  const pmq = useQuery(hasLeaguePlusMinus(lg) && !yr ? `leaguepm:${lg}` : null, () => getLeaguePlusMinus(lg), () => 1800000);
+  const cur = base.data?.current || null;
+  const from = LEADER_FROM[lg];
+  const yearPick = cur && from ? (
+    <Picker label="Season" value={String(yr || cur)} onChange={(v) => setYr(Number(v) === cur ? null : Number(v))}>
+      {Array.from({ length: Math.max(1, cur - from + 1) }, (_, i) => cur - i).map((y) => <option key={y} value={y}>{seasonLabel(lg, y)}</option>)}
+    </Picker>
+  ) : null;
+  if (q.loading && !q.data) return <div style={{ marginTop: 12 }}>{yearPick ? <div className="sechead">{yearPick}<span /></div> : null}<Loading rows={6} /></div>;
+  if (q.error && !q.data) return <div style={{ marginTop: 12 }}>{yearPick ? <div className="sechead">{yearPick}<span /></div> : null}<Problem error={q.error} retry={q.reload} /></div>;
+  if (!q.data.cats.length) return <>{yearPick ? <div className="sechead" style={{ marginTop: 12 }}>{yearPick}<span /></div> : null}<Empty>No leaders listed for {LEAGUE[lg].name} {yr ? `in ${seasonLabel(lg, yr)}` : 'right now'}.</Empty></>;
   const f = filters.find((x) => x.id === fid);
   const pickFilter = (v) => setFid(v);
   let cats = q.data.cats;
@@ -676,28 +699,30 @@ function Leaders({ lg }) {
   }
   return (
     <>
-      {filters.length ? (
+      {filters.length || yearPick ? (
         <div className="sechead" style={{ marginTop: 12 }}>
-          <span />
-          <Picker label="Filter leaders" value={fid} onChange={pickFilter}>
-            <option value="all">{lg === 'cfb' ? 'All FBS' : LEAGUE[lg].college ? 'All Division I' : `All ${LEAGUE[lg].short}`}</option>
-            {filters.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
-          </Picker>
+          {yearPick || <span />}
+          {filters.length ? (
+            <Picker label="Filter leaders" value={fid} onChange={pickFilter}>
+              <option value="all">{lg === 'cfb' ? 'All FBS' : LEAGUE[lg].college ? 'All Division I' : `All ${LEAGUE[lg].short}`}</option>
+              {filters.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+            </Picker>
+          ) : <span />}
         </div>
       ) : null}
-      {cats.map((c) => <LeaderCard key={c.key} lg={lg} c={c} f={f} />)}
+      {cats.map((c) => <LeaderCard key={c.key + (yr || '')} lg={lg} c={c} f={f} season={yr} />)}
       <Stamp at={q.updatedAt} />
     </>
   );
 }
 // One stat's leaders. Top 10 comes with the page; filtering or asking for more pulls that stat's full board.
-function LeaderCard({ lg, c, f, focus }) {
+function LeaderCard({ lg, c, f, focus, season }) {
   // Opened for one player: start on the full board (25 deep), then grow to reach them.
   const [n, setN] = useState(focus ? 25 : 5);
   useEffect(() => { if (!focus) setN(5); }, [f?.id]);
   const deepOk = canGoDeep(lg, c.key);
   const wantDeep = deepOk && (!!f || n > 5);
-  const deep = useQuery(wantDeep ? `deep:${lg}:${c.key}` : null, () => getDeepLeader(lg, c.key), () => 600000);
+  const deep = useQuery(wantDeep ? `deep:${lg}:${c.key}${season ? ':' + season : ''}` : null, () => getDeepLeader(lg, c.key, season), () => 600000);
   const base = wantDeep && deep.data?.length ? deep.data : c.rows;
   const list = f ? base.filter((r) => r.team && f.ids.has(r.team.id)) : base;
   const rows = list.slice(0, n);
@@ -787,7 +812,7 @@ function TeamPage({ lg, id, season }) {
   const q = useQuery(`team:${lg}:${id}${yr ? ':' + yr : ''}`, () => getTeam(lg, id, yr), () => 300000);
   const cur = q.data?.currentSeason || null;
   const isPast = !!yr && yr !== cur;
-  const yearLabel = (y) => (LEAGUE[lg].sport === 'football' || LEAGUE[lg].sport === 'baseball' || lg === 'mls' || lg === 'wnba' ? String(y) : `${y - 1}-${String(y).slice(2)}`);
+  const yearLabel = (y) => seasonLabel(lg, y);
   const favs = useFavs();
   const t = q.data?.team;
   const pinned = t && favs.some((f) => favKey(f) === favKey(t));
@@ -1026,6 +1051,23 @@ function PlayerPage({ lg, id }) {
     const did = c.row.stats.some((v, i) => !/^(gp|gs|g|rtg|qbr|rating)$/i.test(String(c.labels[i] || '').trim()) && Number(String(v).replace(/,/g, '')) !== 0 && /\d/.test(String(v)));
     return did || all.length === 1;
   });
+  // A past season's headline tiles: the same stats from that season's tables, ranked on that season's boards.
+  const pastTiles = picked ? (d?.summary?.items || []).map((x) => {
+    for (const c of season) { const i = (c.names || []).indexOf(x.key); if (i >= 0 && /\d/.test(String(c.row.stats[i] ?? ''))) return { ...x, value: c.row.stats[i], board: pastBoard(lg, x.key, d.summary.items) }; }
+    return null;
+  }).filter(Boolean) : [];
+  const pastKeys = [...new Set(pastTiles.map((t) => t.board).filter(Boolean))];
+  const pq = useQuery(pastKeys.length ? `pastranks:${lg}:${picked}:${pastKeys.join(',')}` : null,
+    async () => Object.fromEntries(await Promise.all(pastKeys.map(async (k) => { try { return [k, await getDeepLeader(lg, k, Number(picked))]; } catch { return [k, null]; } }))), () => 0);
+  const pastRank = (k) => {
+    const board = k && pq.data?.[k];
+    if (!board?.length) return null;
+    const i = board.findIndex((r) => r.player?.id === String(id));
+    if (i < 0) return !qualifiedRule(lg, k) && board.length >= 150 ? '150+' : null; // off the end of a counting list
+    const pl = places(board.map((r) => r.value))[i];
+    if (Number(pl.replace(/^T/, '')) > 150) return '150+';
+    return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
+  };
   const lgq = useQuery(picked ? `gamelog:${lg}:${id}:${picked}` : null, () => getGamelog(lg, id, picked), () => 600000);
   const log0 = picked ? (lgq.data || { labels: [], spans: [], seasons: [] }) : d?.gamelog;
   const pmOn = !picked && pm && Object.keys(pm.games).length && log0?.labels.length;
@@ -1076,6 +1118,14 @@ function PlayerPage({ lg, id }) {
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
                   return k ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className={'trank' + (txt.length >= 12 ? ' long' : '')}>{txt}</em>;
                 })() : null}</div>)}</div> : null}
+                {picked && pastTiles.length ? <div className="tiles">{pastTiles.map((x) => {
+                  const r = pastRank(x.board);
+                  const txt = r ? `${r} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : '';
+                  return (
+                    <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>
+                      {txt ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${x.board}/${id}/${picked}`)} aria-label={`${txt}: see the ${seasonLabel(lg, Number(picked))} ${x.label} leaders`}>{txt}</button> : null}
+                    </div>);
+                })}</div> : null}
                 {season.map((c) => (
                   <div className="card pad" key={c.key + c.title} style={{ marginTop: 12 }}>
                     <div className="ptitle">{c.row.season} {c.title}</div>

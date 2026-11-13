@@ -957,6 +957,7 @@ function normCareer(d) {
   return (d?.categories || []).map((c) => ({
     key: String(c.name || ''), title: shortTitle(c.displayName || c.name || ''),
     labels: (c.labels || []).map((l) => cleanText(l)),
+    names: (c.names || []).map((n) => String(n || '')), // the feed's stat keys, matching the headline tiles' keys
     rows: (c.statistics || []).map((x) => ({
       year: Number(x.season?.year) || 0,
       season: String(x.season?.displayName || x.season?.year || ''),
@@ -1238,6 +1239,10 @@ export async function getRankings(lg) {
 // Each leader category maps to [stat group, stat name, category the feed wants filled] (formats checked live). Percentages and goalie
 // rates are left out on purpose: that board does not apply minimums, so a 1-for-1 shooter would lead.
 const DEEP = {
+  hockey: {
+    goals: ['offensive', 'goals'], assists: ['offensive', 'assists'], points: ['offensive', 'points'], plusMinus: ['general', 'plusMinus'],
+    penaltyMinutes: ['penalties', 'penaltyMinutes'], shutouts: ['defensive', 'shutouts'],
+  },
   // Baseball: rate stats read the qualified list (the feed's default: 3.1 plate appearances or 1 inning per team game),
   // counting stats everyone (isqualified=false), so closers and part-timers count. [group, stat, category, 'asc' for lowest-first, all players]
   baseball: {
@@ -1320,14 +1325,17 @@ function d1Ids(lg) {
   }
   return d1P.get(lg);
 }
+// A past season for the full-list stat reads (regular season); nothing for the current one.
+const seasonQ = (season) => (season ? { season: String(season), seasontype: '2' } : {});
 // Every qualified hoops board from one read of the league's players (pros: everyone; college: the 2,000 busiest).
 const hoopsP = new Map();
-function hoopsBoards(lg) {
-  if (!hoopsP.has(lg)) {
+function hoopsBoards(lg, season) {
+  const mk = `${lg}:${season || ''}`;
+  if (!hoopsP.has(mk)) {
     const pages = LEAGUE[lg].college ? [1, 2, 3, 4] : [1];
     // College: the feed mixes in NAIA and small-college players, so keep Division I teams only.
     const d1 = LEAGUE[lg].college ? d1Ids(lg) : Promise.resolve(null);
-    hoopsP.set(lg, Promise.all([d1, ...pages.map((pg) => get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500', ...(pg > 1 ? { page: String(pg) } : {}) })).catch(() => null))]).then(([ids, ...ds]) => {
+    hoopsP.set(mk, Promise.all([d1, ...pages.map((pg) => get(url(COMMON, lg, '/statistics/byathlete', { sort: 'general.avgMinutes:desc', limit: '500', ...seasonQ(season), ...(pg > 1 ? { page: String(pg) } : {}) })).catch(() => null))]).then(([ids, ...ds]) => {
       const rows = ds.filter(Boolean).flatMap(byAthleteRows).filter((x) => !ids || ids.has(String(x.a.teamId ?? '')));
       const tg = new Map();
       rows.forEach((x) => { const t = String(x.a.teamId ?? ''), gp = x.at('general', 'gamesPlayed'); if (t && gp > (tg.get(t) || 0)) tg.set(t, gp); });
@@ -1348,9 +1356,9 @@ function hoopsBoards(lg) {
           }));
       }
       return out;
-    }).catch((e) => { hoopsP.delete(lg); throw e; }));
+    }).catch((e) => { hoopsP.delete(mk); throw e; }));
   }
-  return hoopsP.get(lg);
+  return hoopsP.get(mk);
 }
 const nOf = (v) => Number(String(v ?? '').replace(/,/g, ''));
 function byAthleteRows(d) {
@@ -1360,25 +1368,26 @@ function byAthleteRows(d) {
 // A team's games: the most any of its players has played. Read off the busiest rushers and passers (every team's
 // QB and backs), so a kicker or returner who sat out some games still counts against all of his team's games.
 const teamGamesP = new Map();
-function teamGames(lg) {
-  if (!teamGamesP.has(lg)) {
+function teamGames(lg, season) {
+  const mk = `${lg}:${season || ''}`;
+  if (!teamGamesP.has(mk)) {
     const lim = LEAGUE[lg].college ? '400' : '200';
-    teamGamesP.set(lg, Promise.allSettled([
-      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'rushing.rushingAttempts:desc', limit: lim, category: 'offense:rushing' })),
-      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'passing.passingAttempts:desc', limit: lim, category: 'offense:passing' })),
+    teamGamesP.set(mk, Promise.allSettled([
+      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'rushing.rushingAttempts:desc', limit: lim, category: 'offense:rushing', ...seasonQ(season) })),
+      get(url(COMMON, lg, '/statistics/byathlete', { sort: 'passing.passingAttempts:desc', limit: lim, category: 'offense:passing', ...seasonQ(season) })),
     ]).then((rs) => {
       const m = new Map();
       rs.filter((r) => r.status === 'fulfilled').forEach((r) => byAthleteRows(r.value).forEach((x) => { const t = String(x.a.teamId ?? ''), gp = x.at('general', 'gamesPlayed'); if (t && gp > (m.get(t) || 0)) m.set(t, gp); }));
       return m;
-    }).catch(() => { teamGamesP.delete(lg); return new Map(); }));
+    }).catch(() => { teamGamesP.delete(mk); return new Map(); }));
   }
-  return teamGamesP.get(lg);
+  return teamGamesP.get(mk);
 }
-async function qualifiedBoard(lg, key, q) {
+async function qualifiedBoard(lg, key, q, season) {
   // Everyone with real volume, then keep those over the minimum and sort by the stat.
   const [d, tgs] = await Promise.all([
-    get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat })),
-    teamGames(lg),
+    get(url(COMMON, lg, '/statistics/byathlete', { sort: `${q.group}.${q.vol}:desc`, limit: LEAGUE[lg].college ? '400' : '200', category: q.cat, ...seasonQ(season) })),
+    teamGames(lg, season),
   ]);
   const stat = q.stat || key;
   return byAthleteRows(d).map((x) => ({ a: x.a, vol: x.at(q.group, q.vol), gp: x.at('general', 'gamesPlayed'), v: x.at(q.group, stat), shown: String(x.raw(q.group, stat) ?? '') }))
@@ -1392,14 +1401,14 @@ async function qualifiedBoard(lg, key, q) {
 }
 export const EXTRA_BOARDS = { rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
 export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key] || !!qualifiedRule(lg, key);
-export async function getDeepLeader(lg, key) {
+export async function getDeepLeader(lg, key, season) {
   const q = qualifiedRule(lg, key);
-  if (q?.hoops) return (await hoopsBoards(lg))[key] || null;
-  if (q) return qualifiedBoard(lg, key, q);
+  if (q?.hoops) return (await hoopsBoards(lg, season))[key] || null;
+  if (q) return qualifiedBoard(lg, key, q, season);
   const m = DEEP[LEAGUE[lg]?.sport]?.[key];
   if (!m) return null;
   const [group, stat, cat, dir = 'desc', everyone = false] = m;
-  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${group}.${stat}:${dir}`, limit: LEAGUE[lg].college ? '300' : '150', ...(cat ? { category: cat } : {}), ...(everyone ? { isqualified: 'false' } : {}) }));
+  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${group}.${stat}:${dir}`, limit: LEAGUE[lg].college ? '300' : '150', ...(cat ? { category: cat } : {}), ...(everyone ? { isqualified: 'false' } : {}), ...seasonQ(season) }));
   const idx = (d.categories || []).find((c) => c.name === group)?.names?.indexOf(stat) ?? -1;
   if (idx < 0) return null;
   return (d.athletes || []).map((x) => {
@@ -1440,12 +1449,35 @@ const LEADER_TITLE = {
 };
 // Qualified shooting leaders. To count, a player needs the attempts per game below and at least half the games
 // of the busiest player. Read from the per-player board sorted by minutes, which holds every rotation player.
-export async function getLeaders(lg) {
+// Leaders for a past season the leaders feed won't give (it errors for some leagues): built from the full stat lists.
+const PAST_TITLES = {
+  baseball: { avg: ['Batting Average', 'AVG'], homeRuns: ['Home Runs', 'HR'], RBIs: ['Runs Batted In', 'RBI'], runs: ['Runs', 'R'], OPS: ['On-Base-Plus-Slugging', 'OPS'],
+    onBasePct: ['On Base Percentage', 'OBP'], slugAvg: ['Slugging Percentage', 'SLG'], hits: ['Hits', 'H'], stolenBases: ['Stolen Bases', 'SB'], ERA: ['Earned Run Average', 'ERA'],
+    wins: ['Wins', 'W'], strikeouts: ['Strikeouts', 'K'], saves: ['Saves', 'SV'], WHIP: ['Walks Plus Hits Per Inning Pitched', 'WHIP'], qualityStarts: ['Quality Starts', 'QS'], holds: ['Holds', 'HLD'] },
+  basketball: { pointsPerGame: 'PTS', reboundsPerGame: 'REB', assistsPerGame: 'AST', stealsPerGame: 'STL', blocksPerGame: 'BLK', fieldGoalPercentage: 'FG%',
+    '3PointsMadePerGame': '3PM', '3PointPct': '3P%', FreeThrowPct: 'FT%', minutesPerGame: 'MIN', avgTurnovers: 'TO', foulsPerGame: 'PF' },
+  hockey: { goals: ['Goals', 'G'], assists: ['Assists', 'A'], points: ['Points', 'PTS'], plusMinus: ['Plus/Minus', '+/-'], penaltyMinutes: ['Penalty Minutes', 'PIM'], shutouts: ['Shutouts', 'SO'] },
+  football: { passingYards: ['Passing Yards', 'YDS'], passingTouchdowns: ['Passing Touchdowns', 'TD'], rushingYards: ['Rushing Yards', 'YDS'], rushingTouchdowns: ['Rushing Touchdowns', 'TD'],
+    receivingYards: ['Receiving Yards', 'YDS'], receptions: ['Receptions', 'REC'], receivingTouchdowns: ['Receiving Touchdowns', 'TD'], sacks: ['Sacks', 'SACK'], totalTackles: ['Tackles', 'TOT'] },
+};
+async function pastLeaders(lg, season) {
+  const sp = LEAGUE[lg]?.sport, list = PAST_TITLES[sp];
+  if (!list) return [];
+  const cats = await Promise.all(Object.entries(list).map(async ([key, t]) => {
+    const [title, abbr] = Array.isArray(t) ? t : [qualifiedRule(lg, key)?.title || key, t];
+    try { const rows = await getDeepLeader(lg, key, season); return rows?.length && rows.some((r) => Number(String(r.value).replace(/,/g, '')) !== 0) ? { key, title, abbr, rows } : null; } catch { return null; }
+  }));
+  return cats.filter(Boolean);
+}
+export async function getLeaders(lg, season) {
   const tries = [[SITE3, '/leaders'], [SITE, '/leaders'], [SITE, '/statistics']];
   let lastErr = null;
   for (const [base, path] of tries) {
     try {
-      const d = await get(url(base, lg, path)); // no limit param: the feed errors on it (checked live)
+      const d = await get(url(base, lg, path, seasonQ(season))); // no limit param: the feed errors on it (checked live)
+      // A past season the feed doesn't have answers with this season's lists: don't pass those off as that year.
+      const got = Number(d.requestedSeason?.year || d.season?.year || 0);
+      if (season && got && got !== Number(season)) throw new FeedError('Wrong season', 0);
       const raw = d.leaders?.categories || d.categories || d.stats || d.leaders || [];
       const cats = (Array.isArray(raw) ? raw : []).filter((c) => !LEADER_SKIP.test(String(c.name || ''))).map((c) => ({
         key: String(c.name || c.abbreviation || c.displayName || ''),
@@ -1471,12 +1503,22 @@ export async function getLeaders(lg) {
       if (kept.length && LEAGUE[lg]?.sport === 'basketball') {
         // Shooting percentages: the feed's board has no minimum, so a 1-for-1 shooter leads. Rebuild those lists from qualified shooters.
         try {
-          const q = await hoopsBoards(lg);
-          kept.forEach((c) => { if (q[c.key]?.length) c.rows = q[c.key]; });
+          const q = await hoopsBoards(lg, season);
+          // Only a board with real numbers (an old season's lists can come back all zeros).
+          kept.forEach((c) => { if (q[c.key]?.length && q[c.key].some((r) => Number(r.value) > 0)) c.rows = q[c.key]; });
         } catch { /* keep the feed's lists */ }
       }
-      if (kept.length) return { lg, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche)] };
+      // A thin past season (one or two boards): fill in the rest from the full stat lists.
+      if (season && kept.length < 5) {
+        const more = (await pastLeaders(lg, season)).filter((c) => !kept.some((k) => k.key === c.key));
+        kept.push(...more);
+      }
+      if (kept.length) return { lg, season: season || null, current: Number(d.currentSeason?.year || d.season?.year || 0) || null, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche)] };
     } catch (e) { lastErr = e; }
+  }
+  if (season) {
+    const cats = await pastLeaders(lg, season);
+    if (cats.length) return { lg, season, current: null, cats };
   }
   if (lastErr) throw lastErr;
   return { lg, cats: [] };
