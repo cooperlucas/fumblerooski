@@ -1,11 +1,12 @@
-/* Fumblerooski: late-80s / 90s throwback. Navy field, teal-white-purple racing stripes, wide italic type.
-   Dark is the default (a scoreboard at night). Light is a day game: cream program paper, navy ink. */
+/* Fumblerooski: late-80s / 90s throwback. Teal-white-purple racing stripes, wide italic type.
+   Dark is the default: espresso, a warm night that pairs with light mode's cream (not the cool navy every other sports
+   app uses). Light is a day game: cream program paper, navy ink. Both share the same teal, purple and gold. */
 :root {
-  --bg: #0C1124; --panel: #151B33; --panel2: #10162C; --chip: #1C2443;
-  --line: #26305A; --line2: #1E2747; --line3: #2C3762;
-  --ink: #F5F5F7; --soft: #CBD2EA; --mute: #8E99BF; --dim: #6F7AA3;
+  --bg: #15100C; --panel: #211912; --panel2: #1A140F; --chip: #2B2119;
+  --line: #3B2E22; --line2: #2C2219; --line3: #47382A;
+  --ink: #F8F2E7; --soft: #E2D5C0; --mute: #AC9A82; --dim: #887764;
   --teal: #22D3D6; --purple: #8B5CF6; --deep: #6E3AB5; --yellow: #FFBE2E; --pink: #FF3D7F; --lime: #9BE33A; --gold: #F5C04A;
-  --rule: #232C50; --on-accent: #0C1124; --tip-ink: #F3E9A6; --err-line: #5A2A46; --win-bg: rgba(155, 227, 58, 0.16);
+  --rule: #33281E; --on-accent: #15100C; --tip-ink: #F3E9A6; --err-line: #5A2A46; --win-bg: rgba(155, 227, 58, 0.16);
   --font: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
 }
@@ -28,7 +29,7 @@
   }
 }
 /* Always-dark pieces: the score crawl, and the team-colored cards that carry white text. */
-.ticker, .board, .teamhero { --ink: #F5F5F7; --soft: #CBD2EA; --mute: #8E99BF; --dim: #6F7AA3; --rule: #232C50; --yellow: #FFBE2E; --teal: #22D3D6; --pink: #FF3D7F; --lime: #9BE33A; color: var(--ink); }
+.ticker, .board, .teamhero { --ink: #F8F2E7; --soft: #E2D5C0; --mute: #AC9A82; --dim: #887764; --rule: #33281E; --yellow: #FFBE2E; --teal: #22D3D6; --pink: #FF3D7F; --lime: #9BE33A; color: var(--ink); }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.35; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
@@ -291,7 +292,7 @@ h1, h2, h3, p { margin: 0; }
 .lrow.fav .sub { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--dim); }
 
 /* bottom score ticker */
-.ticker { flex: none; overflow: hidden; height: 30px; background: #070B18; border-top: 2px solid var(--yellow); }
+.ticker { flex: none; overflow: hidden; height: 30px; background: #0D0906; border-top: 2px solid var(--yellow); }
 .ttrack { display: inline-flex; align-items: center; height: 100%; white-space: nowrap; animation: crawl 60s linear infinite; will-change: transform; }
 @media (hover: hover) { .ticker:hover .ttrack { animation-play-state: paused; } } /* mouse only: a tap on a phone must not stop the crawl */
 .ticker:has(:focus-visible) .ttrack { animation-play-state: paused; }

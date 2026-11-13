@@ -219,7 +219,7 @@ export function applyTheme(t = getTheme()) {
   const root = document.documentElement;
   if (t === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
   const light = t === 'light' || (t === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#F3EFE4' : '#0C1124');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#F3EFE4' : '#15100C');
 }
 export function setTheme(t) { ls.set('fr.theme', t); applyTheme(t); }
 if (typeof window !== 'undefined') {
