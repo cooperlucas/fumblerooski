@@ -1657,7 +1657,7 @@ const made = (x, y, c, r = 5) => <><circle cx={x} cy={y} r={r} fill="none" strok
 const missed = (x, y, c, r = 3.6, w = 1.8) => <path d={`M${x - r} ${y - r} L${x + r} ${y + r} M${x + r} ${y - r} L${x - r} ${y + r}`} stroke={c} strokeWidth={w} strokeLinecap="round" />;
 
 /* ---------- basketball shot chart: both teams on one floor ---------- */
-// Court Chart: every shot on the floor with those plays underneath. The period chips, made/missed and team toggles filter
+// Shot Chart: every shot on the floor with those plays underneath. The period chips, made/missed and team toggles filter
 // both, and tapping a shot on the floor shows just that play below.
 function ShotChart({ shots, game, lg, pbp = [] }) {
   const L = LEAGUE[lg];
@@ -1697,7 +1697,7 @@ function ShotChart({ shots, game, lg, pbp = [] }) {
   const pickedMark = sel ? marks.find((x) => x.s.id === sel) : null;
   return (
     <section className="sec">
-      <H2>Court Chart</H2>
+      <H2>Shot Chart</H2>
       {modes.length > 1 ? (
         <div className="chips" role="group" aria-label="Plays to show" style={{ marginTop: 8 }}>
           {modes.map(([k, l]) => <button key={k} className="chipb" aria-pressed={m === k} onClick={() => reset(setMode)(k)}>{l}</button>)}
@@ -2423,7 +2423,7 @@ function GamePage({ lg, id, feed, replayBar }) {
   const tabs = !d || !started ? [] : [
     ['summary', g.state === 'live' ? 'Live' : 'Summary'],
     d.drives.length ? ['drives', 'Drives'] : null,
-    d.shots.length ? ['shots', 'Court Chart'] : null,
+    d.shots.length ? ['shots', 'Shot Chart'] : null,
     d.ice?.length ? ['ice', 'Ice Chart'] : null,
     d.pitch?.length ? ['pitch', 'Shot Map'] : null,
     d.pbp.length && !d.ice?.length && !d.shots.length ? ['plays', 'Plays'] : null, // hockey and hoops plays live under their charts
