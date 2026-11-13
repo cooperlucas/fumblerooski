@@ -1314,7 +1314,12 @@ export function fbHead(p) {
   return p.type || 'Play';
 }
 function LiveField({ drives, game, lg, onAll }) {
-  const d = drives.find((x) => x.live) || drives[drives.length - 1];
+  // Right after a kick the feed can open the new drive with no plays yet (and a junk "1st & Goal at the 0"). Until its first
+  // snap, stay on the drive that holds the kick, still live, so the field shows the handoff instead.
+  const live0 = drives.find((x) => x.live);
+  const empty = !!live0 && !live0.plays.length;
+  const before = empty ? [...drives].reverse().find((x) => x !== live0 && x.plays.length) : null;
+  const d = (empty && before ? { ...before, live: true } : live0) || drives[drives.length - 1];
   const last = d ? d.plays[d.plays.length - 1] : null;
   const lastKey = d ? `${d.id}:${d.plays.length}` : '';
   // The banner calls out a score, a turnover or a kick for a few seconds, then settles back to who has the ball.

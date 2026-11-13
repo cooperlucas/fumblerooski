@@ -616,3 +616,9 @@ test('today\'s games sort ahead of other days, live first', async () => {
   assert.equal(isToday(g('final', new Date(2026, 10, 11, 20, 0)), now), false);
   assert.equal(isToday({ state: 'live', date: new Date(2026, 10, 11, 20, 0).toISOString() }, now), true);
 });
+
+test('a drive opened by a kick starts where the return ended, before the feed writes its start', () => {
+  const kick = { type: { text: 'Kickoff' }, text: 'D.Zvada kicks 57 yards from NYG 35 to WAS 8. L.McCaffrey to WAS 33 for 25 yards.', start: { team: { id: '19' }, yardsToEndzone: 0 }, end: { team: { id: '28' }, yardsToEndzone: 67 }, period: { number: 2 }, clock: { displayValue: '2:35' } };
+  const [d] = normDrives({ previous: [], current: { id: 'k1', team: { id: '28', abbreviation: 'WSH' }, description: '0 plays, 0 yards, 0:00', start: {}, plays: [kick] } }, '28', '19', true);
+  assert.equal(d.startToEnd, 67); // WSH 33
+});

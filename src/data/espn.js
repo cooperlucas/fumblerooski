@@ -1968,7 +1968,10 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     // the kick play's own spots are the kicking team's.
     const kickOpen = !!first && /kickoff|\bpunts?\b/i.test(`${first.type?.text || ''} ${first.text || ''}`) && String(first.start?.team?.id ?? teamId) !== teamId;
     const tb = kickOpen && /touchback/i.test(first.text || '') ? touchbackSpot(opts.lg, opts.season, /kickoff/i.test(`${first.type?.text || ''} ${first.text || ''}`) ? 'kickoff' : 'punt') : null;
-    const startToEnd = spotToEnd(d.start?.text, abbrOf[teamId] || d.team?.abbreviation) ?? tb;
+    // Right after the kick the feed may not have written the drive's start yet (and sends a start of 0): then the kick's
+    // own end spot, which the feed counts for the receiving team, is where this drive begins.
+    const kickEnd = kickOpen && String(first.end?.team?.id ?? '') === teamId ? num(first.end?.yardsToEndzone) : null;
+    const startToEnd = spotToEnd(d.start?.text, abbrOf[teamId] || d.team?.abbreviation) ?? tb ?? (kickEnd > 0 && kickEnd < 100 ? kickEnd : null);
     const from = kickOpen && startToEnd != null ? startToEnd : num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
     // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
     // after a punt or field goal it is where the ball landed, not where the offense got to.
