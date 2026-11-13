@@ -1326,6 +1326,8 @@ function LiveField({ drives, game, lg, onAll }) {
   const [flash, setFlash] = useState(true);
   useEffect(() => { setFlash(true); const h = setTimeout(() => setFlash(false), 7000); return () => clearTimeout(h); }, [lastKey]);
   if (!d) return null;
+  // Halftime: the drive is over and nobody has the ball. Clear the field and close out the last drive.
+  const half = /halftime/i.test(String(game.statusText || ''));
   const t = d.side === 'away' ? game.away : game.home;
   const opp = d.side === 'away' ? game.home : game.away;
   const cc = chartColors(game.away, game.home, true);
@@ -1356,7 +1358,7 @@ function LiveField({ drives, game, lg, onAll }) {
   const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? (picked && last.from != null ? last.from : retFrom) : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
   const noRet = tRet != null && retFrom != null && Math.abs(retFrom - tRet) < 0.5; // picked off and downed right there
   const ballAt = tRet != null && retFrom != null ? retFrom : at;
-  const going = d.live && last?.kept && last.nextDown > 0 && !(m0.kind === 'punt' && m0.blocked && last.mine);
+  const going = !half && d.live && last?.kept && last.nextDown > 0 && !(m0.kind === 'punt' && m0.blocked && last.mine);
   const fd = going && last.nextDist != null ? Math.max(0, at - last.nextDist) : null;
   const dirn = d.side === 'away' ? 1 : -1;
   const ord = (n) => ['', '1st', '2nd', '3rd', '4th'][n] || '';
@@ -1392,10 +1394,10 @@ function LiveField({ drives, game, lg, onAll }) {
   const kickMine = !!last && m.kind === 'kickoff' && last.mine && !last.kept;
   // A kick this drive's team received: the ball (and the line to gain) show up once the kick has landed and been run back.
   const kickIn = !!last && flash && (m.kind === 'kickoff' || m.kind === 'punt') && !last.mine && !m.recovered ? (m.touchback || m.fairCatch ? 1.4 : 2.3) : 0;
-  const handoff = d.live && !flash && !!last && last.mine && !last.kept && (m.kind === 'punt' || m.kind === 'kickoff') && !m.recovered;
+  const handoff = !half && d.live && !flash && !!last && last.mine && !last.kept && (m.kind === 'punt' || m.kind === 'kickoff') && !m.recovered;
   const hSpot = !handoff ? null : m.kind === 'kickoff' && m.touchback ? 100 - touchbackSpot(lg, game.season, 'kickoff') : m.touchback ? 20 : m.blocked ? last.from - (Number.isFinite(last.yards) ? last.yards : 0) : last.endRaw != null ? 100 - last.endRaw : last.from - (m.yards || 0);
   const hText = hSpot == null ? '' : Math.round(hSpot) === 50 ? '50' : hSpot < 50 ? `${opp.abbr} ${Math.round(hSpot)}` : `${t.abbr} ${Math.round(100 - hSpot)}`;
-  const banner = handoff ? { text: `${opp.abbr} Ball`, team: opp } : flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
+  const banner = half ? { text: 'Halftime' } : handoff ? { text: `${opp.abbr} Ball`, team: opp } : flash && call ? call : going ? { text: `${t.abbr} Ball`, team: t } : call || { text: d.live ? `${t.abbr} Ball` : d.result || `${t.abbr} Drive`, team: t };
 
   // Goalposts stand up off each end line in a three-quarter view: stem, crossbar, far upright (drawn early) and near upright (drawn last, so a kick passes between them).
   // Goalposts drawn flat, as seen from above: the crossbar runs along the end line, the uprights point out past it.
@@ -1480,8 +1482,8 @@ function LiveField({ drives, game, lg, onAll }) {
             <Blob team={handoff ? opp : t} size={30} />
             <span className="tx">{handoff
               ? <><b>Next Drive</b><small>Starts at {hText} · {t.abbr} {m.kind === 'kickoff' ? 'kicked off' : `punted (${d.summary || `${d.plays.length} plays`})`}</small></>
-              : <><b>{d.live ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></>}</span>
-            {d.result && !d.live ? <span className="res">{d.result}</span> : null}
+              : <><b>{d.live && !half ? 'Current Drive' : 'Last Drive'}</b><small>{d.summary || `${d.plays.length} plays`}</small></>}</span>
+            {half ? <span className="res">{d.result || 'End of Half'}</span> : d.result && !d.live ? <span className="res">{d.result}</span> : null}
           </div>
           {going ? (
             <div className="lfdown">
@@ -1499,7 +1501,7 @@ function LiveField({ drives, game, lg, onAll }) {
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
             {game.neutral ? null : <text className="ez mid" x={60 * K} y={mid - 8} textAnchor="middle" dominantBaseline="central" fill={game.home.color || cc.home.main}>{game.home.abbr}</text>}
             <rect x="0" y={top} width={FW} height={FH - top} fill="none" stroke="#0C1124" strokeWidth="2.5" />
-            {glowSide != null ? <rect key={'two' + lastKey} className="tdglow" x={glowSide} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
+            {glowSide != null && !half ? <rect key={'two' + lastKey} className="tdglow" x={glowSide} y={top} width={10 * K} height={FH - top} fill="#FFBE2E" stroke="#FFBE2E" strokeWidth="4" /> : null}
             {/* posts, back half: shadow, stem, crossbar, far upright */}
             {posts.map((P) => (
               <g key={P.s}>
@@ -1516,7 +1518,7 @@ function LiveField({ drives, game, lg, onAll }) {
                   <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
                 </g>
               </g>
-            ) : !defTwo && !kickMine && start != null && at != null ? (
+            ) : !half && !defTwo && !kickMine && start != null && at != null ? (
               <>
                 <rect className="lfmove" x="0" y={ly - 2} width="100" height="4" rx="2" fill="#fff" stroke="#0C1124" strokeWidth="1" vectorEffect="non-scaling-stroke"
                   style={{ transformOrigin: '0 0', transform: `translateX(${Math.min(X(start), X(at))}px) scaleX(${Math.max(0.02, Math.abs(X(at) - X(start)) / 100)})` }} />
@@ -1535,8 +1537,8 @@ function LiveField({ drives, game, lg, onAll }) {
                 </g>
               </>
             ) : null}
-            {handoff || defTwo ? null : show}
-            {defTwo ? (() => {
+            {handoff || defTwo || half ? null : show}
+            {defTwo && !half ? (() => {
               const kick = twoBy === 'away' ? 'home' : 'away', a = Xs(kick, 3), b = Xs(kick, 100);
               return (
                 <g key={'d2' + lastKey}>
@@ -1545,12 +1547,12 @@ function LiveField({ drives, game, lg, onAll }) {
                   <g transform={`translate(${b} ${ly - 19})`}>{ball(8)}</g>
                 </g>);
             })() : null}
-            {retEnd != null && retFrom != null && !noRet ? (
+            {!half && retEnd != null && retFrom != null && !noRet ? (
               <g key={'ret' + lastKey}>{/* the return stays drawn until the next play; only the stamp fades */}
                 {[['#fff', 5.5], [cc[other].main, 3]].map(([c, w]) => <path key={w} className="kret" d={`M${X(retFrom)} ${ly} H${X(retEnd)}`} stroke={c} strokeWidth={w} strokeLinecap="round" fill="none" style={{ '--from': X(retEnd) < X(retFrom) ? '0 0 0 100%' : '0 100% 0 0', animationDelay: '0.2s' }} />)}
                 <g transform={`translate(${X(retEnd)} ${ly - 19})`}>{ball(8)}</g>
               </g>) : null}
-            {stamp ? (
+            {stamp && !half ? (
               <g key={'stamp' + lastKey} className="fshow">
                 {stamp.confetti ? Array.from({ length: 18 }, (_, i) => {
                   const a2 = (i / 18) * Math.PI * 2 + (i % 2) * 0.2, r = 30 + (i % 4) * 14;
