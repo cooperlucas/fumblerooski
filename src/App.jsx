@@ -40,7 +40,7 @@ export default function App() {
   else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
   else if (name === 'leaders' && LEAGUE[a] && b) { tab = 'stats'; body = <LeaderPage key={a + b + (c || '') + (e4 || '')} lg={a} cat={b} focus={c} season={/^\d{4}$/.test(e4 || '') ? Number(e4) : null} />; }
-  else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b} lg={a} id={b} />; }
+  else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? c : ''} />; }
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
@@ -744,7 +744,7 @@ function LeaderCard({ lg, c, f, focus, season }) {
       {loadingDeep && f ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>Loading the full list...</span></div>
         : !rows.length ? <div className="lead"><span className="nm" style={{ color: 'var(--mute)', fontWeight: 700 }}>No one from {f?.label} {deepOk ? 'has this stat yet.' : 'in the top 10.'}</span></div> : null}
       {(loadingDeep && f ? [] : rows).map((r, i) => (
-        <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '') + (focus && r.player?.id === String(focus) ? ' me' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}`) : r.team ? go(`team/${lg}/${r.team.id}`) : null)}>
+        <button key={i} className={'lead' + (/^T?1$/.test(place[i]) ? ' top' : '') + (focus && r.player?.id === String(focus) ? ' me' : '')} onClick={() => (r.player?.id ? go(`player/${lg}/${r.player.id}${season ? '/' + season : ''}`) : r.team ? go(`team/${lg}/${r.team.id}${season ? '/' + season : ''}`) : null)}>
           <span className="pos">{place[i]}</span>
           {r.team ? <Blob team={r.team} /> : null}
           <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
@@ -1006,7 +1006,7 @@ const pct1 = (label, v) => {
 /* ---------- Player ---------- */
 const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };
 const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
-function PlayerPage({ lg, id }) {
+function PlayerPage({ lg, id, season: startYr = '' }) {
   const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
   const pmq = useQuery(hasPlusMinus(lg) ? `pm:${lg}:${id}` : null, () => getPlusMinus(lg, id), () => 600000);
   const pm = pmq.data;
@@ -1030,7 +1030,8 @@ function PlayerPage({ lg, id }) {
   const color = p?.team?.color || '#2B3352';
   const career = d?.career || [];
   // One season picker drives both the Season and Game Log tabs. '' = the latest season.
-  const [logYr, setLogYr] = useSticky('logyr', '');
+  // Opened from a past season's leaders: start on that season.
+  const [logYr, setLogYr] = useSticky('logyr', startYr);
   const careerYears = [...new Set(career.flatMap((c) => c.rows.map((r) => r.year)).filter(Boolean))].sort((a, b) => b - a);
   const years = d?.gamelog?.years?.length ? d.gamelog.years : careerYears.map((y) => ({ value: String(y), label: career.flatMap((c) => c.rows).find((r) => r.year === y)?.season || String(y) }));
   const latest = d?.gamelog?.year || years[0]?.value || '';
