@@ -402,13 +402,13 @@ function Leagues() {
 function CupGroups({ cup, lg, focus }) {
   return (
     <>
-      <p className="cupnote">{cup.played < cup.total ? `Group play · ${cup.played} of ${cup.total} games played. ` : 'Group play is over. '}Group winners (LEAD) and the best second-place team in each conference (WC, wild card) reach the knockout round.</p>
+      <p className="cupnote">{cup.played < cup.total ? `Group play · ${cup.played} of ${cup.total} games played. ` : 'Group play is over. '}Group winners (seeded 1, 2, 3 in their conference) and the best second-place team in each (WC, wild card) reach the knockout round.</p>
       {cup.groups.map((gr) => (
-        <div className="card" key={gr.name}>
-          <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 56, textAlign: 'right' }}>REC</span><span style={{ width: 52, textAlign: 'right' }}>DIFF</span></div>
+        <div className="card cupcard" key={gr.name}>
+          <div className="shead"><span className="nm">{gr.name}</span><span style={{ width: 44, textAlign: 'right' }}>REC</span><span style={{ width: 46, textAlign: 'right' }}>DIFF</span></div>
           {gr.rows.map((r, j) => (
             <button key={r.id} className={'srow' + (focus && r.id === String(focus) ? ' me' : '')} onClick={() => go(`team/${lg}/${r.id}`)}>
-              <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}{r.tag ? <span className={'stag ' + (r.tag === 'lead' ? 'div' : 'wc')} title={r.tag === 'lead' ? 'Leads the group' : 'Wild card spot'}>{r.tag === 'lead' ? 'LEAD' : 'WC'}</span> : null}</span>
+              <span className="pos">{j + 1}</span><Blob team={r.team} /><span className="nm">{r.team.name}{r.tag ? <span className={'stag ' + (r.tag === 'lead' ? 'div' : 'wc')} title={r.tag === 'lead' ? `Leads the group: the ${r.seed || ''} seed` : 'Wild card spot'}>{r.tag === 'lead' ? r.seed || '1' : 'WC'}</span> : null}</span>
               <span className="v">{r.w}-{r.l}</span><span className="v2">{r.pd > 0 ? '+' : ''}{r.pd}</span>
             </button>
           ))}

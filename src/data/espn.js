@@ -479,6 +479,10 @@ export async function getNbaCup() {
     const seconds = out.filter((g) => g.conf === c && g.rows[1] && g.rows[1].w + g.rows[1].l > 0).map((g) => g.rows[1]);
     seconds.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || b.pd - a.pd || b.pf - a.pf);
     if (seconds[0]) seconds[0].tag = 'wild';
+    // The group winners are seeded 1-3 in their conference (the wild card is the 4 seed): record, point differential, points.
+    const leaders = out.filter((g) => g.conf === c && g.rows[0]?.tag === 'lead').map((g) => g.rows[0]);
+    leaders.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || b.pd - a.pd || b.pf - a.pf);
+    leaders.forEach((r, i) => { r.seed = i + 1; });
   });
   const last = list.map((g) => String(g.date)).sort().pop();
   return { groups: out, played: done.length, total: list.length, last };

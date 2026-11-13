@@ -764,3 +764,7 @@ button.pick.date { cursor: pointer; }
 .plink, .trank.tlink { text-decoration-thickness: 1px; text-underline-offset: 3px; }
 /* A record never splits at its dashes ("2-5-" / "1"): it moves as one piece. */
 .grow .nm small, .nmt small { white-space: nowrap; }
+/* NBA Cup groups: short records, so narrower number columns; the seed tag stays on the name's line. */
+.cupcard .srow .v { width: 44px; }
+.cupcard .srow .v2 { width: 46px; }
+.cupcard .srow .nm .stag { margin-left: 5px; }
