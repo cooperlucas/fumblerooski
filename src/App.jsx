@@ -1590,7 +1590,10 @@ function LiveField({ drives, game, lg, onAll }) {
 
 function Drives({ drives, game }) {
   const live = game.state === 'live';
-  const list = live ? [...drives].reverse() : drives; // newest first while the game is on
+  // At halftime the drive on the field is over: close it out.
+  const half = live && /halftime/i.test(String(game.statusText || ''));
+  const shown = half ? drives.map((d) => (d.live ? { ...d, live: false, result: d.result || 'End of Half' } : d)) : drives;
+  const list = live ? [...shown].reverse() : shown; // newest first while the game is on
   const [open, setOpen] = useState(() => drives.find((d) => d.live)?.id ?? null);
   const team = (d) => (d.side === 'home' ? game.home : game.away);
   return (
