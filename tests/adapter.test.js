@@ -605,3 +605,14 @@ test('a finished drive drops the official timeout tacked on after its punt', () 
   const [d] = normDrives({ previous: [drv], current: drv }, '28', '19', true);
   assert.equal(d.plays[d.plays.length - 1].type, 'Punt');
 });
+
+test('today\'s games sort ahead of other days, live first', async () => {
+  const { isToday } = await import('../src/data/headlines.js');
+  const now = new Date(2026, 10, 12, 21, 0); // Thu 9pm
+  const g = (state, d) => ({ state, date: d.toISOString() });
+  assert.equal(isToday(g('pre', new Date(2026, 10, 12, 19, 30)), now), true);
+  assert.equal(isToday(g('pre', new Date(2026, 10, 13, 1, 0)), now), true); // 1am Fri still belongs to Thursday night
+  assert.equal(isToday(g('pre', new Date(2026, 10, 15, 13, 0)), now), false);
+  assert.equal(isToday(g('final', new Date(2026, 10, 11, 20, 0)), now), false);
+  assert.equal(isToday({ state: 'live', date: new Date(2026, 10, 11, 20, 0).toISOString() }, now), true);
+});

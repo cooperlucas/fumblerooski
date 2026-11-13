@@ -3,7 +3,7 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
-import { headlineGames, footballModes, freshFinal, MORNING_UNTIL } from './data/headlines.js';
+import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus, StarCut } from './ui.jsx';
 
 /* ---------- router ---------- */
@@ -159,8 +159,8 @@ function Board({ games, pick, favSet, title }) {
 const RANKED = (g) => (g.away.rank && g.away.rank <= 25 ? 1 : 0) + (g.home.rank && g.home.rank <= 25 ? 1 : 0);
 function topOf(games, favSet, n) {
   const now = new Date();
-  // Live first; in the morning, last night's finals next; then what's coming up; then older finals.
-  const order = (g) => (g.state === 'live' ? 0 : freshFinal(g, now) ? 1 : g.state === 'pre' ? 2 : g.state === 'final' ? 3 : 4);
+  // Live first; in the morning, last night's finals next; then today's games; then games on other days.
+  const order = (g) => (g.state === 'live' ? 0 : freshFinal(g, now) ? 1 : isToday(g, now) ? (g.state === 'pre' ? 2 : 3) : g.state === 'pre' ? 4 : g.state === 'final' ? 5 : 6);
   return [...games].sort((a, b) => (isFavGame(b, favSet) - isFavGame(a, favSet)) || (order(a) - order(b)) || (RANKED(b) - RANKED(a)) || String(a.date).localeCompare(String(b.date))).slice(0, n);
 }
 // Headliners' games: each league's slate by the rhythm of its sport (see data/headlines.js).
@@ -200,7 +200,13 @@ function Scores() {
     const seen = new Set();
     return sortGames([...today, ...(hl.q.data?.games || [])].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
   }, [today, hl.q.data, favSet]);
-  const leagues = shownLeagues(prefs).filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+  // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
+  const leagues = useMemo(() => {
+    const now = new Date();
+    const has = (l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet) && isToday(g, now));
+    const list = shownLeagues(prefs).filter((l) => today.some((g) => g.lg === l.id && !isFavGame(g, favSet)));
+    return [...list.filter(has), ...list.filter((l) => !has(l))];
+  }, [today, favSet, prefs]);
   const q = pickL ? sb : hl.q;
   const gf = useGameFilter(pickL || 'top');
   return (

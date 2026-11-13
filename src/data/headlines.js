@@ -62,3 +62,11 @@ export function freshFinal(g, now) {
   const t = Date.parse(g.date || '');
   return Number.isFinite(t) && now - t < 20 * 3600000;
 }
+
+// Is this game on today's sports day (3am to 3am)? Live games always count: they're happening right now.
+export function isToday(g, now = new Date()) {
+  if (g.state === 'live') return true;
+  const t = Date.parse(g.date || '');
+  if (!Number.isFinite(t)) return false;
+  return sportsDay(new Date(t)).toDateString() === sportsDay(now).toDateString();
+}

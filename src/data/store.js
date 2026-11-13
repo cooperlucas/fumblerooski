@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LEAGUES } from './leagues.js';
 import { getScoreboard, getTeams, getDivisionTeams, setFetcher } from './espn.js';
 import { demoFetch } from './fixtures.js';
+import { isToday } from './headlines.js';
 
 const ls = {
   get(k, fallback) { try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
@@ -173,9 +174,11 @@ export function useDay(offset) {
 }
 
 const ORDER = { live: 0, pre: 1, final: 2, off: 3 };
+// Your teams first, then live, then today's games before anything on another day, then by start time.
 export function sortGames(games, favSet) {
+  const now = new Date();
   return [...games].sort((a, b) =>
-    (isFavGame(b, favSet) - isFavGame(a, favSet)) || (ORDER[a.state] - ORDER[b.state]) || String(a.date).localeCompare(String(b.date)));
+    (isFavGame(b, favSet) - isFavGame(a, favSet)) || (ORDER[a.state] === 0 ? 0 : 1) - (ORDER[b.state] === 0 ? 0 : 1) || (isToday(b, now) - isToday(a, now)) || (ORDER[a.state] - ORDER[b.state]) || String(a.date).localeCompare(String(b.date)));
 }
 
 /* ---------- team search index (cached on the device for a week) ---------- */
