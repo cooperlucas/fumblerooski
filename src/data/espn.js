@@ -1905,6 +1905,25 @@ export function spotToEnd(text, abbr) {
   return m[1].trim().toUpperCase() === String(abbr || '').toUpperCase() ? 100 - n : n;
 }
 
+// Where a kick return ended, read from the play's words: the last "to XXX nn" ("kicks 62 yards from WAS 35 to NYG 3.
+// G.Desrosiers to NYG 27 for 24 yards"). In yards to the end zone the receiving team (mine) attacks. The words can use
+// another abbreviation than ours (WAS for WSH), so a near match by first letter counts.
+export function kickReturnSpot(text, mine, theirs) {
+  const all = [...String(text || '').matchAll(/\bto\s+(?:([A-Z]{2,4})\s+)?(\d{1,2})\b/g)];
+  const m = all[all.length - 1];
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (n === 50) return 50;
+  const a = String(m[1] || '').toUpperCase(), me = String(mine).toUpperCase(), them = String(theirs).toUpperCase();
+  if (!a) return null;
+  if (a === me) return 100 - n;
+  if (a === them) return n;
+  if (me && a[0] === me[0] && (!them || a[0] !== them[0])) return 100 - n;
+  if (them && a[0] === them[0] && (!me || a[0] !== me[0])) return n;
+  return null;
+}
+const spotText = (toEnd, mine, theirs) => { const r = Math.round(toEnd); return r === 50 ? '50' : r > 50 ? `${mine} ${100 - r}` : `${theirs} ${r}`; };
+
 // A drive that ended with the other side scoring on the return: a pick six, scoop and score, or a punt or blocked kick run back.
 // The feed files it under the offense's drive ("Interception Touchdown"), but the points went the other way.
 function returnScoreAgainst(d, teamId) {
@@ -1933,6 +1952,13 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     // Only when it is the feed's number flipped: an abbreviation that doesn't match ours can't move the ball anywhere else.
     return raw != null && txt != null && txt !== raw && txt === 100 - raw ? txt : raw;
   };
+  // A kick's end spot, counted for the receiving team. Fresh off the kick the feed can send 0 for it: read the words instead.
+  const kickEndRaw = (p) => {
+    const raw = num(p.end?.yardsToEndzone);
+    if (!/kickoff|\bpunts?\b/i.test(`${p.type?.text || ''} ${p.text || ''}`) || (raw != null && raw > 0 && raw < 100) || /touchback/i.test(p.text || '')) return raw;
+    const kicker = String(p.start?.team?.id ?? ''), rcv = Object.keys(abbrOf).find((id) => id !== kicker);
+    return (rcv ? kickReturnSpot(p.text, abbrOf[rcv], abbrOf[kicker]) : null) ?? raw;
+  };
   return list.map((d, i) => {
     // The feed sometimes credits a drive to the wrong team (after a blocked punt, say, SMU's touchdown drive came in as Tulane's
     // "Downs Touchdown"). Go by who ran the scrimmage plays when they all agree.
@@ -1948,7 +1974,7 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
       type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: startSpot(p), to: /\bpunts?\b|kickoff/i.test(p.text || '') ? num(p.end?.yardsToEndzone) : fixSpot(startSpot(p), num(p.end?.yardsToEndzone), num(p.statYardage)), // kick yards are not field position, so no spot check
       // endRaw is the feed's own end spot (after a kick it is counted from the receiving team's side); mine = the drive's team ran the play.
-      endRaw: num(p.end?.yardsToEndzone), mine: String(p.start?.team?.id ?? teamId) === teamId,
+      endRaw: kickEndRaw(p), mine: String(p.start?.team?.id ?? teamId) === teamId,
       kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
       next: cleanText(p.end?.downDistanceText || ''), nextShort: cleanText(p.end?.shortDownDistanceText || ''), spot: cleanText(p.end?.possessionText || ''),
     })).filter((p) => p.text);
@@ -1971,7 +1997,11 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     // Right after the kick the feed may not have written the drive's start yet (and sends a start of 0): then the kick's
     // own end spot, which the feed counts for the receiving team, is where this drive begins.
     const kickEnd = kickOpen && String(first.end?.team?.id ?? '') === teamId ? num(first.end?.yardsToEndzone) : null;
-    const startToEnd = spotToEnd(d.start?.text, abbrOf[teamId] || d.team?.abbreviation) ?? tb ?? (kickEnd > 0 && kickEnd < 100 ? kickEnd : null);
+    // Last resort, still before the feed fills in any spots: the kick's own text says where the return ended
+    // ("G.Desrosiers to NYG 27 for 24 yards").
+    const myAbbr = abbrOf[teamId] || d.team?.abbreviation || '', theirAbbr = Object.entries(abbrOf).find(([id]) => id !== teamId)?.[1] || '';
+    const kickText = kickOpen && !tb ? kickReturnSpot(first.text, myAbbr, theirAbbr) : null;
+    const startToEnd = spotToEnd(d.start?.text, myAbbr) ?? tb ?? (kickEnd > 0 && kickEnd < 100 ? kickEnd : null) ?? kickText;
     const from = kickOpen && startToEnd != null ? startToEnd : num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
     // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
     // after a punt or field goal it is where the ball landed, not where the offense got to.
@@ -1985,7 +2015,7 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       scoreSide: kind === 'defTd' ? (side === 'away' ? 'home' : 'away') : side, // who the points went to
       summary: cleanText(d.description || ''),
       period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
-      startText: cleanText(d.start?.text || ''), startToEnd: kickOpen ? from : null,
+      startText: cleanText(d.start?.text || '') || (kickOpen && from != null ? spotText(from, myAbbr, theirAbbr) : ''), startToEnd: kickOpen ? from : null,
       x0: pos(from), x1: pos(to),
       plays,
       live: !!live && !!cur && String(d.id) === String(cur.id),

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries, touchbackSpot, spotToEnd, normDrives } from '../src/data/espn.js';
+import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries, touchbackSpot, spotToEnd, normDrives, kickReturnSpot } from '../src/data/espn.js';
 import { LEAGUE } from '../src/data/leagues.js';
 import { demoFetch } from '../src/data/fixtures.js';
 import { scrub, isBetting, cleanText } from '../src/data/guard.js';
@@ -621,4 +621,20 @@ test('a drive opened by a kick starts where the return ended, before the feed wr
   const kick = { type: { text: 'Kickoff' }, text: 'D.Zvada kicks 57 yards from NYG 35 to WAS 8. L.McCaffrey to WAS 33 for 25 yards.', start: { team: { id: '19' }, yardsToEndzone: 0 }, end: { team: { id: '28' }, yardsToEndzone: 67 }, period: { number: 2 }, clock: { displayValue: '2:35' } };
   const [d] = normDrives({ previous: [], current: { id: 'k1', team: { id: '28', abbreviation: 'WSH' }, description: '0 plays, 0 yards, 0:00', start: {}, plays: [kick] } }, '28', '19', true);
   assert.equal(d.startToEnd, 67); // WSH 33
+});
+
+test('fresh off a kickoff with no spots yet, the drive starts where the words say the return ended', () => {
+  const kick = { type: { text: 'Kickoff' }, text: 'D.Stevens kicks 62 yards from WAS 35 to NYG 3. G.Desrosiers to NYG 27 for 24 yards (T.Owens).', start: { team: { id: '28' } }, end: { yardsToEndzone: 0, possessionText: 'NYG 0' }, period: { number: 3 }, clock: { displayValue: '6:56' } };
+  const prev = { id: 'p', team: { id: '28', abbreviation: 'WSH' }, result: 'TD', description: '6 plays', plays: [{ type: { text: 'Rush' }, text: 'run', start: { team: { id: '28' }, yardsToEndzone: 5 }, end: { team: { id: '28' } } }] };
+  const cur = { id: 'k', team: { id: '19', abbreviation: 'NYG' }, description: '0 plays, 0 yards, 0:00', start: {}, plays: [kick] };
+  const ds = normDrives({ previous: [prev], current: cur }, '28', '19', true);
+  const d = ds[ds.length - 1];
+  assert.equal(d.startToEnd, 73);
+  assert.equal(d.startText, 'NYG 27');
+  assert.equal(d.plays[0].endRaw, 73);
+});
+
+test('kick return spot from the words, with the feed calling Washington WAS', () => {
+  assert.equal(kickReturnSpot('D.Zvada kicks 57 yards from NYG 35 to WAS 8. L.McCaffrey to WAS 33 for 25 yards.', 'WSH', 'NYG'), 67);
+  assert.equal(kickReturnSpot('kicks 65 yards from WAS 35 to NYG 0. Touchback.', 'NYG', 'WSH'), 100);
 });
