@@ -1020,6 +1020,11 @@ function PlayerPage({ lg, id }) {
     // Only one season's tables: a QB's one tackle from 2023 is not part of his 2026.
     const top = Math.max(...all.map((x) => x.row.year || 0));
     return !top || !c.row.year || c.row.year === top;
+  }).filter((c, _, all) => {
+    // A table of nothing but zeros (a tight end's empty passing line, its rating a formula's leftover) says nothing.
+    // Games played and ratings don't count as doing something; keep it if it's the only table.
+    const did = c.row.stats.some((v, i) => !/^(gp|gs|g|rtg|qbr|rating)$/i.test(String(c.labels[i] || '').trim()) && Number(String(v).replace(/,/g, '')) !== 0 && /\d/.test(String(v)));
+    return did || all.length === 1;
   });
   const lgq = useQuery(picked ? `gamelog:${lg}:${id}:${picked}` : null, () => getGamelog(lg, id, picked), () => 600000);
   const log0 = picked ? (lgq.data || { labels: [], spans: [], seasons: [] }) : d?.gamelog;
