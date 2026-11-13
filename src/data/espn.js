@@ -1406,9 +1406,15 @@ export async function getDeepLeader(lg, key) {
 const SITE3 = 'https://site.api.espn.com/apis/site/v3/sports';
 // Who leads the league in each stat. The feed has moved this around, so try each place it has lived.
 // The feed's display text rounds half sacks away ("8" for 8.5), so trust the number when it has a fraction.
-function leaderValue(l) {
-  const shown = String(l.displayValue ?? l.value ?? '');
+function leaderValue(l, key = '') {
+  let shown = String(l.displayValue ?? l.value ?? '');
   const n = Number(l.value);
+  // Baseball's feed now sends a whole stat line as the display ("179-567, 42 HR, ..."): build the number from the value.
+  if (Number.isFinite(n) && !/^-?[\d,.]+%?$/.test(shown.trim())) {
+    shown = Number.isInteger(n) ? String(n)
+      : /^(avg|onBasePct|slugAvg|OPS|opponentAvg)$/i.test(key) ? n.toFixed(3).replace(/^0(?=\.)/, '')
+        : /^(ERA|WHIP)$/i.test(key) ? n.toFixed(2) : n.toFixed(1);
+  }
   if (/^\d+$/.test(shown) && Number.isFinite(n)) {
     if (!Number.isInteger(n)) return String(Math.round(n * 10) / 10);
     if (n >= 1000) return n.toLocaleString('en-US');
@@ -1416,7 +1422,7 @@ function leaderValue(l) {
   return shown;
 }
 // The feed's PER board is broken (all zeros in college, a copy of FG% in the NBA), so it is left out.
-const LEADER_SKIP = /^PER$/i;
+const LEADER_SKIP = /^(PER|opponentAvg)$/i; // OBA too: baseball's opponent-average board has no innings minimum (a 1-inning .000 leads)
 // Plainer names than the feed's ("3 points field goal percentage").
 const LEADER_TITLE = {
   fieldGoalPercentage: 'Field Goal %', FreeThrowPct: 'Free Throw %', '3PointPct': '3-Point %', '3PointsMadePerGame': '3-Pointers Made Per Game',
@@ -1441,7 +1447,7 @@ export async function getLeaders(lg) {
           // Some percentage boards come as fractions (0.778); show them like the rest (77.8).
           const pct = /pct|percent/i.test(nm) && Number.isFinite(n) && n <= 1 && /^-?\d*\.?\d+$/.test(String(l.displayValue ?? '').trim()) && Number(l.displayValue) <= 1;
           return {
-            value: /double|triple/i.test(nm) && Number.isFinite(n) ? String(Math.round(n)) : pct ? (n * 100).toFixed(1) : leaderValue(l),
+            value: /double|triple/i.test(nm) && Number.isFinite(n) ? String(Math.round(n)) : pct ? (n * 100).toFixed(1) : leaderValue(l, nm),
             player: a ? { id: String(a.id ?? ''), name: cleanText(a.displayName || a.fullName || a.shortName || ''), pos: a.position?.abbreviation || '' } : null,
             team: t?.id ? normTeam(t, lg) : null,
           };
