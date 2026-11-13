@@ -10,9 +10,10 @@ const jsx = /export function Mascot\(\)[\s\S]*?(<svg[\s\S]*?<\/svg>)/.exec(src)[
 const svg = jsx
   .replace(/\s(className|width|height|aria-hidden)="[^"]*"/g, '')
   .replace(/stopColor/g, 'stop-color').replace(/strokeWidth/g, 'stroke-width').replace(/strokeLinecap/g, 'stroke-linecap')
-  .replace(/clipPath="/g, 'clip-path="').replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  .replace(/clipPath="/g, 'clip-path="').replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+  .replace(/var\(--ink\)/g, '#0C1124'); // the middle racing stripe takes the page's ink: navy on the cream icon
 
-const BG = '#0C1124';
+const BG = '#F3EFE4'; // light mode's cream program paper
 // [file, size, how wide the mascot is as a share of the icon]. Maskable icons get cropped to a circle, so it sits smaller.
 const OUT = [['icon-512.png', 512, 0.8], ['icon-192.png', 192, 0.8], ['apple-touch-icon.png', 180, 0.8], ['icon-maskable-512.png', 512, 0.62]];
 

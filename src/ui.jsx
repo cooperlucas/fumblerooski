@@ -305,7 +305,7 @@ export function Mascot() {
         <clipPath id="frBallClip"><ellipse cx="38" cy="25" rx="21" ry="14" transform="rotate(-20 38 25)" /></clipPath>
       </defs>
       <path d="M4 16 H22" stroke="#22D3D6" strokeWidth="4" strokeLinecap="round" />
-      <path d="M9 23 H20" stroke="#F5F5F7" strokeWidth="4" strokeLinecap="round" />
+      <path d="M9 23 H20" stroke="var(--ink)" strokeWidth="4" strokeLinecap="round" />
       <path d="M2 30 H20" stroke="#8B5CF6" strokeWidth="4" strokeLinecap="round" />
       <ellipse cx="41" cy="28" rx="21" ry="14" transform="rotate(-20 41 28)" fill="#6E3AB5" />
       <ellipse cx="38" cy="25" rx="21" ry="14" transform="rotate(-20 38 25)" fill="url(#frBall)" />
