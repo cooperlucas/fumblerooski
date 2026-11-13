@@ -199,7 +199,10 @@ function Scores() {
   // window), plus how they did last night: that result stays all day, even after Headliners moves the league on to today.
   const mine = useMemo(() => {
     const seen = new Set();
-    const lastNight = hl.yest.filter((g) => g.state === 'final');
+    // ...unless that team plays again today: then last night's game follows the league's usual morning rule.
+    const todayAll = [...today, ...(hl.q.data?.games || [])];
+    const playsToday = (g, side) => todayAll.some((t) => t.lg === g.lg && t.id !== g.id && (t.away.id === g[side].id || t.home.id === g[side].id));
+    const lastNight = hl.yest.filter((g) => g.state === 'final' && !['away', 'home'].some((sd) => favSet.has(favKey({ lg: g.lg, id: g[sd].id })) && playsToday(g, sd)));
     return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
   }, [today, hl.q.data, hl.yest, favSet]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
