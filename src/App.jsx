@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getFootballSlate, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
@@ -63,6 +63,21 @@ export default function App() {
 const Page = ({ children }) => <main className="page"><div className="enter">{children}</div></main>;
 
 /* ---------- Bottom ticker: today's scores crawling by, league by league, like an old sports channel ---------- */
+// Pinned college teams' own schedules, so a D-II / D-III / FCS team's games show up (the main boards are top division only).
+// Live games refresh like a scoreboard. Returns { today, yest, all } split by sports day.
+const PIN_LEAGUES = new Set(['cfb', 'ncaam', 'ncaaw']);
+function usePinnedGames(favs) {
+  const pins = favs.filter((f) => PIN_LEAGUES.has(f.lg));
+  const key = pins.map(favKey).sort().join(',');
+  const q = useQuery(pins.length ? `pinned:${key}` : null,
+    async () => (await Promise.all(pins.map((f) => getTeamGames(f.lg, f.id).catch(() => [])))).flat(),
+    (all) => (all?.some((g) => g.state === 'live') ? 30000 : 300000));
+  return useMemo(() => {
+    const all = q.data || [], now = new Date();
+    const y = new Date(now.getTime() - 86400000);
+    return { all, today: all.filter((g) => isToday(g, now)), yest: all.filter((g) => g.state !== 'live' && isToday(g, y)) };
+  }, [q.data]);
+}
 function Ticker() {
   const today = useDay(0);
   const morning = isMorning();
@@ -71,13 +86,17 @@ function Ticker() {
   const [secs, setSecs] = useState(60);
   const prefs = useLeaguePrefs();
   const favs = useFavs();
+  const pinned = usePinnedGames(favs);
   const groups = useMemo(() => {
     const favSet = new Set(favs.map(favKey));
     const rank = { live: 0, final: 1, pre: 2, off: 3 };
-    const pool = [...(morning ? (yest.data?.games || []) : []), ...(today.data?.games || [])];
+    // Pinned small-college teams ride along on their game day (the boards' own copy wins when a game is on both).
+    const seen = new Set();
+    const pool = [...(morning ? (yest.data?.games || []) : []), ...(today.data?.games || []), ...(morning ? pinned.yest : []), ...pinned.today]
+      .filter((g) => !seen.has(g.lg + g.id) && seen.add(g.lg + g.id));
     // Leagues switched off in Settings stay off the crawl, except games with a pinned team.
     return orderLeagues(prefs).map((l) => ({ l, games: pool.filter((g) => g.lg === l.id && (isLeagueOn(l.id, prefs) || isFavGame(g, favSet))).sort((a, b) => rank[a.state] - rank[b.state] || String(a.date).localeCompare(String(b.date))) })).filter((x) => x.games.length);
-  }, [today.data, yest.data, morning, prefs, favs]);
+  }, [today.data, yest.data, morning, prefs, favs, pinned]);
   const count = groups.reduce((n, x) => n + x.games.length, 0);
   // Constant crawl speed no matter how many games are on.
   useLayoutEffect(() => { if (track.current) setSecs(Math.max(20, Math.round(track.current.scrollWidth / 2 / 55))); }, [count]);
@@ -172,11 +191,18 @@ function useHeadlines(prefs) {
   const modes = footballModes(now, today.data?.seasons?.cfb || '');
   const cfbW = useQuery(isLeagueOn('cfb', prefs) && modes.cfb ? `hl:cfb:${modes.cfb}` : null, () => getFootballSlate('cfb', modes.cfb === 'done'), boardRefresh);
   const nflW = useQuery(isLeagueOn('nfl', prefs) && modes.nfl ? `hl:nfl:${modes.nfl}` : null, () => getFootballSlate('nfl', modes.nfl === 'done'), boardRefresh);
-  const games = useMemo(() => headlineGames({
-    now: new Date(), today: today.data?.games || [], yest: morning ? (yest.data?.games || []) : [],
-    weeks: { cfb: cfbW.data?.games, nfl: nflW.data?.games }, seasons: today.data?.seasons || {},
-  }), [today.data, yest.data, cfbW.data, nflW.data, morning]);
-  return { games, q: today, yest: yest.data?.games || [] };
+  // Pinned small-college teams' games go in with everyone else's, so the same day and week rules apply to them.
+  const pinned = usePinnedGames(useFavs());
+  const games = useMemo(() => {
+    const pc = pinned.all.filter((g) => g.lg === 'cfb'), t = Date.now();
+    const inWeek = modes.cfb === 'done' ? pc.filter((g) => g.state === 'final' && t - Date.parse(g.date) < 4 * 86400000)
+      : modes.cfb === 'next' ? pc.filter((g) => g.state !== 'final' && Date.parse(g.date) - t < 7 * 86400000) : [];
+    return headlineGames({
+      now: new Date(), today: [...(today.data?.games || []), ...pinned.today], yest: morning ? [...(yest.data?.games || []), ...pinned.yest] : [],
+      weeks: { cfb: cfbW.data?.games || inWeek.length ? [...(cfbW.data?.games || []), ...inWeek] : undefined, nfl: nflW.data?.games }, seasons: today.data?.seasons || {},
+    });
+  }, [today.data, yest.data, cfbW.data, nflW.data, morning, pinned, modes.cfb]);
+  return { games, q: today, yest: [...(yest.data?.games || []), ...pinned.yest] };
 }
 
 function Scores() {

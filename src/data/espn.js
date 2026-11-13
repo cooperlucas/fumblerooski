@@ -389,6 +389,13 @@ export async function getScoreboard(lg, day, week) {
   };
 }
 
+// One team's games from its schedule, shaped like scoreboard games. For pinned small-college teams (D-II, D-III, FCS)
+// that the main scoreboards leave out.
+export async function getTeamGames(lg, id) {
+  const d = await get(url(SITE, lg, `/teams/${encodeURIComponent(id)}/schedule`));
+  return (d.events || []).map((e) => normEvent(e, lg)).filter((g) => g.id && g.home.id && g.away.id);
+}
+
 /* ---------- NBA Cup: group standings, worked out from the schedule (the feed has no Cup table) ---------- */
 // rankCupGroup: order one group's teams by the Cup's own tiebreakers: record, then head-to-head among the
 // tied teams, then point differential, then points scored. games: finished group games among these teams.
