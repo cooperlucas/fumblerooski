@@ -1334,7 +1334,8 @@ function LiveField({ drives, game, lg, onAll }) {
   const Xs = (side, toEnd) => (10 + (side === 'away' ? 100 - toEnd : toEnd)) * K;
   const X = (toEnd) => Xs(d.side, toEnd);
   const other = d.side === 'away' ? 'home' : 'away';
-  const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal/i.test(p.type));
+  // Stoppages (timeouts, the two-minute warning, end of a quarter) aren't snaps: the feed's spots on them can be anything.
+  const steps = d.plays.filter((p) => p.from != null && p.to != null && p.kept && !/kickoff|punt|extra point|field goal|timeout|two-minute|two minute|end of|end quarter|end half/i.test(p.type));
   const puntBack0 = !!last && /\bpunts?\b/i.test(last.text) && last.kept && last.mine && last.to != null;
   // A muffed punt the kicking team recovers is a new drive: it starts at the recovery spot, with nothing drawn back to the old one.
   const start = puntBack0 ? last.to : steps[0]?.from ?? d.startToEnd ?? last?.from ?? null; // a one-play drive (say, a pick on the first snap) starts where that play did
