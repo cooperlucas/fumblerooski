@@ -1944,6 +1944,9 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     })).filter((p) => p.text);
     const first = d.plays?.[0], last = d.plays?.[d.plays.length - 1];
     let result = cleanText(d.displayResult || d.result || d.shortDisplayResult || '');
+    // A finished drive can trail a stoppage the feed tacks on after the punt or score (an official timeout, the end of a
+    // quarter). Left in, the live field reads it as the latest play: the punting team still "has the ball" with a fresh down.
+    if (result) while (plays.length > 1 && /timeout|end of|two-minute|two minute/i.test(plays[plays.length - 1].type) && !plays[plays.length - 1].scoring) plays.pop();
     const against = returnScoreAgainst(d, teamId); // the defense scored on this drive's last play
     // "Downs Touchdown" and the like: the feed glued the other team's turnover onto this drive's score.
     if (!against && d.isScore === true && /touchdown|\btd\b/i.test(result)) result = result.replace(/^\s*(downs|punt|blocked punt|fumble|interception)\s+/i, '');

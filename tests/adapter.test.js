@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries, touchbackSpot, spotToEnd } from '../src/data/espn.js';
+import { setFetcher, getScoreboard, getStandings, getTeams, getTeam, getGame, headlineFor, statNumber, teamColor, pctOf, plusMinusFromPlays, scoreSeries, touchbackSpot, spotToEnd, normDrives } from '../src/data/espn.js';
 import { LEAGUE } from '../src/data/leagues.js';
 import { demoFetch } from '../src/data/fixtures.js';
 import { scrub, isBetting, cleanText } from '../src/data/guard.js';
@@ -596,4 +596,12 @@ test('headliners follow each sport\'s rhythm', async () => {
   const day = [{ lg: 'ncaam', id: 'n1', state: 'pre', date: tip, away: {}, home: {} }], night = [{ lg: 'ncaam', id: 'f1', state: 'final', date: '', away: {}, home: {} }];
   assert.deepEqual(headlineGames({ now: sat, today: day, yest: night }).map((x) => x.id), ['n1']);
   assert.deepEqual(headlineGames({ now: new Date(2026, 10, 14, 9), today: day, yest: night }).map((x) => x.id), ['f1']);
+});
+
+test('a finished drive drops the official timeout tacked on after its punt', () => {
+  const play = (type, text, team) => ({ type: { text: type }, text, start: { team: { id: team } }, end: {}, period: { number: 1 }, clock: { displayValue: '7:33' } });
+  const drv = { id: 'd1', team: { id: '28', abbreviation: 'WSH' }, result: 'PUNT', description: '6 plays, 12 yards, 3:45', start: { yardsToEndzone: 80 },
+    plays: [play('Pass Incompletion', 'J.Daniels pass incomplete.', '28'), play('Punt', 'T.Way punts 40 yards to NYG 40.', '28'), play('Official Timeout', 'Official Timeout at 07:33.', '19')] };
+  const [d] = normDrives({ previous: [drv], current: drv }, '28', '19', true);
+  assert.equal(d.plays[d.plays.length - 1].type, 'Punt');
 });
