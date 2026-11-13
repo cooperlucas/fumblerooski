@@ -1357,7 +1357,9 @@ function LiveField({ drives, game, lg, onAll }) {
   const tRet = !defTd && m0.kind === 'turnover' && last && last.endRaw != null ? Math.max(0, Math.min(100, 100 - last.endRaw)) : null;
   const retEnd = defTd ? 100 : tRet;
   const retYds = (defTd || tRet != null) && /return(?:ed)? for no gain|no return/i.test(last.text) ? 0 : defTd || tRet != null ? (Number((/return(?:ed)?\s+(?:for\s+)?(\d+)\s+y/i.exec(last.text) || /for (\d+) yards, touchdown/i.exec(last.text) || /for (\d+) y(?:ar)?ds?\b[^.]*\btouchdown/i.exec(last.text) || /(\d+) yd (?:interception|fumble)/i.exec(last.text) || [])[1]) || (last.yards > 0 ? last.yards : null)) : null;
-  const retFrom = retYds != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retYds)) : null;
+  // A pick with no return yardage in the words ("J.Holland to NYG 2 for no gain") was not run back: it ends where it was caught.
+  const retGot = retYds ?? (tRet != null ? 0 : null);
+  const retFrom = retGot != null && retEnd != null ? Math.max(0, Math.min(100, retEnd - retGot)) : null;
   // On a pick the offense's line stops at the line of scrimmage; the ball turns over where it was caught.
   const picked = tRet != null && /intercept/i.test(`${last.type} ${last.text}`);
   const at = defTd ? (last.from ?? 100) : tRet != null && retFrom != null ? (picked && last.from != null ? last.from : retFrom) : d.kind === 'td' ? 0 : puntBack ? last.to : lastKept ? lastKept.to : start;
