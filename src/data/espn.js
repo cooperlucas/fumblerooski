@@ -1238,6 +1238,16 @@ export async function getRankings(lg) {
 // Each leader category maps to [stat group, stat name, category the feed wants filled] (formats checked live). Percentages and goalie
 // rates are left out on purpose: that board does not apply minimums, so a 1-for-1 shooter would lead.
 const DEEP = {
+  // Baseball: rate stats read the qualified list (the feed's default: 3.1 plate appearances or 1 inning per team game),
+  // counting stats everyone (isqualified=false), so closers and part-timers count. [group, stat, category, 'asc' for lowest-first, all players]
+  baseball: {
+    avg: ['batting', 'avg', 'batting'], onBasePct: ['batting', 'onBasePct', 'batting'], slugAvg: ['batting', 'slugAvg', 'batting'], OPS: ['batting', 'OPS', 'batting'],
+    homeRuns: ['batting', 'homeRuns', 'batting', 'desc', true], RBIs: ['batting', 'RBIs', 'batting', 'desc', true], runs: ['batting', 'runs', 'batting', 'desc', true],
+    hits: ['batting', 'hits', 'batting', 'desc', true], stolenBases: ['batting', 'stolenBases', 'batting', 'desc', true],
+    ERA: ['pitching', 'ERA', 'pitching', 'asc'], WHIP: ['pitching', 'WHIP', 'pitching', 'asc'],
+    wins: ['pitching', 'wins', 'pitching', 'desc', true], strikeouts: ['pitching', 'strikeouts', 'pitching', 'desc', true], saves: ['pitching', 'saves', 'pitching', 'desc', true],
+    holds: ['pitching', 'holds', 'pitching', 'desc', true], qualityStarts: ['pitching', 'qualityStarts', 'pitching', 'desc', true],
+  },
   football: {
     passingYards: ['passing', 'passingYards', 'offense:passing'], passingTouchdowns: ['passing', 'passingTouchdowns', 'offense:passing'], quarterbackRating: ['passing', 'QBRating', 'offense:passing'],
     rushingYards: ['rushing', 'rushingYards', 'offense:rushing'], rushingTouchdowns: ['rushing', 'rushingTouchdowns', 'offense:rushing'],
@@ -1388,8 +1398,8 @@ export async function getDeepLeader(lg, key) {
   if (q) return qualifiedBoard(lg, key, q);
   const m = DEEP[LEAGUE[lg]?.sport]?.[key];
   if (!m) return null;
-  const [group, stat, cat] = m;
-  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${group}.${stat}:desc`, limit: LEAGUE[lg].college ? '300' : '150', ...(cat ? { category: cat } : {}) }));
+  const [group, stat, cat, dir = 'desc', everyone = false] = m;
+  const d = await get(url(COMMON, lg, '/statistics/byathlete', { sort: `${group}.${stat}:${dir}`, limit: LEAGUE[lg].college ? '300' : '150', ...(cat ? { category: cat } : {}), ...(everyone ? { isqualified: 'false' } : {}) }));
   const idx = (d.categories || []).find((c) => c.name === group)?.names?.indexOf(stat) ?? -1;
   if (idx < 0) return null;
   return (d.athletes || []).map((x) => {
