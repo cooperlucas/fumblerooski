@@ -168,7 +168,7 @@ function useHeadlines(prefs) {
   const now = new Date();
   const today = useDay(0);
   const morning = now.getHours() < MORNING_UNTIL;
-  const yest = useDay(morning ? -1 : 0); // same query as today's when not needed
+  const yest = useDay(-1); // Your Teams keeps last night's results all day
   const modes = footballModes(now, today.data?.seasons?.cfb || '');
   const cfbW = useQuery(isLeagueOn('cfb', prefs) && modes.cfb ? `hl:cfb:${modes.cfb}` : null, () => getFootballSlate('cfb', modes.cfb === 'done'), boardRefresh);
   const nflW = useQuery(isLeagueOn('nfl', prefs) && modes.nfl ? `hl:nfl:${modes.nfl}` : null, () => getFootballSlate('nfl', modes.nfl === 'done'), boardRefresh);
@@ -176,7 +176,7 @@ function useHeadlines(prefs) {
     now: new Date(), today: today.data?.games || [], yest: morning ? (yest.data?.games || []) : [],
     weeks: { cfb: cfbW.data?.games, nfl: nflW.data?.games }, seasons: today.data?.seasons || {},
   }), [today.data, yest.data, cfbW.data, nflW.data, morning]);
-  return { games, q: today };
+  return { games, q: today, yest: yest.data?.games || [] };
 }
 
 function Scores() {
@@ -195,11 +195,13 @@ function Scores() {
   const sb = sb0;
   const hl = useHeadlines(prefs);
   const today = hl.games;
-  // Your Teams: whatever Headliners shows for them, plus any game of theirs today, always (even in the morning results window).
+  // Your Teams: whatever Headliners shows for them, plus any game of theirs today, always (even in the morning results
+  // window), plus how they did last night: that result stays all day, even after Headliners moves the league on to today.
   const mine = useMemo(() => {
     const seen = new Set();
-    return sortGames([...today, ...(hl.q.data?.games || [])].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
-  }, [today, hl.q.data, favSet]);
+    const lastNight = hl.yest.filter((g) => g.state === 'final');
+    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
+  }, [today, hl.q.data, hl.yest, favSet]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
   const leagues = useMemo(() => {
     const now = new Date();
