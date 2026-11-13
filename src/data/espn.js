@@ -1755,7 +1755,7 @@ export function scoreSeries(game, plays, L) {
     pts.push({ m, a: p.away, h: p.home }); pa = p.away; ph = p.home;
   }
   let bounds = [], total = null;
-  if (pts.length >= 3 && timed) {
+  if (timed && (pts.length >= 2 || game.state === "live")) {
     total = L.sport === 'soccer' ? Math.max(90, ...pts.map((p) => p.m)) : L.periods * L.periodLen + Math.max(0, played - L.periods) * ot;
     let last = 0;
     pts.forEach((p) => { p.m = Math.max(last, Math.min(total, p.m)); last = p.m; p.t = p.m / total; });
