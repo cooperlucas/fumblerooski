@@ -1923,6 +1923,16 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
   // Team abbreviations by id, for drives whose team the feed got wrong.
   const abbrOf = {};
   for (const d of list) if (d.team?.id) abbrOf[String(d.team.id)] = d.team.abbreviation;
+  // Where a play started, in yards to the end zone its offense attacks. The feed's number is sometimes flipped (a punt from
+  // the NYG 25 came in as 25 to go, not 75), so trust the spot it writes out ("4th & 19 at NYG 25") when there is one.
+  const startSpot = (p) => {
+    const raw = num(p.start?.yardsToEndzone);
+    const at = /\bat\s+(.+)$/i.exec(String(p.start?.downDistanceText || ''))?.[1] || p.start?.possessionText;
+    const abbr = abbrOf[String(p.start?.team?.id ?? '')];
+    const txt = at && abbr ? spotToEnd(at, abbr) : null;
+    // Only when it is the feed's number flipped: an abbreviation that doesn't match ours can't move the ball anywhere else.
+    return raw != null && txt != null && txt !== raw && txt === 100 - raw ? txt : raw;
+  };
   return list.map((d, i) => {
     // The feed sometimes credits a drive to the wrong team (after a blocked punt, say, SMU's touchdown drive came in as Tulane's
     // "Downs Touchdown"). Go by who ran the scrimmage plays when they all agree.
@@ -1936,7 +1946,7 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       period: p.period?.number || 0, clock: p.clock?.displayValue || '',
       scoring: p.scoringPlay === true, away: Number(p.awayScore), home: Number(p.homeScore),
       // For the live field: where the play started and ended (yards to the end zone the offense is attacking), and what comes next.
-      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: num(p.start?.yardsToEndzone), to: /\bpunts?\b|kickoff/i.test(p.text || '') ? num(p.end?.yardsToEndzone) : fixSpot(num(p.start?.yardsToEndzone), num(p.end?.yardsToEndzone), num(p.statYardage)), // kick yards are not field position, so no spot check
+      type: cleanText(p.type?.text || ''), yards: num(p.statYardage), from: startSpot(p), to: /\bpunts?\b|kickoff/i.test(p.text || '') ? num(p.end?.yardsToEndzone) : fixSpot(startSpot(p), num(p.end?.yardsToEndzone), num(p.statYardage)), // kick yards are not field position, so no spot check
       // endRaw is the feed's own end spot (after a kick it is counted from the receiving team's side); mine = the drive's team ran the play.
       endRaw: num(p.end?.yardsToEndzone), mine: String(p.start?.team?.id ?? teamId) === teamId,
       kept: String(p.end?.team?.id ?? teamId) === teamId, nextDown: Number(p.end?.down) || 0, nextDist: num(p.end?.distance),
