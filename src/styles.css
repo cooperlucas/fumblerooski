@@ -329,6 +329,7 @@ h1, h2, h3, p { margin: 0; }
 .lead .pos { flex: none; width: 26px; font-size: 12px; font-weight: 800; color: var(--dim); text-align: right; }
 .lead .nm { flex: 1; min-width: 0; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lead .nm small { font-weight: 700; color: var(--mute); font-size: 11px; }
+.lead .vsub { flex: none; font-size: 11px; font-weight: 800; color: var(--mute); letter-spacing: 0.02em; white-space: nowrap; }
 .lead .v { font-stretch: 112%; font-style: italic; font-weight: 900; font-size: 16px; font-variant-numeric: tabular-nums; }
 .lead.top .v { color: var(--yellow); font-size: 20px; text-shadow: 2px 2px 0 #6E3AB5; }
 .pbox th.sort { cursor: pointer; }

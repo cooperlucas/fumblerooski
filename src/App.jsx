@@ -783,6 +783,7 @@ function LeaderCard({ lg, c, f, focus, season }) {
           <span className="pos">{place[i]}</span>
           {r.team ? <Blob team={r.team} /> : null}
           <span className="nm">{r.player?.name || r.team?.full}{r.player?.pos ? <small> {r.player.pos}</small> : null}</span>
+          {r.sub ? <span className="vsub">{r.sub}</span> : null}
           <span className="v">{pct1(c.title, r.value)}</span>
         </button>
       ))}

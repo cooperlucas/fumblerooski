@@ -1270,6 +1270,8 @@ const DEEP = {
     // average boards include tiny samples and wouldn't match the rank shown).
     rushingAttempts: ['rushing', 'rushingAttempts', 'offense:rushing'], soloTackles: ['defensive', 'soloTackles', 'defense'],
     tacklesForLoss: ['defensive', 'tacklesForLoss', 'defense'], fumblesForced: ['general', 'fumblesForced', 'defense'],
+    // Kicking boards added to the leaders page (the feed has none): everyone, so a kicker with few tries still counts.
+    fieldGoalsMade: ['kicking', 'fieldGoalsMade', 'specialTeams:kicking', 'desc', true], longFieldGoalMade: ['kicking', 'longFieldGoalMade', 'specialTeams:kicking', 'desc', true],
   },
   basketball: {
     pointsPerGame: ['offensive', 'avgPoints'], assistsPerGame: ['offensive', 'avgAssists'], reboundsPerGame: ['general', 'avgRebounds'],
@@ -1406,6 +1408,7 @@ async function qualifiedBoard(lg, key, q, season) {
       team: r.a.teamId ? normTeam({ id: r.a.teamId, abbreviation: r.a.teamShortName, displayName: r.a.teamName, shortDisplayName: r.a.teamShortName }, lg) : null,
     }));
 }
+const KICK_BOARDS = [['fieldGoalsMade', 'Field Goals Made', 'FGM'], ['longFieldGoalMade', 'Long Field Goal', 'LNG']];
 export const EXTRA_BOARDS = { rushingAttempts: 'Rushing Attempts', soloTackles: 'Solo Tackles', tacklesForLoss: 'Tackles For Loss', fumblesForced: 'Forced Fumbles' };
 export const canGoDeep = (lg, key) => !!DEEP[LEAGUE[lg]?.sport]?.[key] || !!qualifiedRule(lg, key);
 export async function getDeepLeader(lg, key, season) {
@@ -1420,9 +1423,13 @@ export async function getDeepLeader(lg, key, season) {
   if (idx < 0) return null;
   return (d.athletes || []).map((x) => {
     const a = x.athlete || {};
-    const v = String((x.categories || []).find((c) => c.name === group)?.totals?.[idx] ?? '');
+    const tot = (x.categories || []).find((c) => c.name === group)?.totals || [];
+    const v = String(tot[idx] ?? '');
+    const col = (n) => tot[(d.categories || []).find((c) => c.name === group)?.names?.indexOf(n) ?? -1];
+    // Field goals made carry the tries and percentage beside them.
+    const sub = stat === 'fieldGoalsMade' && col('fieldGoalAttempts') ? `${col('fieldGoalAttempts')} ATT · ${col('fieldGoalPct')}%` : undefined;
     return {
-      value: v,
+      value: v, sub,
       player: { id: String(a.id ?? ''), name: cleanText(a.displayName || ''), pos: a.position?.abbreviation || '' },
       team: a.teamId ? normTeam({ id: a.teamId, abbreviation: a.teamShortName, displayName: a.teamName, shortDisplayName: a.teamShortName }, lg) : null,
     };
@@ -1506,7 +1513,12 @@ export async function getLeaders(lg, season) {
       const niche = (c) => /punt|return|kick|field goal/i.test(c.title + ' ' + c.key);
       // Hoops: total points just repeats the points-per-game list, so it goes.
       const hoops = LEAGUE[lg]?.sport === 'basketball';
-      const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key) && !(hoops && c.key === 'points'));
+      const football = LEAGUE[lg]?.sport === 'football';
+      // Football: interception return yards go; field goals made and long field goal join at the very bottom.
+      const kept = cats.filter((c) => !/kickoff/i.test(c.title + ' ' + c.key) && !(hoops && c.key === 'points') && !(football && c.key === 'interceptionYards'));
+      const kick = football ? (await Promise.all(KICK_BOARDS.map(async ([key, title, abbr]) => {
+        try { const rows = await getDeepLeader(lg, key, season); return rows?.length ? { key, title, abbr, rows: rows.slice(0, 10) } : null; } catch { return null; }
+      }))).filter(Boolean) : [];
       if (kept.length && LEAGUE[lg]?.sport === 'basketball') {
         // Shooting percentages: the feed's board has no minimum, so a 1-for-1 shooter leads. Rebuild those lists from qualified shooters.
         try {
@@ -1520,7 +1532,7 @@ export async function getLeaders(lg, season) {
         const more = (await pastLeaders(lg, season)).filter((c) => !kept.some((k) => k.key === c.key));
         kept.push(...more);
       }
-      if (kept.length) return { lg, season: season || null, current: Number(d.currentSeason?.year || d.season?.year || 0) || null, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche)] };
+      if (kept.length) return { lg, season: season || null, current: Number(d.currentSeason?.year || d.season?.year || 0) || null, cats: [...kept.filter((c) => !niche(c)), ...kept.filter(niche), ...kick] };
     } catch (e) { lastErr = e; }
   }
   if (season) {
