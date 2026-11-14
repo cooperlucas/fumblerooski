@@ -2710,8 +2710,21 @@ function Preview({ p, game, lg }) {
   const both = [game.away, game.home];
   const [l5, setL5] = useSticky('l5', game.away.id);
   const inGroup = (gr, id) => gr.rows.some((r) => r.id === id);
-  const shared = p.standings.find((gr) => inGroup(gr, game.away.id) && inGroup(gr, game.home.id));
-  const groups = shared ? [shared] : p.standings;
+  // Small-college games (FCS, D-II, D-III): the game feed sends no standings, so read the division's table and keep the
+  // conference (or conferences) these two play in.
+  const lower = !p.standings.length && !!DIVISIONS[lg]?.length;
+  const ls = useQuery(lower ? `pvst:${lg}:${game.away.id}:${game.home.id}` : null, async () => {
+    for (const d of DIVISIONS[lg].filter((x) => x.groups.length)) {
+      try {
+        const hit = (await getStandings(lg, d.id)).groups.filter((g) => g.rows.some((r) => r.team.id === game.away.id || r.team.id === game.home.id));
+        if (hit.length) return hit.map((g) => ({ title: g.name, cols: ['REC', g.col2Label || 'CONF'], rows: g.rows.map((r) => ({ id: r.team.id, name: r.team.name, stats: [r.overall || '', r.col2 || ''] })) }));
+      } catch { /* try the next division */ }
+    }
+    return [];
+  }, () => 600000);
+  const standings = p.standings.length ? p.standings : ls.data || [];
+  const shared = standings.find((gr) => inGroup(gr, game.away.id) && inGroup(gr, game.home.id));
+  const groups = shared ? [shared] : standings;
   const [gi, setGi] = useSticky('stand', 0);
   const gr = groups[Math.min(gi, groups.length - 1)];
   const leaderKeys = [...new Set(both.flatMap((t) => (p.leaders[t.id] || []).map((x) => x.key)))];
