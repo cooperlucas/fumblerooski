@@ -322,7 +322,9 @@ function LeagueScores({ lg, startDay }) {
   const today = ymdOf(new Date());
   const dayKey = day || (b?.dates ? gameDayFor(b.dates.map((x) => x.replace(/-/g, '')), today) : today);
   const [wt, wn] = (wkKey || '').split(':').map(Number);
-  const isBase = weekMode ? !yr && wkKey === curWk : dayKey === (b?.current?.day ? b.current.day.replace(/-/g, '') : today);
+  // The feed's default slate only counts as a day when it says which day it is (with groups=50 college hoops doesn't, and
+  // in the morning that slate is still last night's): otherwise ask for the day by date.
+  const isBase = weekMode ? !yr && wkKey === curWk : !!b?.current?.day && dayKey === b.current.day.replace(/-/g, '');
   const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${yr || ''}:${wkKey}` : `board:${lg}:d${dayKey}`) : null,
     () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt, year: yr || undefined }) : getScoreboard(lg, dayKey)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
   // Past seasons have their own week list (bowl names, playoff rounds), which comes back with that season's slate.
