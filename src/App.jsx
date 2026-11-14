@@ -230,9 +230,9 @@ function Scores() {
     const todayAll = [...today, ...(hl.q.data?.games || [])];
     const playsToday = (g, side) => todayAll.some((t) => t.lg === g.lg && t.id !== g.id && (t.away.id === g[side].id || t.home.id === g[side].id));
     const lastNight = hl.yest.filter((g) => g.state === 'final' && !['away', 'home'].some((sd) => favSet.has(favKey({ lg: g.lg, id: g[sd].id })) && playsToday(g, sd)));
-    // Finals from an earlier day are gone by 3pm, even when Headliners still shows that league's week.
+    // Finals from an earlier day are gone by 3pm (and stay gone through the midnight-to-3am tail of the sports day), even when Headliners still shows that league's week.
     const now = new Date(), y = new Date(now.getTime() - 86400000);
-    const fresh = (g) => g.state !== 'final' || isToday(g, now) || (now.getHours() < YOUR_TEAMS_UNTIL && isToday(g, y));
+    const fresh = (g) => g.state !== 'final' || isToday(g, now) || (now.getHours() >= 3 && now.getHours() < YOUR_TEAMS_UNTIL && isToday(g, y));
     return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
   }, [today, hl.q.data, hl.yest, favSet]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
