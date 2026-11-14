@@ -31,10 +31,11 @@
 /* Always-dark pieces: the score crawl, and the team-colored cards that carry white text. */
 .ticker, .board, .teamhero { --ink: #F8F2E7; --soft: #E2D5C0; --mute: #AC9A82; --dim: #887764; --rule: #33281E; --yellow: #FFBE2E; --teal: #22D3D6; --pink: #FF3D7F; --lime: #9BE33A; color: var(--ink); }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { min-height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.35; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
-/* Pinned to the screen edges: as a Home Screen app on iPhone, height: 100% stops short and leaves a dead band at the bottom. */
-#root { position: fixed; inset: 0; }
+/* The window itself scrolls (so tapping the iPhone's clock jumps to the top): the header sticks to the top and the
+   ticker and tab bar ride in a dock fixed to the bottom. --headh and --dockh are measured by the app. */
+#root { min-height: 100%; }
 button { font: inherit; color: inherit; cursor: pointer; transition: transform 120ms ease, background-color 160ms ease; }
 button:active { transform: scale(0.97); }
 :focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
@@ -52,7 +53,9 @@ h1, h2, h3, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 /* shell: header, scrolling page, tab bar. Centered phone column on big screens. */
-.app { height: 100%; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg); position: relative; }
+.app { min-height: 100vh; min-height: 100dvh; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg); position: relative; padding-bottom: var(--dockh, 0px); }
+.stick { position: sticky; top: 0; z-index: 20; background: var(--bg); }
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; }
 @media (min-width: 560px) { .app { border-left: 1px solid var(--line2); border-right: 1px solid var(--line2); } }
 .head { flex: none; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 14px) max(18px, env(safe-area-inset-right, 0px)) 10px max(18px, env(safe-area-inset-left, 0px)); }
 .brand { margin: 0; padding-right: 4px; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 22px; line-height: 1.05; white-space: nowrap; display: inline-block; letter-spacing: 0.01em; text-transform: uppercase; background: linear-gradient(180deg, #FFFFFF 0%, #C8FAFB 40%, #22D3D6 52%, #0E6F7A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0.6px #0C1124; filter: drop-shadow(2px 2px 0 #6E3AB5) drop-shadow(1px 1px 0 #0C1124); }
@@ -61,10 +64,10 @@ h1, h2, h3, p { margin: 0; }
 .round { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--chip); border: 1px solid var(--line3); display: flex; align-items: center; justify-content: center; padding: 0; }
 .subtitle { flex: 1; min-width: 0; font-stretch: 125%; font-weight: 800; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stripes { flex: none; height: 10px; background: linear-gradient(to bottom, var(--teal) 0 2px, transparent 2px 4px, var(--ink) 4px 6px, transparent 6px 8px, var(--purple) 8px 10px); }
-.page { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px max(18px, env(safe-area-inset-right, 0px)) 28px max(18px, env(safe-area-inset-left, 0px)); }
+.page { flex: 1; padding: 10px max(18px, env(safe-area-inset-right, 0px)) 28px max(18px, env(safe-area-inset-left, 0px)); }
 .enter { animation: frEnter 340ms cubic-bezier(.2, .8, .2, 1) both; }
 /* The tab bar tucks down into the home-indicator strip (like the phone's own apps) so the page gets the room. */
-.tabs { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 5px 10px max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)); background: var(--bg); border-top: 1px solid var(--line2); }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 5px 10px max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)); background: var(--bg); border-top: 1px solid var(--line2); }
 .tab { height: 48px; border: none; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-weight: 800; font-size: 11px; background: transparent; color: var(--mute); }
 .tab[aria-current="page"] { background: var(--chip); color: var(--yellow); }
 .demo { flex: none; text-align: center; padding: 5px 10px; background: var(--yellow); color: var(--on-accent); font-size: 11px; font-weight: 900; letter-spacing: 0.08em; }
@@ -257,7 +260,7 @@ h1, h2, h3, p { margin: 0; }
 .court { display: block; width: 100%; height: auto; }
 
 /* game page sections: one at a time, picked from a row that stays put while you scroll */
-.gtabs { position: sticky; top: -10px; z-index: 3; display: flex; gap: 8px; overflow-x: auto; margin: 12px -18px 0; padding: 10px 18px; background: var(--bg); border-bottom: 1px solid var(--line2); scrollbar-width: none; }
+.gtabs { position: sticky; top: var(--headh, 0px); z-index: 3; display: flex; gap: 8px; overflow-x: auto; margin: 12px -18px 0; padding: 10px 18px; background: var(--bg); border-bottom: 1px solid var(--line2); scrollbar-width: none; }
 .gtabs::-webkit-scrollbar { display: none; }
 .gtab.solo > .sec { margin-top: 12px; }
 .gtab.solo > .sec > .h2, .gtab.solo > .sec > .sechead { display: none; }
@@ -319,8 +322,7 @@ h1, h2, h3, p { margin: 0; }
 /* Installed on an iPhone Home Screen: the page box stops short of the bottom by the notch and home-bar insets.
    Full viewport height is the one measure that reaches the real bottom there. Browsers keep the rule above. */
 @media (display-mode: standalone) {
-  html, body { height: 100vh; }
-  #root { bottom: auto; height: 100vh; }
+  .app { min-height: 100vh; }
 }
 
 /* stats */
@@ -624,7 +626,7 @@ button.pick.date { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .court .runchip, .court .runchip rect { animation: none; } }
 
 /* replay: a finished game played back as if live */
-.replaybar { margin-top: 14px; padding: 6px 8px 8px; border-radius: 14px; background: var(--panel); border: 2px solid var(--yellow); display: flex; flex-direction: column; gap: 4px; position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
+.replaybar { margin-top: 14px; padding: 6px 8px 8px; border-radius: 14px; background: var(--panel); border: 2px solid var(--yellow); display: flex; flex-direction: column; gap: 4px; position: sticky; bottom: var(--dockh, 0px); z-index: 5; box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
 .replaybar .rbtop { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
 .replaybar .rbtop span { flex: none; font-size: 11px; font-weight: 800; color: var(--mute); font-variant-numeric: tabular-nums; }
 .replaybar input[type=range] { flex: 1; min-width: 0; margin: 0; height: 22px; accent-color: var(--yellow); }

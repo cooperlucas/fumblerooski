@@ -353,11 +353,11 @@ function FitTagline() {
   return <div ref={ref} className="tagline">Pure sports · No odds · No ads</div>;
 }
 // Tap the top bar (anywhere but its buttons) to jump back to the top, like tapping the status bar in a native app.
-// iOS's own status-bar tap only scrolls the window, and our pages scroll inside .page, so it never reaches them.
-const toTop = (e) => { if (!e.target.closest('button, a')) document.querySelector('.page')?.scrollTo({ top: 0, behavior: 'smooth' }); };
+// (Tapping the iPhone's clock does the same: the window is what scrolls.)
+const toTop = (e) => { if (!e.target.closest('button, a')) window.scrollTo({ top: 0, behavior: 'smooth' }); };
 export function RootHeader() {
   return (
-    <>
+    <div className="stick">
       <header className="head" onClick={toTop}>
         <Mascot />
         <div className="brandbox">
@@ -370,12 +370,12 @@ export function RootHeader() {
         </div>
       </header>
       <div className="stripes" aria-hidden="true" />
-    </>
+    </div>
   );
 }
 export function SubHeader({ title, children, mini, miniOn }) {
   return (
-    <header className="head" onClick={toTop}>
+    <header className="head stick" onClick={toTop}>
       <button className="round" aria-label="Back" onClick={back}>
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>

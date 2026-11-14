@@ -16,18 +16,20 @@ export default function App() {
   // Back to a screen: return to where it was scrolled, once its content is there to scroll.
   useEffect(() => {
     const target = back ? savedScroll(path) : 0;
+    window.scrollTo(0, 0); // a new screen starts at the top (the window carries over from the last one)
     if (!target) return undefined;
     let tries = 0;
     const t = setInterval(() => {
-      const el = document.querySelector('.page');
-      if (el) { el.scrollTop = target; if (Math.abs(el.scrollTop - target) < 4 || ++tries > 40) clearInterval(t); } else if (++tries > 40) clearInterval(t);
+      window.scrollTo(0, target);
+      if (Math.abs(window.scrollY - target) < 4 || ++tries > 40) clearInterval(t);
     }, 50);
     return () => clearInterval(t);
   }, [path]);
   useEffect(() => {
-    const on = (e) => { if (e.target?.classList?.contains('page')) saveScroll(e.target.scrollTop); };
-    document.addEventListener('scroll', on, true);
-    return () => document.removeEventListener('scroll', on, true);
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; // we put each screen back ourselves
+    const on = () => saveScroll(window.scrollY);
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
   }, []);
   const [, repaint] = useState(0);
   useEffect(() => onColors(() => repaint((n) => n + 1)), []);
@@ -49,14 +51,31 @@ export default function App() {
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
 
   // Team, game and search screens draw their own header (they know the title or own the search box).
+  // The sticky header's and bottom dock's heights, for sticky bars and the page's bottom padding.
+  const dock = useRef(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const measure = () => {
+      root.style.setProperty('--dockh', (dock.current?.offsetHeight || 0) + 'px');
+      root.style.setProperty('--headh', (document.querySelector('.app .stick')?.offsetHeight || 0) + 'px');
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    if (dock.current) ro.observe(dock.current);
+    const h = document.querySelector('.app .stick'); if (h) ro.observe(h);
+    return () => ro.disconnect();
+  });
   const ownHeader = name === 'team' || name === 'game' || name === 'replay' || name === 'search' || name === 'player';
   return (
     <div className="app">
       <DemoBar />
       {root ? <RootHeader /> : ownHeader ? null : <SubHeader title={title} />}
       {ownHeader ? body : <main className="page" key={parts.join('/')}><div className="enter">{body}</div></main>}
-      <Ticker />
-      <TabBar active={tab} />
+      <div className="dock" ref={dock}>
+        <Ticker />
+        <TabBar active={tab} />
+      </div>
     </div>
   );
 }
@@ -2528,7 +2547,7 @@ function GamePage({ lg, id, feed, replayBar }) {
   useEffect(() => {
     const el = boardRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(([e]) => setMini(!e.isIntersecting && e.boundingClientRect.top < 80), { root: el.closest('.page'), threshold: 0, rootMargin: '-64px 0px 0px 0px' });
+    const io = new IntersectionObserver(([e]) => setMini(!e.isIntersecting && e.boundingClientRect.top < (document.querySelector('.app .stick')?.offsetHeight || 64) + 16), { root: null, threshold: 0, rootMargin: `-${(document.querySelector('.app .stick')?.offsetHeight || 64)}px 0px 0px 0px` });
     io.observe(el);
     return () => io.disconnect();
   }, [!!d]);
@@ -2547,7 +2566,7 @@ function GamePage({ lg, id, feed, replayBar }) {
   const perLabel = (i) => (i < (L.periods || 4) || L.sport === 'baseball' ? perName(L, i + 1) : periods - (L.periods || 4) > 1 ? `OT${i - (L.periods || 4) + 1}` : 'OT');
   return (
     <>
-      <SubHeader title={title} miniOn={mini && started} mini={started ? <MiniScore g={g} L={L} onTap={() => boardRef.current?.closest('.page')?.scrollTo({ top: 0, behavior: 'smooth' })} /> : null} />
+      <SubHeader title={title} miniOn={mini && started} mini={started ? <MiniScore g={g} L={L} onTap={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /> : null} />
       <Page>
         {q.loading && !d ? <Loading rows={5} /> : q.error && !d ? <Problem error={q.error} retry={q.reload} /> : (
           <>
