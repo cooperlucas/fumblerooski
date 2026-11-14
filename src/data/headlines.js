@@ -1,7 +1,7 @@
 // Which games Headliners shows for each league, by the rhythm of its sport.
 // Evening sports (NBA, NHL, MLB, college hoops): before noon, last night's results (plus anything already live); after noon, today.
 // Soccer: today (matches start in the morning).
-// College football: Saturday's slate on Saturday; the weekend's results Sunday through Tuesday morning; weekdays follow the
+// College football: Saturday's slate all day Saturday (no morning results); the weekend's results Sunday through Tuesday morning; weekdays follow the
 //   morning/afternoon rule on days with games (MACtion), otherwise the upcoming week's slate. Bowl season runs day by day.
 // NFL: last week's results on Tuesday (3am Tuesday to 3am Wednesday); the new week from then on.
 // Evening sports and weeknight football flip early when today's first game is close (weekend noon tips and kickoffs).
@@ -28,6 +28,7 @@ export function footballModes(now, cfbSeason = '') {
 export function headlineGames({ now, today = [], yest = [], weeks = {}, seasons = {} }) {
   const morning = now.getHours() < MORNING_UNTIL;
   const modes = footballModes(now, seasons.cfb);
+  const saturday = !/post/i.test(seasons.cfb || '') && sportsDay(now).getDay() === 6;
   const of = (list, lg) => list.filter((g) => g.lg === lg);
   const lgs = [...new Set([...today, ...yest, ...(weeks.cfb || []), ...(weeks.nfl || [])].map((g) => g.lg))];
   const out = [];
@@ -43,7 +44,9 @@ export function headlineGames({ now, today = [], yest = [], weeks = {}, seasons 
   for (const lg of lgs) {
     if (lg === 'nfl') out.push(...(weeks.nfl || of(today, lg)));
     else if (lg === 'cfb') {
-      if (!modes.cfb) out.push(...daily(lg));
+      // Saturday is the game day itself: the slate all day long, not Friday night's results in the morning.
+      if (!modes.cfb && saturday) out.push(...of(yest, lg).filter((g) => g.state === 'live'), ...of(today, lg));
+      else if (!modes.cfb) out.push(...daily(lg));
       else if (modes.cfb === 'done') out.push(...(weeks.cfb || []));
       else {
         // Weeknights: a game day (MACtion) goes by the morning/afternoon rule; otherwise what's coming up this week.

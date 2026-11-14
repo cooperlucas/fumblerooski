@@ -580,6 +580,8 @@ test('headliners follow each sport\'s rhythm', async () => {
   // Thursday morning after Wednesday MACtion: those results; Thursday afternoon with games: Thursday's
   assert.deepEqual(headlineGames({ now: at(4, 9), today: [g('cfb', 'th', 'pre')], yest: [g('cfb', 'we', 'final')], weeks: { cfb: wk } }).map((x) => x.id), ['we']);
   assert.deepEqual(headlineGames({ now: at(4, 15), today: [g('cfb', 'th', 'pre')], yest: [g('cfb', 'we', 'final')], weeks: { cfb: wk } }).map((x) => x.id), ['th']);
+  // Saturday morning: the day's slate, not Friday night's results (a Friday game still going stays)
+  assert.deepEqual(headlineGames({ now: at(6, 7), today: [g('cfb', 'sa', 'pre')], yest: [g('cfb', 'fr', 'final'), g('cfb', 'fl', 'live')] }).map((x) => x.id), ['fl', 'sa']);
   // Bowl season runs day by day
   assert.equal(footballModes(at(2, 14), 'Postseason').cfb, null);
   // NFL: last week Tuesday and Wednesday; the new week from Thursday
