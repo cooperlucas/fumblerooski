@@ -954,7 +954,22 @@ function normGamelog(d) {
   // The seasons the feed can show this player's games for, newest first (its own season filter).
   const f = (d?.filters || []).find((x) => x.name === 'season');
   const years = (f?.options || []).map((o) => ({ value: String(o.value), label: cleanText(o.displayValue || String(o.value)) }));
-  return { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons, years, year: f?.value ? String(f.value) : '' };
+  const out = { labels, spans: spans.reduce((n, x) => n + x.count, 0) === labels.length ? spans : [], seasons, years, year: f?.value ? String(f.value) : '' };
+  return trimKicking(out, (d?.names || []).map(String));
+}
+// Kickers: the feed never fills the distance splits game by game (always 0-0, though the totals are real), and its first
+// FG column is just the makes again. Keep FG made-tried first, then FG%, long, XP and points.
+const SPAN_TITLE = { fieldgoals: 'Field Goals', pats: 'PATs' };
+function trimKicking(g, names) {
+  if (!names.includes('fieldGoalsMade-fieldGoalAttempts')) return g;
+  const keep = names.map((n, i) => i).filter((i) => !/^fieldGoals$|^fieldGoalsMade\d/.test(names[i]));
+  const fg = keep.find((i) => names[i] === 'fieldGoalsMade-fieldGoalAttempts');
+  const order = [fg, ...keep.filter((i) => i !== fg && names[i] === 'fieldGoalPct'), ...keep.filter((i) => i !== fg && names[i] !== 'fieldGoalPct')];
+  const pick = (arr) => order.map((i) => arr[i] ?? '');
+  // Spans follow the columns: count what's left of each one.
+  let at = 0;
+  const spans = g.spans.map((sp) => { const from = at; at += sp.count; return { title: SPAN_TITLE[sp.title.toLowerCase()] || sp.title, count: order.filter((i) => i >= from && i < at).length }; }).filter((sp) => sp.count);
+  return { ...g, labels: pick(g.labels).map((l) => l.trim()), spans, seasons: g.seasons.map((st) => ({ ...st, rows: st.rows.map((r) => ({ ...r, stats: pick(r.stats) })), totals: st.totals ? pick(st.totals) : null })) };
 }
 // One season of a player's game log.
 export async function getGamelog(lg, id, season) {
