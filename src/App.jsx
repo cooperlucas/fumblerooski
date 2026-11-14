@@ -143,6 +143,7 @@ function useCovered(lg) {
 }
 const isCovered = (set, id) => !set || set.has(String(id));
 // Until noon the ticker leads with last night's finals (the Scores board shows only the day you pick).
+const YOUR_TEAMS_UNTIL = 15; // last night's finals leave Your Teams at 3pm
 const isMorning = () => new Date().getHours() < MORNING_UNTIL;
 
 // One day's games: your teams first, then each league in its own card.
@@ -222,14 +223,17 @@ function Scores() {
   const hl = useHeadlines(prefs);
   const today = hl.games;
   // Your Teams: whatever Headliners shows for them, plus any game of theirs today, always (even in the morning results
-  // window), plus how they did last night: that result stays all day, even after Headliners moves the league on to today.
+  // window), plus how they did last night: that result stays until 3pm, even after Headliners moves the league on to today.
   const mine = useMemo(() => {
     const seen = new Set();
     // ...unless that team plays again today: then last night's game follows the league's usual morning rule.
     const todayAll = [...today, ...(hl.q.data?.games || [])];
     const playsToday = (g, side) => todayAll.some((t) => t.lg === g.lg && t.id !== g.id && (t.away.id === g[side].id || t.home.id === g[side].id));
     const lastNight = hl.yest.filter((g) => g.state === 'final' && !['away', 'home'].some((sd) => favSet.has(favKey({ lg: g.lg, id: g[sd].id })) && playsToday(g, sd)));
-    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
+    // Finals from an earlier day are gone by 3pm, even when Headliners still shows that league's week.
+    const now = new Date(), y = new Date(now.getTime() - 86400000);
+    const fresh = (g) => g.state !== 'final' || isToday(g, now) || (now.getHours() < YOUR_TEAMS_UNTIL && isToday(g, y));
+    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
   }, [today, hl.q.data, hl.yest, favSet]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
   const leagues = useMemo(() => {
