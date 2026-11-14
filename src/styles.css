@@ -140,6 +140,7 @@ h1, h2, h3, p { margin: 0; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--panel2); border: 1px solid var(--line2); border-radius: 14px; }
 .seg button { min-height: 40px; border: none; border-radius: 10px; background: transparent; font-weight: 800; font-size: 13px; color: var(--mute); }
 .seg button[aria-pressed="true"] { background: var(--chip); color: var(--yellow); }
+.h2 + .seg { margin-top: 10px; }
 .seg.sub { margin-top: 10px; background: transparent; border-color: transparent; padding: 0; gap: 8px; }
 .seg.sub button { min-height: 34px; border: 1px solid var(--line2); border-radius: 999px; font-size: 12px; }
 .seg.sub button[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); color: #0C1124; }
