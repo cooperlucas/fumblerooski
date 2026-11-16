@@ -1436,7 +1436,11 @@ function LiveField({ drives, game, lg, onAll }) {
   const empty = !!live0 && !live0.plays.length;
   const before = empty ? [...drives].reverse().find((x) => x !== live0 && x.plays.length) : null;
   const d = (empty && before ? { ...before, live: true } : live0) || drives[drives.length - 1];
-  const last = d ? d.plays[d.plays.length - 1] : null;
+  // A stoppage after the latest snap or kick (an official timeout right after the kickoff, say) carries junk spots like
+  // "1st & Goal at the 0": the field goes by the last real play. The plays list below still shows the stoppage.
+  const STOP = /timeout|two-minute|two minute|end of|end quarter|end half|end period/i;
+  const real = d ? d.plays.filter((p) => !STOP.test(p.type)) : [];
+  const last = d ? (real.length ? real[real.length - 1] : d.plays[d.plays.length - 1]) : null;
   const lastKey = d ? `${d.id}:${d.plays.length}` : '';
   // The banner calls out a score, a turnover or a kick for a few seconds, then settles back to who has the ball.
   const [flash, setFlash] = useState(true);
