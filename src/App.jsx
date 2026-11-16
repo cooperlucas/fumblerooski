@@ -1050,12 +1050,14 @@ function TeamSeason({ lg, id, season, team }) {
 }
 
 /* ---------- percentages: one decimal everywhere (57 -> 57.0, 73.333 -> 73.3) ---------- */
-// Win percentages and save percentages written as .700 / .945 are left as they are.
+// Percentages show whole numbers everywhere ("48%", not "48.3%"). Win and save percentages written as .700 / .945 are left as they are.
 const isPctLabel = (l) => /%|pct|percent/i.test(String(l || ''));
 const pct1 = (label, v) => {
   const t = String(v ?? '').trim();
   if (!isPctLabel(label) || !/^-?\d+(\.\d+)?%?$/.test(t)) return v;
-  return Number(t.replace('%', '')).toFixed(1) + (t.endsWith('%') ? '%' : '');
+  const n = Number(t.replace('%', ''));
+  if (!t.endsWith('%') && n > 0 && n < 1) return v; // a rate written 0.915, not a percentage
+  return String(Math.round(Number(t.replace('%', '')))) + (t.endsWith('%') ? '%' : '');
 };
 
 /* ---------- Player ---------- */
@@ -1818,7 +1820,7 @@ function ShotChart({ shots, game, lg, pbp = [] }) {
   const floorOn = m === 'shots' || m === 'all';
   const shown = shots.filter((s) => !per || s.period === per);
   const onFloor = floorOn ? shown.filter((s) => kindOn.has(s.made ? 'made' : 'miss') && teamOn.has(s.teamId)) : [];
-  const pctTxt = (mm, n) => (n ? ` · ${((100 * mm) / n).toFixed(1)}%` : '');
+  const pctTxt = (mm, n) => (n ? ` · ${Math.round((100 * mm) / n)}%` : '');
   // The plays list follows the floor: the shots on it, every play for All, or the picked kind.
   const onIds = new Set(onFloor.map((s) => s.id).filter(Boolean));
   const kre = others.find(([k]) => k === m)?.[2];
@@ -2398,7 +2400,7 @@ function PlayByPlay({ pbp, game, L }) {
   );
 }
 
-const Pct = ({ label, v, skip }) => { const p = !skip && PCT_COLS.has(label) ? pctOf(v, 1) : ''; return p ? <small className="pct"> {p}</small> : null; };
+const Pct = ({ label, v, skip }) => { const p = !skip && PCT_COLS.has(label) ? pctOf(v) : ''; return p ? <small className="pct"> {p}</small> : null; };
 function BoxScore({ box, game, sport }) {
   const [side, setSide] = useState(0);
   const teams = [game.away, game.home];

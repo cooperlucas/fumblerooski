@@ -129,13 +129,13 @@ test('player box score: football shows passing, rushing, receiving in that order
 });
 
 test('percentages: only real made-of-attempted stats get one', async () => {
-  assert.equal(pctOf('41-88'), '46.6%'); assert.equal(pctOf('22/31', 0), '71%'); assert.equal(pctOf('0-0'), ''); assert.equal(pctOf('412'), ''); assert.equal(pctOf('31:24'), '');
+  assert.equal(pctOf('41-88'), '47%'); assert.equal(pctOf('41-88', 1), '46.6%'); assert.equal(pctOf('22/31', 0), '71%'); assert.equal(pctOf('0-0'), ''); assert.equal(pctOf('412'), ''); assert.equal(pctOf('31:24'), '');
   const hoops = await getGame('nba', 'g10');
   const fg = hoops.stats.find((s) => s.label === 'Field goals');
-  assert.equal(fg.awayPct, '46.6%'); assert.equal(fg.homePct, '51.1%');
+  assert.equal(fg.awayPct, '47%'); assert.equal(fg.homePct, '51%');
   assert.equal(hoops.stats.find((s) => s.label === 'Rebounds').awayPct, '');
   const fb = await getGame('nfl', 'g2');
-  assert.equal(fb.stats.find((s) => s.label === '3rd down eff.').homePct, '57.1%');
+  assert.equal(fb.stats.find((s) => s.label === '3rd down eff.').homePct, '57%');
 });
 
 test('plus/minus from play-by-play: counted when lineups add up, withheld when they do not', () => {

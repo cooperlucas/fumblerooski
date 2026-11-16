@@ -1443,7 +1443,7 @@ export async function getDeepLeader(lg, key, season) {
     const v = String(tot[idx] ?? '');
     const col = (n) => tot[(d.categories || []).find((c) => c.name === group)?.names?.indexOf(n) ?? -1];
     // Field goals made carry the tries and percentage beside them.
-    const sub = stat === 'fieldGoalsMade' && col('fieldGoalAttempts') ? `${col('fieldGoalAttempts')} ATT · ${col('fieldGoalPct')}%` : undefined;
+    const sub = stat === 'fieldGoalsMade' && col('fieldGoalAttempts') ? `${col('fieldGoalAttempts')} ATT · ${Math.round(Number(col('fieldGoalPct')))}%` : undefined;
     return {
       value: v, sub,
       player: { id: String(a.id ?? ''), name: cleanText(a.displayName || ''), pos: a.position?.abbreviation || '' },
@@ -1636,7 +1636,7 @@ export function statNumber(v) {
   return Number.isFinite(n) ? n : 0;
 }
 // "41-88" or "22/31" as a percentage ("46.6%"), or '' when it is not a made-of-attempted pair.
-export function pctOf(v, digits = 1) {
+export function pctOf(v, digits = 0) {
   const m = String(v ?? '').trim().match(/^(\d+)\s*[-/]\s*(\d+)$/);
   if (!m || !+m[2] || +m[1] > +m[2]) return '';
   return `${(100 * +m[1] / +m[2]).toFixed(digits)}%`;
@@ -2340,7 +2340,7 @@ function normPreview(data, game, lg) {
     const h = H.find((x) => x.name === s.name);
     if (!h) return null;
     const pct = /pct|percent/i.test(s.name);
-    return { key: s.name, label: short(s.label || s.displayName || s.name), away: pct ? `${Number(s.displayValue).toFixed(1)}%` : String(s.displayValue ?? ''), home: pct ? `${Number(h.displayValue).toFixed(1)}%` : String(h.displayValue ?? ''),
+    return { key: s.name, label: short(s.label || s.displayName || s.name), away: pct ? `${Math.round(Number(s.displayValue))}%` : String(s.displayValue ?? ''), home: pct ? `${Math.round(Number(h.displayValue))}%` : String(h.displayValue ?? ''),
       awayN: num(s.displayValue), homeN: num(h.displayValue), pct, lowerBetter: /against|allowed|turnover/i.test(s.name + ' ' + (s.label || '')) };
   }).filter((r) => r && r.awayN != null && r.homeN != null && (r.awayN || r.homeN) && !/^team turnovers$/i.test(r.label));
   compare.sort((a, b) => a.lowerBetter - b.lowerBetter); // offense first, then what they give up
