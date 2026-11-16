@@ -1291,14 +1291,17 @@ function LeadChart({ chart, game, L }) {
     <section className="sec">
       <H2>Lead Tracker</H2>
       <div className="card pad chart">
-        <div className="leadstats">
-          <span className="lscap">Biggest lead</span>
-          {stat(game.away, cc.away.main, bigA)}
-          {stat(game.home, cc.home.main, bigH)}
-        </div>
+        {chart.coarse ? null : (
+          <div className="leadstats">
+            <span className="lscap">Biggest lead</span>
+            {stat(game.away, cc.away.main, bigA)}
+            {stat(game.home, cc.home.main, bigH)}
+          </div>
+        )}
         {at ? (
           <p className="leadnote scrubbing"><b>{[at.per, at.clock].filter(Boolean).join(' · ')}</b><span style={{ color: cc.away.main }}>{game.away.abbr} {at.p.a}</span><span style={{ color: cc.home.main }}>{game.home.abbr} {at.p.h}</span></p>
-        ) : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
+        ) : chart.coarse ? <p className="leadnote">Score by {L.sport === 'football' || L.sport === 'basketball' && L.periods === 4 ? 'quarter' : 'period'} only: this feed sends no scoring plays</p>
+        : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
         <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
           <svg ref={svgRef} className="flow scrub" viewBox={`0 0 ${W} ${H}`} aria-hidden="true"
             onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); setScrub(tAt(e)); }}

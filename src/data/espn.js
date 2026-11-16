@@ -1850,27 +1850,36 @@ export function scoreSeries(game, plays, L) {
     if (m == null) timed = false;
     pts.push({ m, a: p.away, h: p.home }); pa = p.away; ph = p.home;
   }
-  let bounds = [], total = null;
-  if (timed && (pts.length >= 2 || game.state === "live")) {
+  let bounds = [], total = null, coarse = false;
+  const fa = parseInt(game.away.score, 10), fh = parseInt(game.home.score, 10);
+  // A live game with points on the board but no scoring plays (small colleges send none) goes by the line score instead.
+  const scored = (fa || 0) + (fh || 0) > 0;
+  if (timed && (pts.length >= 2 || (game.state === "live" && !(scored && game.home.lines.length)))) {
     total = L.sport === 'soccer' ? Math.max(90, ...pts.map((p) => p.m)) : L.periods * L.periodLen + Math.max(0, played - L.periods) * ot;
     let last = 0;
     pts.forEach((p) => { p.m = Math.max(last, Math.min(total, p.m)); last = p.m; p.t = p.m / total; });
     const ends = L.sport === 'soccer' ? [45, total] : Array.from({ length: played }, (_, i) => (i < L.periods ? (i + 1) * L.periodLen : L.periods * L.periodLen + (i - L.periods + 1) * ot));
     bounds = ends.map((e) => e / total);
-  } else if (game.home.lines.length >= 2 && game.home.lines.length === game.away.lines.length) {
-    const n = game.home.lines.length; let h = 0, a = 0;
+  } else if (game.home.lines.length >= (game.state === 'live' ? 1 : 2) && game.home.lines.length === game.away.lines.length) {
+    // Line score only: the score at the end of each finished period. A live game's current period is still going,
+    // so it ends at the current score at the current clock (below), on a full-length game axis.
+    const live = game.state === 'live';
+    const n = live ? Math.max(L.periods || 0, game.home.lines.length) : game.home.lines.length;
+    const done = live ? game.home.lines.length - 1 : game.home.lines.length;
+    let h = 0, a = 0;
     pts = [{ t: 0, a: 0, h: 0 }];
-    game.home.lines.forEach((v, i) => { h += +v || 0; a += +game.away.lines[i] || 0; pts.push({ t: (i + 1) / n, a, h, soft: true }); });
+    game.home.lines.slice(0, done).forEach((v, i) => { h += +v || 0; a += +game.away.lines[i] || 0; pts.push({ t: (i + 1) / n, a, h, soft: true }); });
     bounds = Array.from({ length: n }, (_, i) => (i + 1) / n);
+    if (live && L.periodLen && n === L.periods) total = L.periods * L.periodLen;
+    coarse = true;
   } else return null;
   // End the lines at the final whistle, or at the current moment of a live game.
   const lastPt = pts[pts.length - 1];
-  const fa = parseInt(game.away.score, 10), fh = parseInt(game.home.score, 10);
   let end = game.state === 'final' ? 1 : lastPt.t;
   if (game.state === 'live' && total) { const now = elapsed(game.period, game.clock, L); if (now != null) end = Math.max(lastPt.t, Math.min(1, now / total)); }
   const endA = Number.isFinite(fa) ? Math.max(fa, lastPt.a) : lastPt.a, endH = Number.isFinite(fh) ? Math.max(fh, lastPt.h) : lastPt.h;
   if (end > lastPt.t || endA !== lastPt.a || endH !== lastPt.h) pts.push({ t: Math.max(end, lastPt.t), a: endA, h: endH });
-  return { points: pts.map((p) => ({ t: p.t, a: p.a, h: p.h })), max: Math.max(1, endA, endH), bounds, periods: bounds.length, stepped: !pts.some((p) => p.soft), end: pts[pts.length - 1].t };
+  return { points: pts.map((p) => ({ t: p.t, a: p.a, h: p.h })), max: Math.max(1, endA, endH), bounds, periods: bounds.length, stepped: !pts.some((p) => p.soft), coarse, end: pts[pts.length - 1].t };
 }
 
 /* ---------- plus/minus worked out from the play-by-play ---------- */
