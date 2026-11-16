@@ -420,7 +420,8 @@ export function rankCupGroup(ids, games) {
   rows.forEach((r) => { const k = pct(r).toFixed(4); byPct.set(k, [...(byPct.get(k) || []), r]); });
   return [...byPct.keys()].sort((a, b) => b - a).flatMap((k) => {
     const tied = byPct.get(k), ids2 = tied.map((r) => r.id);
-    return tied.length < 2 ? tied : [...tied].sort((a, b) => h2h(b.id, ids2) - h2h(a.id, ids2) || b.pd - a.pd || b.pf - a.pf);
+    // Mid-way through, the same percentage can mean different records: 2-0 goes above 1-0 (and 0-1 above 0-2) before the tiebreakers.
+    return tied.length < 2 ? tied : [...tied].sort((a, b) => (b.w - b.l) - (a.w - a.l) || h2h(b.id, ids2) - h2h(a.id, ids2) || b.pd - a.pd || b.pf - a.pf);
   });
 }
 // Official NBA Cup groups by year (from the NBA's announcement); keys are conference + letter.
@@ -484,11 +485,11 @@ export async function getNbaCup() {
   out.forEach((g) => { if (g.rows[0]?.w + g.rows[0]?.l > 0) g.rows[0].tag = 'lead'; });
   ['East', 'West'].forEach((c) => {
     const seconds = out.filter((g) => g.conf === c && g.rows[1] && g.rows[1].w + g.rows[1].l > 0).map((g) => g.rows[1]);
-    seconds.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || b.pd - a.pd || b.pf - a.pf);
+    seconds.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || (b.w - b.l) - (a.w - a.l) || b.pd - a.pd || b.pf - a.pf);
     if (seconds[0]) seconds[0].tag = 'wild';
     // The group winners are seeded 1-3 in their conference (the wild card is the 4 seed): record, point differential, points.
     const leaders = out.filter((g) => g.conf === c && g.rows[0]?.tag === 'lead').map((g) => g.rows[0]);
-    leaders.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || b.pd - a.pd || b.pf - a.pf);
+    leaders.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l) || (b.w - b.l) - (a.w - a.l) || b.pd - a.pd || b.pf - a.pf);
     leaders.forEach((r, i) => { r.seed = i + 1; });
   });
   const last = list.map((g) => String(g.date)).sort().pop();

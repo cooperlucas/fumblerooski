@@ -461,6 +461,9 @@ test('rankCupGroup uses record, then head-to-head, then point differential', asy
   // three-way tie at 1-1 that head-to-head cannot split (each beat one): point differential decides
   const loop = [g('X', 100, 'Y', 90), g('Y', 100, 'Z', 80), g('Z', 101, 'X', 100)];
   assert.deepEqual(rankCupGroup(['X', 'Y', 'Z'], loop).map((x) => x.id), ['Y', 'X', 'Z']);
+  // mid-group: 2-0 sits above 1-0 even with a smaller point differential, and 0-1 above 0-2
+  const mid = [g('O', 110, 'T', 103), g('O', 108, 'M', 100), g('D', 116, 'N', 100), g('T', 100, 'M', 90)];
+  assert.deepEqual(rankCupGroup(['D', 'O', 'T', 'N', 'M'], mid).map((x) => x.id), ['O', 'D', 'T', 'N', 'M']);
 });
 
 test('touchback spots by league and year', () => {
