@@ -105,12 +105,14 @@ export function overflows(el, slack = 3) {
 // An event label (all caps, letter-spaced) that tightens, then shrinks, to fit its line before it ever cuts off.
 export function GameNote({ text }) {
   const ref = useRef(null);
-  const steps = [[10, 0.08], [10, 0.04], [9.5, 0.02], [9, 0.02], [8.5, 0.01], [8, 0]];
+  const steps = [[10, 0.08], [10, 0.04], [9.5, 0.02], [9, 0.02]];
   const [i, setI] = useState(0);
   useLayoutEffect(() => { setI(0); }, [text]);
   useEffect(() => { const again = () => setI(0); window.addEventListener('resize', again); document.fonts?.ready?.then(again); return () => window.removeEventListener('resize', again); }, []);
-  useLayoutEffect(() => { const el = ref.current; if (el && i < steps.length - 1 && overflows(el, 1)) setI(i + 1); });
-  return <span ref={ref} className="gnote" style={{ fontSize: steps[i][0], letterSpacing: `${steps[i][1]}em` }}>{text}</span>;
+  // Shrink a little to stay on one line; past that, wrap to a second line at the normal size rather than cut it off.
+  useLayoutEffect(() => { const el = ref.current; if (el && i < steps.length && overflows(el, 1)) setI(i + 1); });
+  const wrap = i >= steps.length;
+  return <span ref={ref} className="gnote" style={wrap ? { fontSize: 10, letterSpacing: '0.04em', whiteSpace: 'normal', overflow: 'visible' } : { fontSize: steps[i][0], letterSpacing: `${steps[i][1]}em` }}>{text}</span>;
 }
 export function shortEvent(note) {
   let n = String(note || '').replace(/\s+-\s+Rescheduled.*$/i, '').replace(/\s+(presented|pres\.?|powered|driven)\s+by\b.*$/i, '').trim();
