@@ -1,0 +1,89 @@
+# Builds the iPhone app on GitHub's Macs, so no local Mac or Xcode is needed.
+# - Every push that touches the app checks that it still compiles (no signing, nothing uploaded).
+# - Run it by hand from the Actions tab with "Upload to TestFlight" ticked to sign it and send a build to TestFlight.
+#   That needs these repository secrets (Settings > Secrets and variables > Actions), all from App Store Connect:
+#     APPLE_TEAM_ID      your 10-character team ID (developer.apple.com > Membership)
+#     ASC_KEY_ID         an App Store Connect API key's ID (Users and Access > Integrations > App Store Connect API)
+#     ASC_ISSUER_ID      the issuer ID shown on that same page
+#     ASC_KEY_P8_BASE64  the downloaded .p8 key file, base64-encoded (base64 -i AuthKey_XXXX.p8 | pbcopy)
+name: iPhone app
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'ios/**', 'public/**', 'index.html', 'capacitor.config.json', 'package.json', 'package-lock.json', '.github/workflows/ios.yml']
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: Upload to TestFlight
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - name: Build the site and copy it into the Xcode project
+        run: npm run ios:sync
+
+      - name: Compile check (simulator, unsigned)
+        if: ${{ !inputs.testflight }}
+        working-directory: ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 40
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Signed build and TestFlight upload
+        if: ${{ inputs.testflight }}
+        working-directory: ios/App
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -eo pipefail
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+            if [ -z "${!v}" ]; then echo "Missing secret $v (see the top of this file)"; exit 1; fi
+          done
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          # Each upload needs a new build number: use this workflow's run number.
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            "${AUTH[@]}" archive | tail -n 40
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" | tail -n 40
+          echo "Uploaded build ${{ github.run_number }}. It shows up in App Store Connect > TestFlight after Apple finishes processing (usually 5 to 30 minutes)."
