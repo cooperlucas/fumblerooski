@@ -75,3 +75,12 @@ src/App.jsx            every screen
 src/styles.css         the look
 tests/                 data layer tests
 ```
+
+## iPhone app (Capacitor)
+
+The same web build ships as an iPhone app through [Capacitor](https://capacitorjs.com). The Xcode project lives in `ios/`.
+
+- `npm run ios:sync` builds the site and copies it into the Xcode project.
+- `npm run ios` does that and opens Xcode (needs a Mac with a current Xcode).
+- `node scripts/icons.cjs` redraws the app icon and the light and dark launch screens from the header mascot.
+- Bundle ID: `com.fumblerooski.app` (in `capacitor.config.json`; can change until the first App Store upload).

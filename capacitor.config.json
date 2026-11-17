@@ -1,0 +1,9 @@
+{
+  "appId": "com.fumblerooski.app",
+  "appName": "Fumblerooski",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#15100C"
+  }
+}
