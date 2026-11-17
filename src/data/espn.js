@@ -229,6 +229,7 @@ function redZoneOf(comp) {
 // team; football's scoreboard carries only what's left in its situation. Dots: the league's allowance, filled for each left.
 const TIMEOUTS = { football: 3, nba: 7, wnba: 4, ncaam: 4, ncaaw: 4, hockey: 1 };
 function timeoutsOf(comp, c, side, lg) {
+  if (comp.timeoutsAvailable === false) return null; // college hoops: the feed says it doesn't track them (and sends 0s)
   const left = Number(c.timeoutsRemaining ?? comp.situation?.[`${side}Timeouts`]);
   if (!Number.isFinite(left) || left < 0) return null;
   const L = LEAGUE[lg] || {};
