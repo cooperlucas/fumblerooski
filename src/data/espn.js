@@ -226,15 +226,15 @@ function redZoneOf(comp) {
   return st.isRedZone === true;
 }
 // Timeouts left in a live game, per side: { left, total } or null. The game feed's header carries remaining and used on each
-// team; football's scoreboard carries only what's left in its situation. A side's total is used + left when both are known.
+// team; football's scoreboard carries only what's left in its situation. Dots: the league's allowance, filled for each left.
 const TIMEOUTS = { football: 3, nba: 7, wnba: 4, ncaam: 4, ncaaw: 4, hockey: 1 };
 function timeoutsOf(comp, c, side, lg) {
   const left = Number(c.timeoutsRemaining ?? comp.situation?.[`${side}Timeouts`]);
   if (!Number.isFinite(left) || left < 0) return null;
-  const used = Number(c.timeoutsUsed);
   const L = LEAGUE[lg] || {};
   const dflt = TIMEOUTS[lg] ?? TIMEOUTS[L.sport] ?? left;
-  return { left, total: Number.isFinite(used) ? left + used : Math.max(left, dflt) };
+  // Always the league's full allowance (NBA 7, like ESPN shows), never used + left: the feed's used count resets by half or period.
+  return { left, total: Math.max(left, dflt) };
 }
 export function normEvent(ev, lg) {
   const comp = ev?.competitions?.[0] || ev || {};
@@ -381,6 +381,18 @@ export async function getFootballSlate(lg, wantDone) {
   if (!wantDone && allDone) return (await step(1)) || sb;
   return sb;
 }
+// ESPN's list of days with games this season (regular season and postseason as scheduled so far), as 'YYYY-MM-DD'.
+const gameDaysMemo = new Map();
+function gameDays(lg) {
+  const L = LEAGUE[lg];
+  const hit = gameDaysMemo.get(lg);
+  if (hit && Date.now() - hit.at < 3600000) return hit.p; // a new postseason day can turn up: re-read hourly
+  const p = get(`https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}/calendar/ondays`)
+    .then((d) => [...new Set((d?.eventDate?.dates || []).map((x) => String(x).slice(0, 10)))].sort());
+  gameDaysMemo.set(lg, { p, at: Date.now() });
+  p.catch(() => gameDaysMemo.delete(lg));
+  return p;
+}
 export async function getScoreboard(lg, day, week) {
   const L = LEAGUE[lg];
   const wk = week ? { week: String(week.week), seasontype: String(week.type), ...(week.year ? { dates: String(week.year) } : {}) } : {};
@@ -391,14 +403,12 @@ export async function getScoreboard(lg, day, week) {
   // Football's calendar is weeks; everyone else's is the list of dates that have games (used for the calendar dots).
   const weeks = Lg.calendarType === 'list' ? cal.flatMap((t) => (t.entries || []).map((e) => ({ week: Number(e.value), type: Number(t.value), label: cleanText(e.label || ''), detail: cleanText(e.detail || ''), start: e.startDate, end: e.endDate })))
     .filter((w) => w.week && w.type !== 4 && (w.type !== 1 || L.sport === 'football' && !L.college)) : null;
+  // The days that have games, for the calendar's dots. The scoreboard's own calendar can't be trusted for that (MLB's lists
+  // two dozen days all season, then every day into November once it's over), so ask ESPN's list of days with games.
   let dates = Lg.calendarType === 'day' ? cal.map((x) => String(x).slice(0, 10)) : null;
-  // In the offseason the feed's calendar runs on past the last game (MLB's lists every day to mid-November), while its
-  // default slate stays on the last day that had games. Days between that one and today had none: no dots for them.
+  if (dates) { try { const on = await gameDays(lg); if (on.length) dates = on; } catch { /* keep the scoreboard's list */ } }
   const feedDay = data.day?.date || null;
-  if (dates && feedDay && !day && (data.events || []).length) {
-    const t = new Date(); const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-    if (feedDay < today) dates = [...new Set([...dates.filter((x) => x <= feedDay || x > today), feedDay])].sort();
-  }
+  if (dates && feedDay && !day && (data.events || []).length && !dates.includes(feedDay)) dates = [...dates, feedDay].sort();
   if (lg === 'cfb' && Number(data.season?.type) === 2) { try { await addDivisionRanks(games, Number(data.season?.year), Number(data.week?.number)); } catch { /* ranks stay as the feed had them */ } }
   return {
     lg, games, season: Lg.season?.type?.name || '',
