@@ -315,10 +315,15 @@ function Scores() {
 
 /* ---------- A league's scores, by week (football) or by day with a calendar ---------- */
 // Today if it has games; otherwise the next day that does; otherwise the last one played. ('YYYYMMDD')
+// The day a schedule opens on: today if there are games, else the next game day if it's within a week, else (an idle
+// stretch or the offseason) the last day that had games, until the next season is a week out.
 function gameDayFor(dates, today) {
   const list = [...dates].sort();
   if (!list.length || list.includes(today)) return today;
-  return list.find((x) => x > today) || list[list.length - 1];
+  const next = list.find((x) => x > today), prev = [...list].reverse().find((x) => x < today);
+  const days = (a, b) => Math.round((dateOf(b) - dateOf(a)) / 86400000);
+  if (next && (!prev || days(today, next) <= 7)) return next;
+  return prev || next;
 }
 const ymdOf = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 const dateOf = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), 12);
@@ -2554,12 +2559,13 @@ function GamePage({ lg, id, feed, replayBar }) {
   const boardRef = useRef(null);
   const [mini, setMini] = useState(false);
   useEffect(() => {
-    const el = boardRef.current;
+    // The mini score bug shows as soon as the big score itself has scrolled up under the header (not the whole board).
+    const el = boardRef.current?.querySelector('.score') || boardRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
     const io = new IntersectionObserver(([e]) => setMini(!e.isIntersecting && e.boundingClientRect.top < (document.querySelector('.app .stick')?.offsetHeight || 64) + 16), { root: null, threshold: 0, rootMargin: `-${(document.querySelector('.app .stick')?.offsetHeight || 64)}px 0px 0px 0px` });
     io.observe(el);
     return () => io.disconnect();
-  }, [!!d]);
+  }, [!!d, started]);
   // Only offer the sections this game actually has.
   const tabs = !d || !started ? [] : [
     ['summary', g.state === 'live' ? 'Live' : 'Summary'],

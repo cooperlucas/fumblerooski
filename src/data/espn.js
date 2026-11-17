@@ -379,7 +379,14 @@ export async function getScoreboard(lg, day, week) {
   // Football's calendar is weeks; everyone else's is the list of dates that have games (used for the calendar dots).
   const weeks = Lg.calendarType === 'list' ? cal.flatMap((t) => (t.entries || []).map((e) => ({ week: Number(e.value), type: Number(t.value), label: cleanText(e.label || ''), detail: cleanText(e.detail || ''), start: e.startDate, end: e.endDate })))
     .filter((w) => w.week && w.type !== 4 && (w.type !== 1 || L.sport === 'football' && !L.college)) : null;
-  const dates = Lg.calendarType === 'day' ? cal.map((x) => String(x).slice(0, 10)) : null;
+  let dates = Lg.calendarType === 'day' ? cal.map((x) => String(x).slice(0, 10)) : null;
+  // In the offseason the feed's calendar runs on past the last game (MLB's lists every day to mid-November), while its
+  // default slate stays on the last day that had games. Days between that one and today had none: no dots for them.
+  const feedDay = data.day?.date || null;
+  if (dates && feedDay && !day && (data.events || []).length) {
+    const t = new Date(); const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    if (feedDay < today) dates = [...new Set([...dates.filter((x) => x <= feedDay || x > today), feedDay])].sort();
+  }
   if (lg === 'cfb' && Number(data.season?.type) === 2) { try { await addDivisionRanks(games, Number(data.season?.year), Number(data.week?.number)); } catch { /* ranks stay as the feed had them */ } }
   return {
     lg, games, season: Lg.season?.type?.name || '',
