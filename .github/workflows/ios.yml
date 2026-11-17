@@ -39,19 +39,20 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
-      - run: npm test
-      - name: Build the site and copy it into the Xcode project
-        run: npm run ios:sync
+      - name: Install, test, and copy the site into the Xcode project
+        run: |
+          set -o pipefail
+          xcodebuild -version | tee "$RUNNER_TEMP/log.txt"
+          { npm ci && npm test && npm run ios:sync; } 2>&1 | tee -a "$RUNNER_TEMP/log.txt"
 
       - name: Compile check (simulator, unsigned)
         if: ${{ !inputs.testflight }}
         working-directory: ios/App
         run: |
+          set -o pipefail
           xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO build | tail -n 40
-          test ${PIPESTATUS[0]} -eq 0
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee -a "$RUNNER_TEMP/log.txt" | tail -n 40
 
       - name: Signed build and TestFlight upload
         if: ${{ inputs.testflight }}
@@ -73,7 +74,7 @@ jobs:
           xcodebuild -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            "${AUTH[@]}" archive | tail -n 40
+            "${AUTH[@]}" archive 2>&1 | tee -a "$RUNNER_TEMP/log.txt" | tail -n 40
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -85,5 +86,14 @@ jobs:
           </dict></plist>
           PLIST
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
-            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" | tail -n 40
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" 2>&1 | tee -a "$RUNNER_TEMP/log.txt" | tail -n 40
           echo "Uploaded build ${{ github.run_number }}. It shows up in App Store Connect > TestFlight after Apple finishes processing (usually 5 to 30 minutes)."
+
+      # On a failure, surface the errors as annotations (they show on the commit's check, without opening the full log).
+      - name: Report errors
+        if: failure()
+        run: |
+          f="$RUNNER_TEMP/log.txt"; [ -f "$f" ] || exit 0
+          head -n 2 "$f" | while IFS= read -r l; do echo "::notice title=Xcode::${l}"; done
+          grep -E "error:|ERR!|not ok|fatal|failed" "$f" | grep -v "^warning" | head -n 15 | while IFS= read -r l; do echo "::error title=Build::${l}"; done
+          tail -n 8 "$f" | while IFS= read -r l; do echo "::warning title=Tail::${l}"; done
