@@ -225,6 +225,17 @@ function redZoneOf(comp) {
   if (m && has?.team?.abbreviation) return m[1].toUpperCase() !== String(has.team.abbreviation).toUpperCase() && +m[2] <= 20;
   return st.isRedZone === true;
 }
+// Timeouts left in a live game, per side: { left, total } or null. The game feed's header carries remaining and used on each
+// team; football's scoreboard carries only what's left in its situation. A side's total is used + left when both are known.
+const TIMEOUTS = { football: 3, nba: 7, wnba: 4, ncaam: 4, ncaaw: 4, hockey: 1 };
+function timeoutsOf(comp, c, side, lg) {
+  const left = Number(c.timeoutsRemaining ?? comp.situation?.[`${side}Timeouts`]);
+  if (!Number.isFinite(left) || left < 0) return null;
+  const used = Number(c.timeoutsUsed);
+  const L = LEAGUE[lg] || {};
+  const dflt = TIMEOUTS[lg] ?? TIMEOUTS[L.sport] ?? left;
+  return { left, total: Number.isFinite(used) ? left + used : Math.max(left, dflt) };
+}
 export function normEvent(ev, lg) {
   const comp = ev?.competitions?.[0] || ev || {};
   const cs = comp.competitors || [];
@@ -254,6 +265,7 @@ export function normEvent(ev, lg) {
     // Down, distance and ball spot ("2nd & 7", "AKR 41"). Blank between plays like kickoffs and extra points.
     down: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.shortDownDistanceText || '') : '',
     spot: state === 'live' && LEAGUE[lg]?.sport === 'football' && Number(comp.situation?.down) > 0 ? cleanText(comp.situation?.possessionText || '') : '',
+    timeouts: state === 'live' ? { away: timeoutsOf(comp, awayC, 'away', lg), home: timeoutsOf(comp, homeC, 'home', lg) } : null,
   };
 }
 
@@ -2457,7 +2469,7 @@ export function replayCut(data, sport, i) {
   comp.competitors = comp.competitors.map((c) => {
     const k = c.homeAway === 'home' ? 'homeScore' : 'awayScore';
     const lines = Array.from({ length: per }, (_, n) => { const v = Number(endOf(n + 1)[k]) - Number(n ? endOf(n)[k] : 0); return { value: v, displayValue: String(v) }; });
-    return { ...c, score: String(Number(endOf(per)[k]) || 0), linescores: lines, winner: undefined };
+    return { ...c, score: String(Number(endOf(per)[k]) || 0), linescores: lines, winner: undefined, timeoutsRemaining: undefined, timeoutsUsed: undefined };
   });
   const clock = lastP.clock?.displayValue || '';
   const nth = (n) => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) || n % 10 > 3 ? 0 : n % 10]}`;
@@ -2478,6 +2490,8 @@ export function clockOf(text) {
 // more than two minutes apart (the scoreboard is at most ~30 seconds old), the scoreboard's clock wins.
 export function pickClock(game, board) {
   if (!game || !board || game.state !== 'live' || board.state !== 'live') return game;
+  // Football's game feed has timeouts used across the game but not what's left this half; the scoreboard knows.
+  if (board.timeouts && !game.timeouts?.away && !game.timeouts?.home) game = { ...game, timeouts: board.timeouts };
   const a = clockOf(game.statusText), b = clockOf(board.statusText);
   if (!a || !b || a.per !== b.per || Math.abs(a.secs - b.secs) <= 120) return game;
   return { ...game, statusText: board.statusText };

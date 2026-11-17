@@ -2598,6 +2598,14 @@ function GamePage({ lg, id, feed, replayBar }) {
                     <span style={{ position: 'relative' }}><span style={{ display: 'inline-flex', borderRadius: 16, boxShadow: '0 0 0 2px #fff, 3px 3px 0 2px #0C1124' }}><Blob team={t} size={58} radius={16} /></span>{t.rank ? <b className="rtag brd" aria-label={`Ranked ${t.rank}`}>{t.rank}</b> : null}</span>
                     <span ref={i === 0 ? pair.a : pair.b} className="nm" style={pair.style}>{t.name}</span>
                     <span className="rc">{t.record}</span>
+                    {(() => {
+                      const to = g.timeouts?.[i === 0 ? 'away' : 'home'];
+                      return to && to.total > 0 && to.total <= 9 ? (
+                        <span className="tos" role="img" aria-label={`${to.left} timeout${to.left === 1 ? '' : 's'} left`}>
+                          {Array.from({ length: to.total }, (_, k) => <i key={k} className={k < to.left ? 'on' : undefined} />)}
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
                 ) : started ? <div key="s" className="score" style={String(g.away.score).length + String(g.home.score).length > 4 ? { fontSize: 30 } : undefined} aria-label={`${g.away.score} to ${g.home.score}`}>{g.away.score}<span style={{ opacity: 0.7 }}> · </span>{g.home.score}</div>
                   : <div key="s" className="when">{g.state === 'off' ? (g.statusText || 'Postponed') : <>{g.tbd ? 'TBD' : fmtTime(g.date)}<div style={{ fontSize: 12, color: '#fff', textShadow: 'none', fontStyle: 'normal', fontWeight: 800 }}>{fmtDate(g.date)}</div></>}</div>)}

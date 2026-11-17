@@ -773,3 +773,8 @@ button.pick.date { cursor: pointer; }
 .cupcard .srow .v { width: 44px; }
 .cupcard .srow .v2 { width: 46px; }
 .cupcard .srow .nm .stag { margin-left: 5px; }
+
+/* Timeouts left, under each team on a live game: filled dots for the ones left, hollow for the ones used. */
+.board .tos { display: flex; justify-content: center; gap: 4px; margin-top: -1px; }
+.board .tos i { width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.55); }
+.board .tos i.on { background: var(--yellow); border-color: var(--yellow); }
