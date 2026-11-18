@@ -132,6 +132,7 @@ h1, h2, h3, p { margin: 0; }
 
 /* standings, lists */
 .srow, .lrow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: none; background: transparent; text-align: left; }
+a.lrow { color: inherit; text-decoration: none; }
 .srow .pos { width: 18px; font-size: 12px; font-weight: 800; color: var(--dim); text-align: right; }
 .srow .nm, .lrow .nm { flex: 1; min-width: 0; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .srow .v { width: 56px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -778,3 +779,14 @@ button.pick.date { cursor: pointer; }
 .board .tos { display: flex; justify-content: center; gap: 4px; margin-top: -1px; }
 .board .tos i { width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.55); }
 .board .tos i.on { background: var(--yellow); border-color: var(--yellow); }
+
+/* The one-time "put it on your home screen" card on the Scores page. */
+.nudge { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 14px; border-color: var(--gold); }
+.nudge .mascot { flex: none; width: 46px; height: auto; margin-top: 2px; }
+.nudge .ntext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nudge .ntext b { font-size: 15px; font-weight: 900; }
+.nudge .ntext span { font-size: 13.5px; line-height: 1.45; color: var(--soft); }
+.nudge .ntext em { font-style: normal; font-weight: 800; color: var(--ink); }
+.nudge .shareic { vertical-align: -2px; color: var(--teal); }
+.nudge .btn { align-self: flex-start; }
+.nudge .nx { flex: none; width: 30px; height: 30px; margin: -4px -2px 0 0; border: none; border-radius: 50%; background: var(--chip); color: var(--mute); font-size: 20px; line-height: 1; cursor: pointer; }

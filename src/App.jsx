@@ -1,10 +1,11 @@
+import { FEEDBACK_EMAIL, APP_VERSION } from './config.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
-import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus, StarCut } from './ui.jsx';
+import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus, StarCut, Mascot } from './ui.jsx';
 
 /* ---------- router ---------- */
 const ROOTS = new Set(['', 'scores', 'leagues', 'stats']);
@@ -225,6 +226,42 @@ function useHeadlines(prefs) {
   return { games, q: today, yest: [...(yest.data?.games || []), ...pinned.yest] };
 }
 
+// A one-time card on the Scores page showing how to put the app on the home screen: on an iPhone or iPad in Safari the
+// Share > Add to Home Screen steps (Safari has no install button of its own), on Android Chrome a real Install button.
+// Hidden once installed, inside the iPhone app, or after "Not now".
+let installEvt = null;
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
+function InstallNudge() {
+  const [gone, setGone] = useState(() => { try { return localStorage.getItem('fr.install.v1') === 'no'; } catch { return false; } });
+  const [, bump] = useState(0);
+  useEffect(() => { const on = () => bump((n) => n + 1); window.addEventListener('beforeinstallprompt', on); return () => window.removeEventListener('beforeinstallprompt', on); }, []);
+  const ua = navigator.userAgent;
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true || !!window.Capacitor?.isNativePlatform?.();
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safari = ios && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua);
+  if (gone || standalone || (!ios && !installEvt)) return null;
+  const close = () => { try { localStorage.setItem('fr.install.v1', 'no'); } catch { /* carry on */ } setGone(true); };
+  const install = async () => { const e = installEvt; installEvt = null; if (!e) return; e.prompt(); const r = await e.userChoice.catch(() => null); if (r?.outcome === 'accepted') close(); else bump((n) => n + 1); };
+  return (
+    <div className="card nudge" style={{ marginTop: 14 }}>
+      <Mascot />
+      <div className="ntext">
+        <b>Put Fumblerooski on your home screen</b>
+        {installEvt ? <span>Opens full screen like any other app.</span>
+          : safari ? <span>In Safari, tap <ShareIcon /> <em>Share</em> (on newer iPhones it's under the <em>···</em> button), then <em>Add to Home Screen</em>. It opens full screen like any other app.</span>
+          : <span>Open this page in Safari, tap <ShareIcon /> <em>Share</em>, then <em>Add to Home Screen</em>.</span>}
+        {installEvt ? <button className="btn on" style={{ marginTop: 10 }} onClick={install}>Install</button> : null}
+      </div>
+      <button className="nx" aria-label="Not now" onClick={close}>×</button>
+    </div>
+  );
+}
+const ShareIcon = () => (
+  <svg className="shareic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2" />
+  </svg>
+);
+
 function Scores() {
   const [lg, setLg] = useSticky('lg', 'top');
   const favs = useFavs();
@@ -269,6 +306,7 @@ function Scores() {
         <button className="chipb rchip" aria-pressed={!pickL} aria-label="Headliners" title="Headliners" onClick={() => setLg('top')}><StarCut /></button>
         {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
+      {!pickL ? <InstallNudge /> : null}
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
         !today.length && !mine.length ? <Empty>No games on the board right now.</Empty> : (
           <>
@@ -2850,8 +2888,23 @@ function Settings() {
     <>
       <LeagueSettings />
       <Appearance />
+      <section className="sec">
+        <H2>More</H2>
+        <div className="card">
+          {FEEDBACK_EMAIL ? <a className="lrow" href={feedbackHref()}><span className="nm">Send feedback<span className="sub">Bugs, ideas, a league you want</span></span><span className="chev" aria-hidden="true">›</span></a> : null}
+          <a className="lrow" href="./privacy.html"><span className="nm">Privacy<span className="sub">We collect nothing. Here's the detail.</span></span><span className="chev" aria-hidden="true">›</span></a>
+          <button className="lrow" onClick={() => go('about')}><span className="nm">About Fumblerooski</span><span className="chev" aria-hidden="true">›</span></button>
+        </div>
+      </section>
+      <p className="stamp">Fumblerooski {APP_VERSION}</p>
     </>
   );
+}
+// A feedback email with the screen they were on and their device filled in, so a bug report says where it happened.
+function feedbackHref() {
+  const from = location.hash.replace(/^#\/?/, '') || 'scores';
+  const body = `\n\n\n---\nFumblerooski ${APP_VERSION} · ${from}\n${navigator.userAgent}`;
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Fumblerooski feedback')}&body=${encodeURIComponent(body)}`;
 }
 // League order and on/off. Drag a row by its grip (or use the arrow keys on it) to move it.
 function LeagueSettings() {
@@ -3021,7 +3074,7 @@ function About() {
     <>
       <section className="card pad" style={{ marginTop: 4 }}>
         <p className="prose"><b>Pure sports. No odds. No ads.</b> Scores, standings and schedules for the teams you care about, and nothing that tells you what to bet.</p>
-        <p className="prose">Betting lines are stripped out before anything reaches your screen. Your pinned teams are saved on this device only. There are no accounts and no tracking.</p>
+        <p className="prose">Betting lines are stripped out before anything reaches your screen. Your pinned teams are saved on this device only. There are no accounts and no tracking. <a className="plink" href="./privacy.html">Privacy</a></p>
         <p className="prose">Teams show as colors and abbreviations, not logos.</p>
       </section>
       <section className="sec">
@@ -3041,7 +3094,8 @@ function About() {
           {demoLocked ? <p className="prose">This preview only runs on demo data.</p> : <button className="btn" style={{ marginTop: 12 }} onClick={() => setDemo(!isDemo())}>{isDemo() ? 'Turn demo mode off' : 'Turn demo mode on'}</button>}
         </div>
       </section>
-      <p className="stamp">Fumblerooski beta 0.1</p>
+      {FEEDBACK_EMAIL ? <p className="stamp"><a className="plink" href={feedbackHref()}>Send feedback</a></p> : null}
+      <p className="stamp">Fumblerooski {APP_VERSION}</p>
     </>
   );
 }
