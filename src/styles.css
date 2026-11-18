@@ -339,6 +339,10 @@ a.lrow { color: inherit; text-decoration: none; }
 .pbox th.sort.on { color: var(--yellow); }
 .pbox td.on { color: var(--ink); font-weight: 800; }
 .pbox .who .rk { display: inline-block; width: 28px; color: var(--dim); font-size: 11px; font-weight: 800; }
+/* Rank beside the name: a long name wraps under itself, not under the rank. */
+.pbox .who .rkrow { display: flex; align-items: baseline; }
+.pbox .who .rkrow .rk { flex: none; }
+.pbox .who .rkrow > span:last-child { min-width: 0; }
 .statbar { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
 /* Two pickers side by side, sharing the row. */
 .statbar.pair { flex-wrap: nowrap; }

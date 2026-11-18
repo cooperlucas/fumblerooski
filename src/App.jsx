@@ -909,7 +909,7 @@ function TeamStats({ lg }) {
           <tbody>
             {rows.map((t, i) => (
               <tr key={t.team.id} className="tap" onClick={() => go(`team/${lg}/${t.team.id}`)}>
-                <th scope="row" className="who"><span className="rk">{place[i]}</span>{t.team.name}</th>
+                <th scope="row" className="who"><span className="rkrow"><span className="rk">{place[i]}</span><span>{t.team.name}</span></span></th>
                 {cat.labels.map((_, j) => <td key={j} className={sort.col === j ? 'on' : undefined}>{pct1(cat.labels[j], t.stats[cat.key][j] ?? '')}</td>)}
               </tr>
             ))}
