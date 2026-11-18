@@ -813,3 +813,9 @@ button.pick.date { cursor: pointer; }
   .turnback span { color: var(--mute); font-size: 14px; }
   .turnback .mascot { width: 72px; height: auto; }
 }
+
+/* First-open team picker */
+.pickrow .pinstar { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line3); color: var(--mute); font-size: 18px; }
+.pickrow .pinstar.on { background: var(--yellow); border-color: var(--yellow); color: var(--on-accent); }
+.welcomebar { position: sticky; bottom: calc(var(--dockh, 0px) + 10px); display: flex; justify-content: center; margin-top: 14px; z-index: 5; }
+.welcomebar .btn { min-width: 220px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }

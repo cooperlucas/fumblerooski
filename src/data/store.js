@@ -40,6 +40,7 @@ export function toggleFav(t) {
     : [...favs, { id: t.id, lg: t.lg, name: t.name, abbr: t.abbr, color: t.color }];
   ls.set('fr.favs.v1', favs); emit();
 }
+export const favsNow = () => favs;
 export function useFavs() {
   return useSyncExternalStore((cb) => { favSubs.add(cb); return () => favSubs.delete(cb); }, () => favs, () => favs);
 }

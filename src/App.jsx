@@ -2,7 +2,7 @@ import { FEEDBACK_EMAIL, APP_VERSION } from './config.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
-import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
+import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, favsNow, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus, StarCut, Mascot } from './ui.jsx';
@@ -47,6 +47,7 @@ export default function App() {
   else if (name === 'game' && LEAGUE[a] && b) { tab = ''; body = <GamePage key={a + b} lg={a} id={b} />; }
   else if (name === 'replay' && LEAGUE[a] && b) { tab = ''; body = <ReplayPage key={a + b} lg={a} id={b} start={Number(c) || 0} />; }
   else if (name === 'search') { tab = ''; body = <Search />; }
+  else if (name === 'welcome') { title = 'Pick your teams'; tab = ''; body = <Welcome />; }
   else if (name === 'about') { title = 'About'; tab = 'leagues'; body = <About />; }
   else if (name === 'settings') { title = 'Settings'; tab = 'leagues'; body = <Settings />; }
   else { title = 'Not found'; body = <Empty>That page does not exist. <br /><button className="btn" onClick={() => go('')}>Go home</button></Empty>; }
@@ -264,6 +265,7 @@ const ShareIcon = () => (
 );
 
 function Scores() {
+  useEffect(() => { if (!isDemo() && !onboarded() && !favsNow().length) go('welcome'); }, []);
   const [lg, setLg] = useSticky('lg', 'top');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
@@ -2907,6 +2909,7 @@ function Settings() {
         <H2>More</H2>
         <div className="card">
           {FEEDBACK_EMAIL ? <a className="lrow" href={feedbackHref()}><span className="nm">Send feedback<span className="sub">Bugs, ideas, a league you want</span></span><span className="chev" aria-hidden="true">›</span></a> : null}
+          <button className="lrow" onClick={() => go('welcome')}><span className="nm">Pick your teams<span className="sub">Pin teams to the top of Scores</span></span><span className="chev" aria-hidden="true">›</span></button>
           <a className="lrow" href="./privacy.html"><span className="nm">Privacy<span className="sub">We collect nothing. Here's the detail.</span></span><span className="chev" aria-hidden="true">›</span></a>
           <button className="lrow" onClick={() => go('about')}><span className="nm">About Fumblerooski</span><span className="chev" aria-hidden="true">›</span></button>
         </div>
@@ -3056,6 +3059,68 @@ function Search() {
           </>
         )}
       </Page>
+    </>
+  );
+}
+
+/* ---------- First open: pick your teams ---------- */
+// A new visitor lands here once (from Scores) to pin a few teams, so Your Teams means something from the first visit.
+// Also reachable any time from Settings.
+const ONBOARD = 'fr.onboard.v1';
+export const onboarded = () => { try { return localStorage.getItem(ONBOARD) === 'done'; } catch { return true; } };
+const PICK_LEAGUES = ['nfl', 'cfb', 'nba', 'ncaam', 'nhl', 'mlb', 'wnba', 'ncaaw', 'mls', 'epl'];
+function Welcome() {
+  const favs = useFavs();
+  const [lg, setLg] = useState(PICK_LEAGUES.find((x) => LEAGUE[x]) || 'nfl');
+  const [text, setText] = useState('');
+  const q = useQuery('teams:all', loadAllTeams, () => 0);
+  const lower = useQuery(q.data && text.trim().length >= 2 ? 'teams:lower' : null, loadLowerTeams, () => 0);
+  const term = text.trim().toLowerCase();
+  const pinned = new Set(favs.map(favKey));
+  const list = useMemo(() => {
+    const all = [...(q.data || []), ...(lower.data || [])];
+    const seen = new Set();
+    const uniq = all.filter((t) => { const k = favKey(t); if (seen.has(k)) return false; seen.add(k); return true; });
+    if (term) {
+      const hit = (t) => { const n = (t.name || '').toLowerCase(), f = (t.full || '').toLowerCase(); return n.startsWith(term) || f.startsWith(term) || f.includes(' ' + term) || (t.abbr || '').toLowerCase() === term; };
+      return uniq.filter(hit).sort((a, b) => (a.full || a.name).localeCompare(b.full || b.name)).slice(0, 40);
+    }
+    return uniq.filter((t) => t.lg === lg && !t.div).sort((a, b) => (a.full || a.name).localeCompare(b.full || b.name));
+  }, [q.data, lower.data, term, lg]);
+  useEffect(() => { if (list.length) ensureColors(list.slice(0, 40), 10); }, [list]);
+  // Seen once is enough: backing out to Scores must not bounce here again.
+  useEffect(() => { try { localStorage.setItem(ONBOARD, 'done'); } catch { /* fine */ } }, []);
+  const done = () => go('');
+  return (
+    <>
+      <p className="prose" style={{ marginTop: 12 }}>Pin your teams and they ride at the top of Scores, with last night's results and tonight's games.</p>
+      <label className="search" style={{ marginTop: 12 }}>
+        <span style={{ position: 'absolute', left: -9999 }}>Find a team</span>
+        <input type="search" enterKeyHint="search" placeholder="Find any team, down to D-III" value={text} onChange={(e) => setText(e.target.value)} />
+      </label>
+      {!term ? (
+        <div className="chips" role="group" aria-label="League" style={{ marginTop: 12 }}>
+          {PICK_LEAGUES.filter((x) => LEAGUE[x]).map((x) => <button key={x} className="chipb" aria-pressed={lg === x} onClick={() => setLg(x)}>{LEAGUE[x].short}</button>)}
+        </div>
+      ) : null}
+      {q.loading && !q.data ? <div style={{ marginTop: 12 }}><Loading rows={6} /></div> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !list.length ? <Empty>{term ? `Nothing matches "${text.trim()}".` : 'No teams listed here yet.'}</Empty> : (
+        <div className="card" style={{ marginTop: 12 }}>
+          {list.map((t) => {
+            const on = pinned.has(favKey(t));
+            return (
+              <button key={favKey(t)} className="lrow pickrow" aria-pressed={on} onClick={() => toggleFav(t)}>
+                <Blob team={t} size={36} radius={10} />
+                <span className="nm">{t.full || t.name}{t.div ? <span className="sub">{t.div}</span> : null}</span>
+                {term ? <LgTag lg={t.lg} /> : null}
+                <span className={'pinstar' + (on ? ' on' : '')} aria-hidden="true">{on ? '★' : '☆'}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="welcomebar">
+        <button className={'btn' + (favs.length ? ' on' : '')} onClick={done}>{favs.length ? `Done · ${favs.length} team${favs.length === 1 ? '' : 's'} pinned` : 'Skip for now'}</button>
+      </div>
     </>
   );
 }
