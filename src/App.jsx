@@ -891,7 +891,7 @@ function TeamStats({ lg }) {
   const pickCol = (i) => setSort(sort.col === i ? { col: i, dir: -sort.dir } : { col: i, dir: -1 });
   return (
     <>
-      <div className="statbar" style={{ marginTop: 12 }}>
+      <div className="statbar pair" style={{ marginTop: 12 }}>
         {cats.length > 1 ? <Picker label="Stat group" value={cat.key} onChange={(v) => { setCat(v); setSort({ col: 0, dir: -1 }); }}>{cats.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}</Picker> : null}
         {filters.length ? (
           <Picker label="Filter teams" value={f ? fid : 'all'} onChange={setFid} shown={f && f.id.startsWith('g:') ? shortConf(f.label) : undefined}>
