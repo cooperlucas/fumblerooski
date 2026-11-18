@@ -77,6 +77,7 @@ export default function App() {
         <Ticker />
         <TabBar active={tab} />
       </div>
+      <div className="turnback" role="alert"><Mascot /><b>Turn your phone upright</b><span>Fumblerooski only works in portrait.</span></div>
     </div>
   );
 }
@@ -434,7 +435,7 @@ function LeagueScores({ lg, startDay }) {
           <div className="datebar">
             <button className="pick date" onClick={() => { setMonth(null); setCal(!cal); }} aria-expanded={cal}>
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style={{ position: 'static' }}><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M3 10 H21 M8 3 V7 M16 3 V7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
-              <span>{dateOf(dayKey).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <span>{dateOf(dayKey).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', ...(dayKey.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }) })}</span>
             </button>
             {dayKey !== today ? <button className="link" onClick={() => pickDay(today)}>Today</button> : null}
             {gf.el ? <span style={{ marginLeft: 'auto', minWidth: 0, flex: '0 1 150px', display: 'flex' }}>{gf.el}</span> : null}
@@ -2527,7 +2528,7 @@ function ReplayPage({ lg, id, start = 0 }) {
         {playBtn}
         <button onClick={() => { setPlaying(false); setI((x) => Math.min(n - 1, x + 1)); }} disabled={i >= n - 1} aria-label="Forward one play"><RIcon k="fwd" size={15} /></button>
         <button onClick={() => { setPlaying(false); if (nextMoment != null) setI(nextMoment); }} disabled={nextMoment == null} aria-label="Next big moment"><RIcon k="nextBig" size={15} /></button>
-        <button className="spd" onClick={() => setSpeed((x) => (x === 1 ? 3 : x === 3 ? 6 : 1))} aria-label="Playback speed">{speed}x</button>
+        <button className="spd" onClick={() => setSpeed((x) => (x === 1 ? 2 : x === 2 ? 4 : 1))} aria-label="Playback speed">{speed}x</button>
         <button className="hide" onClick={() => setTucked(true)} aria-label="Hide replay controls"><RIcon k="down" size={14} /></button>
       </div>
     </div>

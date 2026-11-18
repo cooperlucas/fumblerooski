@@ -791,3 +791,17 @@ button.pick.date { cursor: pointer; }
 .nudge .shareic { vertical-align: -2px; color: var(--teal); }
 .nudge .btn { align-self: flex-start; }
 .nudge .nx { flex: none; width: 30px; height: 30px; margin: -4px -2px 0 0; border: none; border-radius: 50%; background: var(--chip); color: var(--mute); font-size: 20px; line-height: 1; cursor: pointer; }
+
+/* The date button on a schedule stays on one line (the year only shows for another year). */
+.datebar .pick.date { flex: none; white-space: nowrap; }
+
+/* Phones held sideways: the app is portrait only. Home screen web apps can't lock rotation on iPhone, so a sideways
+   phone gets a "turn it back" card over the app instead of a stretched layout. (The iPhone app build locks it for real.) */
+.turnback { display: none; }
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .turnback { display: flex; position: fixed; inset: 0; z-index: 1000; background: var(--bg); color: var(--ink);
+    flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px; }
+  .turnback b { font-stretch: 125%; font-weight: 900; font-style: italic; text-transform: uppercase; font-size: 20px; }
+  .turnback span { color: var(--mute); font-size: 14px; }
+  .turnback .mascot { width: 72px; height: auto; }
+}
