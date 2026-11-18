@@ -2647,6 +2647,7 @@ function GamePage({ lg, id, feed, replayBar }) {
                 </span>
                 <LgTag lg={lg} />
               </div>
+              <ShareGame g={g} lg={lg} />
               <div className="grid">
                 {[g.away, null, g.home].map((t, i) => t ? (
                   <button key={t.id} className="tm" onClick={() => go(`team/${lg}/${t.id}${g.season ? '/' + g.season : ''}`)} aria-label={`Open ${t.full}`}>
@@ -3060,6 +3061,34 @@ function Search() {
         )}
       </Page>
     </>
+  );
+}
+
+/* ---------- Share a game ---------- */
+// The phone's share sheet with the score in words and a link straight to this game (copied instead where there is no
+// share sheet). The link preview is the app's card.
+function shareText(g) {
+  const a = g.away, h = g.home;
+  if (g.state === 'pre') return `${a.name} at ${h.name}, ${fmtDate(g.date)} ${g.tbd ? '' : fmtTime(g.date)}`.trim();
+  const line = `${a.name} ${a.score}, ${h.name} ${h.score}`;
+  return g.state === 'final' ? `${line} (${statusLabel(g)})` : `${line}, ${statusLabel(g)}`;
+}
+function ShareGame({ g, lg }) {
+  const [copied, setCopied] = useState(false);
+  const share = async (e) => {
+    e.stopPropagation();
+    const url = `${location.origin}/#/game/${lg}/${g.id}`;
+    const text = shareText(g);
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Fumblerooski', text, url }); return; }
+    } catch (err) { if (err?.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(`${text} ${url}`); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* nothing to do */ }
+  };
+  return (
+    <button className="bshare" onClick={share} aria-label="Share this game">
+      {copied ? <span className="bcopied">Link copied</span> : null}
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2" /></svg>
+    </button>
   );
 }
 

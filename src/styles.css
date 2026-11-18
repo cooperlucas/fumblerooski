@@ -819,3 +819,8 @@ button.pick.date { cursor: pointer; }
 .pickrow .pinstar.on { background: var(--yellow); border-color: var(--yellow); color: var(--on-accent); }
 .welcomebar { position: sticky; bottom: calc(var(--dockh, 0px) + 10px); display: flex; justify-content: center; margin-top: 14px; z-index: 5; }
 .welcomebar .btn { min-width: 220px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+
+/* Share button on a game's scoreboard, top right */
+.board { position: relative; }
+.board .bshare { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); background: rgba(12,17,36,.35); color: #fff; }
+.board .bcopied { position: absolute; right: 40px; white-space: nowrap; font-size: 11px; font-weight: 800; background: #0C1124; color: #fff; padding: 4px 8px; border-radius: 8px; }
