@@ -135,6 +135,17 @@ export async function run(env) {
       [st, as, hs] = await Promise.all([get(`${base}/status`), get(`${base}/competitors/${away.id}/score`).catch(() => null), get(`${base}/competitors/${home.id}/score`).catch(() => null)]);
     } catch { continue; }
     const now2 = { state: st.type?.state || 'pre', period: Number(st.period) || 0, clock: Number(st.clock) || 0, away: Number(as?.value) || 0, home: Number(hs?.value) || 0 };
+    // Football, late: who has the ball decides how close counts as close.
+    if (L.sport === 'football' && now2.state === 'in' && now2.period >= L.periods && !JSON.parse(g.sent || '[]').includes('close')) {
+      try {
+        const sit = await get(`${base}/situation`);
+        let ref = sit.team?.$ref || '';
+        // No team on the situation: the last play's ending spot says who has it.
+        if (!ref && sit.lastPlay?.$ref) { const pl = await get(String(sit.lastPlay.$ref).replace(/^http:/, 'https:')); ref = pl.end?.team?.$ref || pl.team?.$ref || ''; }
+        const tid = /teams\/(\d+)/.exec(String(ref))?.[1];
+        now2.ball = tid === away.id ? 'away' : tid === home.id ? 'home' : null;
+      } catch { /* unknown: the stricter rule applies */ }
+    }
     const sent = JSON.parse(g.sent || '[]');
     const due = dueAlerts({ state: g.state, sent }, now2, L.sport, L.periods);
     await db.prepare('UPDATE games SET state = ?, sent = ?, updated = ? WHERE gid = ?').bind(now2.state, JSON.stringify([...sent, ...due]), Date.now(), g.gid).run();

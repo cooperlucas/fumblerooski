@@ -6,8 +6,14 @@ test('alerts: start, close late, final, each once', () => {
   assert.deepEqual(dueAlerts({ state: 'pre', sent: [] }, { state: 'in', period: 1, clock: 900, away: 0, home: 0 }, 'football', 4), ['start']);
   // first seen mid-game: no "started"
   assert.deepEqual(dueAlerts(null, { state: 'in', period: 2, clock: 600, away: 7, home: 3 }, 'football', 4), []);
-  // 4th quarter, 4:30 left, 3-point game
-  assert.deepEqual(dueAlerts({ state: 'in', sent: ['start'] }, { state: 'in', period: 4, clock: 270, away: 20, home: 17 }, 'football', 4), ['close']);
+  // 4th quarter, 6:30 left, down 7 with the ball: close
+  assert.deepEqual(dueAlerts({ state: 'in', sent: ['start'] }, { state: 'in', period: 4, clock: 390, away: 17, home: 24, ball: 'away' }, 'football', 4), ['close']);
+  // same score, but the leading team has the ball: not yet (needs 4 or fewer)
+  assert.deepEqual(dueAlerts({ state: 'in', sent: ['start'] }, { state: 'in', period: 4, clock: 390, away: 17, home: 24, ball: 'home' }, 'football', 4), []);
+  // leading team has the ball, up 3: close
+  assert.deepEqual(dueAlerts({ state: 'in', sent: ['start'] }, { state: 'in', period: 4, clock: 270, away: 20, home: 17, ball: 'away' }, 'football', 4), ['close']);
+  // 7:30 left: too early
+  assert.deepEqual(dueAlerts({ state: 'in', sent: [] }, { state: 'in', period: 4, clock: 450, away: 20, home: 17, ball: 'home' }, 'football', 4), []);
   // already sent
   assert.deepEqual(dueAlerts({ state: 'in', sent: ['start', 'close'] }, { state: 'in', period: 4, clock: 100, away: 20, home: 17 }, 'football', 4), []);
   // blowout late: nothing
