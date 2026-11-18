@@ -28,6 +28,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
+    if (url.pathname === '/api/push/health') return json({ ok: !!(env.DB && env.VAPID_PRIVATE_KEY) });
     if (!env.DB || !env.VAPID_PRIVATE_KEY) return json({ ok: false, error: 'Alerts are not set up yet.' }, 503);
     await setup(env.DB);
     try {

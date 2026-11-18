@@ -1,5 +1,5 @@
 import { FEEDBACK_EMAIL, APP_VERSION } from './config.js';
-import { ALERT_KINDS, readAlerts, alertsBlocker, enableAlerts, disableAlerts, syncAlerts, testAlert } from './alerts.js';
+import { ALERT_KINDS, readAlerts, alertsBlocker, alertsReady, enableAlerts, disableAlerts, syncAlerts, testAlert } from './alerts.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
@@ -2930,7 +2930,8 @@ function AlertSettings() {
   const [a, setA] = useState(readAlerts);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const block = alertsBlocker();
+  const up = useQuery('alerts:ready', alertsReady, () => 600000);
+  const block = up.data === false ? 'down' : alertsBlocker();
   const act = async (fn, ok) => { setBusy(true); setMsg(''); try { await fn(); setA(readAlerts()); if (ok) setMsg(ok); } catch (e) { setMsg(e.message || 'Something went wrong.'); } setBusy(false); };
   const toggleKind = (k) => { const kinds = a.kinds.includes(k) ? a.kinds.filter((x) => x !== k) : [...a.kinds, k]; setA({ ...a, kinds }); if (a.on) act(() => syncAlerts(favs, kinds)); else { try { localStorage.setItem('fr.alerts.v1', JSON.stringify({ ...a, kinds })); } catch { /* fine */ } } };
   return (
@@ -2939,6 +2940,7 @@ function AlertSettings() {
       <div className="card alertcard">
         {block === 'install' ? <p className="prose">On iPhone, alerts work from the home screen app. Tap Share in Safari, then Add to Home Screen, then turn them on here.</p>
           : block === 'denied' ? <p className="prose">Notifications are blocked for Fumblerooski. Turn them on in your phone's Settings, under Notifications.</p>
+          : block === 'down' ? <p className="prose">Alerts are coming soon.</p>
           : block === 'native' ? <p className="prose">Alerts aren't in the iPhone app yet.</p>
           : block ? <p className="prose">This browser can't show alerts.</p>
           : (

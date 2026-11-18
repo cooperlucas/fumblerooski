@@ -28,8 +28,8 @@ async function currentSub(create) {
 }
 async function post(path, body) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || `Alerts server said ${r.status}`);
+  const d = await r.json().catch(() => ({ ok: false, error: 'Alerts are not available right now.' }));
+  if (!r.ok || d.ok !== true) throw new Error(d.error || `Alerts server said ${r.status}`);
   return d;
 }
 
@@ -59,4 +59,9 @@ export async function testAlert() {
   const sub = await currentSub(false);
   if (!sub) throw new Error('Alerts are not on for this phone.');
   await post('/api/push/test', { endpoint: sub.endpoint });
+}
+
+// Is the alerts server up? (Before it's deployed, /api/ answers with the app's page, not JSON.)
+export async function alertsReady() {
+  try { const r = await fetch('/api/push/health', { cache: 'no-store' }); const d = await r.json(); return d.ok === true; } catch { return false; }
 }
