@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import './move.js';
 import './data/store.js';
 import { CF_BEACON_TOKEN } from './config.js';
 import App from './App.jsx';
