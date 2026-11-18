@@ -1677,6 +1677,22 @@ export async function getTeamStats(lg) {
       if (kept.length) teams.splice(0, teams.length, ...kept);
     } catch { /* keep them all */ }
   }
+  // Plainer column names where the feed's are wrong (first downs labeled "CMP") or cryptic.
+  const RELABEL = { firstDowns: '1ST D', firstDownsRushing: 'RUSH 1D', firstDownsPassing: 'PASS 1D', firstDownsPenalty: 'PEN 1D', fourthDownAttempts: '4THA',
+    totalPenalties: 'PEN', totalPenaltyYards: 'PEN YDS', turnOverDifferential: 'TO +/-', totalTakeaways: 'TAKE', totalGiveaways: 'GIVE' };
+  for (const c of cats) c.labels = c.labels.map((l, i) => RELABEL[c.ids[i]] || l);
+  for (const c of cats) if (/^defensive\s*interceptions$/i.test(c.title)) c.title = 'Interceptions';
+  // Football's "General" (games, fumbles) is a thin group: fold it into "Misc" (the feed's "Miscellaneous").
+  const misc = cats.find((c) => c.key === 'miscellaneous'), gen = cats.find((c) => c.key === 'general');
+  if (misc) misc.title = 'Misc';
+  if (misc && gen) {
+    const extra = gen.labels.map((_, i) => i).filter((i) => !misc.ids.includes(gen.ids[i]) && gen.ids[i] !== 'gamesPlayed');
+    teams.forEach((t) => { const g = t.stats.general || []; t.stats.miscellaneous = [...(t.stats.miscellaneous || misc.labels.map(() => '')), ...extra.map((i) => g[i] ?? '')]; delete t.stats.general; });
+    misc.labels = [...misc.labels, ...extra.map((i) => gen.labels[i])];
+    misc.names = [...misc.names, ...extra.map((i) => gen.names[i])];
+    misc.ids = [...misc.ids, ...extra.map((i) => gen.ids[i])];
+    cats.splice(cats.indexOf(gen), 1);
+  }
   return { lg, cats: cats.filter((c) => teams.some((t) => t.stats[c.key]?.length)), teams };
 }
 
