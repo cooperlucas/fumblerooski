@@ -1339,6 +1339,8 @@ export const QUALIFIED = {
     yardsPerPassAttempt: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Yards Per Pass', min: 'MIN 14 ATT/G' },
     // Picks thrown: fewest first, so a qualified passer with 0 is 1st and the most is last.
     interceptionsThrown: { group: 'passing', stat: 'interceptions', asc: true, cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Interceptions Thrown', min: 'MIN 14 ATT/G' },
+    // The leaders card (the feed calls passer rating quarterbackRating) and the player tile both rank on this.
+    quarterbackRating: { group: 'passing', stat: 'QBRating', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'Quarterback Rating', min: 'MIN 14 ATT/G' },
     adjQBR: { group: 'passing', cat: 'offense:passing', vol: 'passingAttempts', per: 14, title: 'QBR', min: 'MIN 14 ATT/G' },
     fieldGoalPct: { group: 'kicking', cat: 'specialTeams:kicking', vol: 'fieldGoalAttempts', per: 1, title: 'Field Goal %', min: 'MIN 1 FGA/G' },
     grossAvgPuntYards: { group: 'punting', cat: 'specialTeams:punting', vol: 'punts', per: 2.5, title: 'Punting Average', min: 'MIN 2.5 PUNTS/G' },
@@ -1565,6 +1567,13 @@ export async function getLeaders(lg, season) {
       const kick = football ? (await Promise.all(KICK_BOARDS.map(async ([key, title, abbr]) => {
         try { const rows = await getDeepLeader(lg, key, season); return rows?.length ? { key, title, abbr, rows: rows.slice(0, 10) } : null; } catch { return null; }
       }))).filter(Boolean) : [];
+      // Football: boards with a minimum (QB rating needs 14 pass attempts per team game) are rebuilt from qualified players,
+      // since the feed's own list lets in a backup with a handful of throws.
+      if (kept.length && football) {
+        await Promise.all(kept.filter((c) => qualifiedRule(lg, c.key)).map(async (c) => {
+          try { const rows = await getDeepLeader(lg, c.key, season); if (rows?.length && rows.some((r) => Number(String(r.value).replace(/,/g, '')) !== 0)) c.rows = rows.slice(0, 10); } catch { /* keep the feed's list */ }
+        }));
+      }
       if (kept.length && LEAGUE[lg]?.sport === 'basketball') {
         // Shooting percentages: the feed's board has no minimum, so a 1-for-1 shooter leads. Rebuild those lists from qualified shooters.
         try {
