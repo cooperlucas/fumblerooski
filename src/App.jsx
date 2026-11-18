@@ -874,19 +874,33 @@ function TeamStats({ lg }) {
   const q = useQuery(`teamstats:${lg}`, () => getTeamStats(lg), () => 600000);
   const [catKey, setCat] = useState(null);
   const [sort, setSort] = useState({ col: 0, dir: -1 });
+  const filters = useLeaderFilters(lg);
+  const [fid, setFid] = useSticky('tsfilter:' + lg, 'all');
   useEffect(() => { if (q.data) ensureColors(q.data.teams.map((t) => t.team), 40); }, [q.data]);
   if (q.loading && !q.data) return <div style={{ marginTop: 12 }}><Loading rows={6} /></div>;
   if (q.error && !q.data) return <div style={{ marginTop: 12 }}><Problem error={q.error} retry={q.reload} /></div>;
-  const cats = q.data.cats;
+  // Offense first, then defense and differential; the catch-all "General" group goes last.
+  const ORDER = ['offensive', 'defensive', 'differential'];
+  const rank = (c) => { const i = ORDER.indexOf(c.key.toLowerCase()); return i >= 0 ? i : c.key.toLowerCase() === 'general' ? 99 : 50; };
+  const cats = [...q.data.cats].sort((a, b) => rank(a) - rank(b));
   if (!cats.length) return <Empty>No team stats listed for {LEAGUE[lg].name} right now.</Empty>;
   const cat = cats.find((c) => c.key === catKey) || cats[0];
-  const rows = q.data.teams.filter((t) => t.stats[cat.key]).sort((a, b) => (numOf(b.stats[cat.key][sort.col]) - numOf(a.stats[cat.key][sort.col])) * -sort.dir || a.team.name.localeCompare(b.team.name));
+  const f = filters.find((x) => x.id === fid);
+  const rows = q.data.teams.filter((t) => t.stats[cat.key] && (!f || f.ids.has(t.team.id))).sort((a, b) => (numOf(b.stats[cat.key][sort.col]) - numOf(a.stats[cat.key][sort.col])) * -sort.dir || a.team.name.localeCompare(b.team.name));
   const place = places(rows.map((t) => t.stats[cat.key][sort.col] ?? ''));
   const pickCol = (i) => setSort(sort.col === i ? { col: i, dir: -sort.dir } : { col: i, dir: -1 });
   return (
     <>
       <div className="statbar" style={{ marginTop: 12 }}>
         {cats.length > 1 ? <Picker label="Stat group" value={cat.key} onChange={(v) => { setCat(v); setSort({ col: 0, dir: -1 }); }}>{cats.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}</Picker> : null}
+        {filters.length ? (
+          <Picker label="Filter teams" value={f ? fid : 'all'} onChange={setFid} shown={f && f.id.startsWith('g:') ? shortConf(f.label) : undefined}>
+            <option value="all">{lg === 'cfb' ? 'All FBS' : LEAGUE[lg].college ? 'All Division I' : `All ${LEAGUE[lg].short}`}</option>
+            {filters.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+          </Picker>
+        ) : null}
+      </div>
+      <div className="statbar" style={{ marginTop: 6 }}>
         <span className="stamp" style={{ margin: 0 }}>Sorted by {cat.names[sort.col] || cat.labels[sort.col]}, {sort.dir < 0 ? 'most first' : 'fewest first'}</span>
       </div>
       <div className="card pbox" style={{ marginTop: 10 }}>

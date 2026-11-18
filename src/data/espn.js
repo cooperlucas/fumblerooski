@@ -1631,12 +1631,44 @@ export async function getTeamStats(lg) {
     key: String(c.name || ''), title: cap(cleanText(c.displayName || c.name || '')),
     labels: (c.labels || c.names || []).map((l) => cleanText(l)),
     names: (c.displayNames || c.names || []).map((l) => cleanText(l)),
+    ids: (c.names || []).map(String),
   })).filter((c) => c.key && c.labels.length);
   const teams = (d.teams || []).map((t) => {
     const stats = {};
-    (t.categories || []).forEach((c) => { const v = c.totals || c.displayValues || c.values; if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); }); // raw numbers come with long tails, so trim them
+    // Each group comes twice: the team's own numbers, then its opponents' (splitId 900, "Opponent General"). Only the
+    // team's own belong here; taking the last one showed what teams allowed instead of what they did.
+    (t.categories || []).forEach((c) => {
+      if (String(c.splitId ?? '0') !== '0' || /^opponent/i.test(String(c.displayName || ''))) return;
+      const v = c.totals || c.displayValues || c.values;
+      if (Array.isArray(v)) stats[String(c.name || '')] = v.map((x) => { const t = String(x ?? ''); return /^-?\d+\.\d{3,}$/.test(t) ? String(Math.round(Number(t) * 10) / 10) : t; }); // raw numbers come with long tails, so trim them
+    });
     return { team: normTeam(t.team || {}, lg), stats };
   }).filter((t) => t.team.id);
+  // The feed repeats columns (avgRebounds twice, rebounds and totalRebounds side by side) and labels a per-game average
+  // the same as its total (both "REB"). Keep one of each and call the averages what fans do: RPG, PPG, APG.
+  const PER_GAME = { REB: 'RPG', PTS: 'PPG', AST: 'APG', STL: 'SPG', BLK: 'BPG', TO: 'TOPG', OR: 'ORPG', DR: 'DRPG', PF: 'PF/G' };
+  for (const c of cats) {
+    const col = (i) => teams.map((t) => t.stats[c.key]?.[i] ?? '').join('|');
+    const keep = [], seenName = new Set(), seenVals = new Map();
+    // teamAssistTurnoverRatio counts only team turnovers (mostly 0.0): the real AST/TO sits next to it.
+    c.labels.forEach((_, i) => {
+      const n = c.ids[i] || c.names[i];
+      if (seenName.has(n) || n === 'teamAssistTurnoverRatio') return;
+      const vals = col(i);
+      const twin = seenVals.get(vals);
+      if (twin != null && c.labels[twin] === c.labels[i] && vals.replace(/\|/g, '')) return; // same label, same numbers: a duplicate under another name
+      seenName.add(n); seenVals.set(vals, i); keep.push(i);
+    });
+    const avg = new Set(keep.filter((i) => /^avg[A-Z]/.test(c.ids[i] || '')));
+    const labels = keep.map((i) => {
+      const l = c.labels[i];
+      if (!avg.has(i)) return l;
+      const clash = keep.some((j) => j !== i && !avg.has(j) && c.labels[j] === l);
+      return PER_GAME[l] || (clash ? `${l}/G` : l);
+    });
+    teams.forEach((t) => { const v = t.stats[c.key]; if (v) t.stats[c.key] = keep.map((i) => v[i] ?? ''); });
+    c.labels = labels; c.names = keep.map((i) => c.names[i]); c.ids = keep.map((i) => c.ids[i]);
+  }
   // College hoops: the feed mixes in small-college teams. Keep the league's own (Division I) list.
   if (LEAGUE[lg].college && LEAGUE[lg].sport === 'basketball') {
     try {
