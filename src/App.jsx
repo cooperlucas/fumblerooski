@@ -262,6 +262,25 @@ function InstallNudge() {
     </div>
   );
 }
+// One-time news card: alerts are live. Gone after the X or once alerts are on; never shown where alerts can't work.
+const NEWS = 'fr.news.alerts';
+function AlertsNews() {
+  const [gone, setGone] = useState(() => { try { return !!localStorage.getItem(NEWS); } catch { return true; } });
+  const block = alertsBlocker();
+  if (gone || readAlerts().on || block === 'native' || block === 'unsupported') return null;
+  const close = () => { try { localStorage.setItem(NEWS, '1'); } catch { /* carry on */ } setGone(true); };
+  return (
+    <div className="card nudge" style={{ marginTop: 14 }}>
+      <Mascot />
+      <div className="ntext">
+        <b>New: alerts for your teams</b>
+        <span>Get a heads up when your teams kick off, when it's close late, and the final.{block === 'install' ? ' Works from the home screen app.' : ''}</span>
+        <button className="btn on" style={{ marginTop: 10 }} onClick={() => { close(); go('settings'); }}>Turn on alerts</button>
+      </div>
+      <button className="nx" aria-label="Dismiss" onClick={close}>×</button>
+    </div>
+  );
+}
 const ShareIcon = () => (
   <svg className="shareic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M8 10H6a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-2" />
@@ -313,7 +332,7 @@ function Scores() {
         <button className="chipb rchip" aria-pressed={!pickL} aria-label="Headliners" title="Headliners" onClick={() => setLg('top')}><StarCut /></button>
         {shownLeagues(prefs).map((l) => <button key={l.id} className="chipb" aria-pressed={pickL === l.id} onClick={() => setLg(l.id)}>{l.short}</button>)}
       </div>
-      {!pickL ? <InstallNudge /> : null}
+      {!pickL ? <><AlertsNews /><InstallNudge /></> : null}
       {q.loading && !q.data ? <Loading rows={5} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !pickL ? (
         !today.length && !mine.length ? <Empty>No games on the board right now.</Empty> : (
           <>
@@ -2951,7 +2970,7 @@ function AlertSettings() {
               </button>
               {ALERT_KINDS.map(([k, label]) => (
                 <button key={k} className="lrow sub2" disabled={busy} aria-pressed={a.kinds.includes(k)} onClick={() => toggleKind(k)}>
-                  <span className="nm">{label}</span><span className={'check' + (a.kinds.includes(k) ? ' on' : '')} aria-hidden="true">{a.kinds.includes(k) ? '✓' : ''}</span>
+                  <span className="nm">{label}</span><span className={'abox' + (a.kinds.includes(k) ? ' on' : '')} aria-hidden="true">{a.kinds.includes(k) ? <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}</span>
                 </button>
               ))}
               {a.on ? <button className="lrow" disabled={busy} onClick={() => act(testAlert, 'Test sent. It should pop up in a few seconds.')}><span className="nm">Send a test alert</span><span className="chev" aria-hidden="true">›</span></button> : null}
