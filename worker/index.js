@@ -28,7 +28,12 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
-    if (url.pathname === '/api/push/health') return json({ ok: !!(env.DB && env.VAPID_PRIVATE_KEY) });
+    if (url.pathname === '/api/push/health') {
+      // Says which piece is missing, never the key itself.
+      let keyOk = false;
+      try { const k = JSON.parse(env.VAPID_PRIVATE_KEY || ''); keyOk = k?.kty === 'EC' && !!k.d && !!k.x && !!k.y; } catch { /* not JSON */ }
+      return json({ ok: !!(env.DB && keyOk), database: !!env.DB, key: env.VAPID_PRIVATE_KEY ? (keyOk ? 'ok' : 'set but not valid JSON key') : 'missing' });
+    }
     if (!env.DB || !env.VAPID_PRIVATE_KEY) return json({ ok: false, error: 'Alerts are not set up yet.' }, 503);
     await setup(env.DB);
     try {
