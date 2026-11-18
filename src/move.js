@@ -2,18 +2,17 @@
 // separately, so the old address forwards to the new one carrying the person's pinned teams and settings along in the
 // link, and the new address saves them before the app starts (this module is imported before the store reads them).
 const HOME = 'fumblerooski.app';
-// Caches the app rebuilds on its own: not worth carrying.
-const SKIP = /^fr\.(colors|pm2|fbsids)/;
+// Only what the person chose: pinned teams and settings. Everything else in storage is a cache the app rebuilds, and
+// some of those (the full team list) are far too big for a link: Safari calls such an address invalid.
+const KEEP = ['fr.favs.v1', 'fr.leagues.v1', 'fr.theme', 'fr.stats.lg', 'fr.install.v1'];
 
 try {
   const host = location.hostname;
   if (host.endsWith('.workers.dev')) {
     const carry = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('fr.') && !SKIP.test(k)) carry[k] = localStorage.getItem(k);
-    }
-    const packed = Object.keys(carry).length ? '?carry=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(carry))))) : '';
+    for (const k of KEEP) { const v = localStorage.getItem(k); if (v != null) carry[k] = v; }
+    let packed = Object.keys(carry).length ? '?carry=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(carry))))) : '';
+    if (packed.length > 6000) packed = ''; // never build an address too long to open
     location.replace(`https://${HOME}/${packed}${location.hash}`);
   } else {
     const q = new URLSearchParams(location.search);
