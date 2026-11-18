@@ -4,6 +4,7 @@ import './move.js';
 import './data/store.js';
 import { CF_BEACON_TOKEN } from './config.js';
 import App from './App.jsx';
+import './splash.js';
 import './styles.css';
 
 createRoot(document.getElementById('root')).render(<App />);

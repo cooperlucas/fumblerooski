@@ -31,8 +31,44 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap">
+  <!-- Launch logo: shown before the app's code loads, then flies off (src/splash.js) once the first screen is ready. -->
+  <style>
+    #splash { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: #15100C; --sp-ink: #F8F2E7; transition: opacity 0.25s ease 0.3s; }
+    html.sp-light #splash { background: #F3EFE4; --sp-ink: #0C1124; }
+    #splash svg { width: 132px; height: auto; animation: sp-in 0.35s cubic-bezier(.2,1.4,.4,1) both; }
+    #splash.go { opacity: 0; pointer-events: none; }
+    #splash.go svg { animation: sp-fly 0.55s cubic-bezier(.55,-0.35,.75,.35) forwards; }
+    @keyframes sp-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes sp-fly { 0% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-18px) rotate(4deg); } 100% { transform: translateX(110vw) translateY(-14vh) rotate(-18deg); } }
+    @media (prefers-reduced-motion: reduce) { #splash svg, #splash.go svg { animation: none; } #splash { transition-delay: 0s; } }
+  </style>
+  <script>
+    // Match the saved theme before anything paints.
+    (function () { var t = 'dark'; try { t = JSON.parse(localStorage.getItem('fr.theme')) || 'dark'; } catch (e) {}
+      var light = t === 'light' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+      if (light) document.documentElement.className += ' sp-light'; })();
+  </script>
 </head>
 <body>
+  <div id="splash" aria-hidden="true">
+    <svg viewBox="0 0 64 50">
+      <defs>
+        <linearGradient id="spBall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C97A47" /><stop offset="1" stop-color="#7A3B1C" /></linearGradient>
+        <clipPath id="spClip"><ellipse cx="38" cy="25" rx="21" ry="14" transform="rotate(-20 38 25)" /></clipPath>
+      </defs>
+      <path d="M4 16 H22" stroke="#22D3D6" stroke-width="4" stroke-linecap="round" />
+      <path d="M9 23 H20" stroke="var(--sp-ink)" stroke-width="4" stroke-linecap="round" />
+      <path d="M2 30 H20" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" />
+      <ellipse cx="41" cy="28" rx="21" ry="14" transform="rotate(-20 41 28)" fill="#6E3AB5" />
+      <ellipse cx="38" cy="25" rx="21" ry="14" transform="rotate(-20 38 25)" fill="url(#spBall)" />
+      <g clip-path="url(#spClip)"><path d="M7.7 29.0 L64.1 8.6 L62.1 3.1 L5.8 23.4 Z" fill="#22D3D6" /><path d="M6.8 26.2 L63.1 5.8" stroke="#FFFFFF" stroke-width="1.2" /></g>
+      <ellipse cx="38" cy="25" rx="21" ry="14" transform="rotate(-20 38 25)" fill="none" stroke="#0C1124" stroke-width="2.6" />
+      <ellipse cx="32.5" cy="27" rx="3.8" ry="3.3" fill="#FFFFFF" /><ellipse cx="44" cy="22.8" rx="3.8" ry="3.3" fill="#FFFFFF" />
+      <circle cx="33.6" cy="27.4" r="1.8" fill="#0C1124" /><circle cx="45.1" cy="23.2" r="1.8" fill="#0C1124" />
+      <path d="M28.6 23.2 L35.6 24.2 M40.8 20.6 L47.4 17.4" stroke="#0C1124" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M35.5 33.5 q6 1.8 11 -3.2" fill="none" stroke="#0C1124" stroke-width="2.2" stroke-linecap="round" />
+    </svg>
+  </div>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
