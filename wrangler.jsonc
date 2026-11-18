@@ -1,9 +1,19 @@
-// Cloudflare deploy config. The app is a plain static site: Cloudflare serves the built dist/ folder, no server code.
+// Cloudflare deploy config. The app is the built dist/ folder; the small worker in worker/ only answers /api/* (alerts)
+// and runs the alert check every minute. Everything else is served straight from the assets.
 {
   "name": "fumblerooski",
+  "main": "worker/index.js",
   "compatibility_date": "2025-09-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "fumblerooski", "database_id": "3b2066d1-b0fd-49d0-9ee8-bf2d9ec6e9cc" }
+  ],
+  // The private alert key is a secret set in the Cloudflare dashboard (VAPID_PRIVATE_KEY), never in this file.
+  "vars": { "VAPID_SUBJECT": "mailto:feedback@fumblerooski.app" }
 }
