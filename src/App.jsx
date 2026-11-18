@@ -1,4 +1,5 @@
 import { FEEDBACK_EMAIL, APP_VERSION } from './config.js';
+import { ALERT_KINDS, readAlerts, alertsBlocker, enableAlerts, disableAlerts, syncAlerts, testAlert } from './alerts.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
@@ -34,6 +35,9 @@ export default function App() {
   }, []);
   const [, repaint] = useState(0);
   useEffect(() => onColors(() => repaint((n) => n + 1)), []);
+  // Pinned teams changed while alerts are on: tell the alerts server (a moment later, so a burst of taps is one call).
+  const pinnedNow = useFavs();
+  useEffect(() => { const h = setTimeout(() => { syncAlerts(pinnedNow).catch(() => {}); }, 1500); return () => clearTimeout(h); }, [pinnedNow]);
   const [name = '', a, b, c, e4] = parts;
   const root = ROOTS.has(name);
   let title = '', body, tab = name;
@@ -2904,6 +2908,7 @@ function Preview({ p, game, lg }) {
 function Settings() {
   return (
     <>
+      <AlertSettings />
       <LeagueSettings />
       <Appearance />
       <section className="sec">
@@ -2917,6 +2922,42 @@ function Settings() {
       </section>
       <p className="stamp">Fumblerooski {APP_VERSION}</p>
     </>
+  );
+}
+// Alerts for pinned teams: one switch, the three kinds, and a test.
+function AlertSettings() {
+  const favs = useFavs();
+  const [a, setA] = useState(readAlerts);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const block = alertsBlocker();
+  const act = async (fn, ok) => { setBusy(true); setMsg(''); try { await fn(); setA(readAlerts()); if (ok) setMsg(ok); } catch (e) { setMsg(e.message || 'Something went wrong.'); } setBusy(false); };
+  const toggleKind = (k) => { const kinds = a.kinds.includes(k) ? a.kinds.filter((x) => x !== k) : [...a.kinds, k]; setA({ ...a, kinds }); if (a.on) act(() => syncAlerts(favs, kinds)); else { try { localStorage.setItem('fr.alerts.v1', JSON.stringify({ ...a, kinds })); } catch { /* fine */ } } };
+  return (
+    <section className="sec">
+      <H2>Alerts</H2>
+      <div className="card alertcard">
+        {block === 'install' ? <p className="prose">On iPhone, alerts work from the home screen app. Tap Share in Safari, then Add to Home Screen, then turn them on here.</p>
+          : block === 'denied' ? <p className="prose">Notifications are blocked for Fumblerooski. Turn them on in your phone's Settings, under Notifications.</p>
+          : block === 'native' ? <p className="prose">Alerts aren't in the iPhone app yet.</p>
+          : block ? <p className="prose">This browser can't show alerts.</p>
+          : (
+            <>
+              <button className="lrow" disabled={busy} aria-pressed={a.on} onClick={() => act(() => (a.on ? disableAlerts() : enableAlerts(favs, a.kinds)), a.on ? '' : 'Alerts are on.')}>
+                <span className="nm">Alerts for your teams<span className="sub">{favs.length ? `${favs.length} pinned team${favs.length === 1 ? '' : 's'}` : 'Pin a team to get alerts'}</span></span>
+                <span className={'switch' + (a.on ? ' on' : '')} aria-hidden="true"><i /></span>
+              </button>
+              {ALERT_KINDS.map(([k, label]) => (
+                <button key={k} className="lrow sub2" disabled={busy} aria-pressed={a.kinds.includes(k)} onClick={() => toggleKind(k)}>
+                  <span className="nm">{label}</span><span className={'check' + (a.kinds.includes(k) ? ' on' : '')} aria-hidden="true">{a.kinds.includes(k) ? '✓' : ''}</span>
+                </button>
+              ))}
+              {a.on ? <button className="lrow" disabled={busy} onClick={() => act(testAlert, 'Test sent. It should pop up in a few seconds.')}><span className="nm">Send a test alert</span><span className="chev" aria-hidden="true">›</span></button> : null}
+            </>
+          )}
+      </div>
+      {msg ? <p className="stamp" role="status">{msg}</p> : null}
+    </section>
   );
 }
 // A feedback email with the screen they were on and their device filled in, so a bug report says where it happened.
