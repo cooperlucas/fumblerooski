@@ -835,7 +835,7 @@ const TEAM_STATS = {
     ['Defense', [['defensive', 'sacks', 'Sacks'], ['defensive', 'tacklesForLoss', 'TFL'], ['defensiveInterceptions', 'interceptions', 'INT'], ['general', 'fumblesRecovered', 'Fumbles rec'], ['defensive', 'passesDefended', 'Passes def']]],
     ['Situational', [['miscellaneous', 'thirdDownConvPct', '3rd down %'], ['miscellaneous', 'fourthDownConvPct', '4th down %'], ['miscellaneous', 'redzoneScoringPct', 'Red zone %'], ['miscellaneous', 'turnOverDifferential', 'TO margin'], ['miscellaneous', 'totalPenaltyYards', 'Penalty yds'], ['kicking', 'fieldGoalPct', 'FG %']]]],
   basketball: [['Offense', [['offensive', 'avgPoints', 'Points'], ['offensive', 'fieldGoalPct', 'FG %'], ['offensive', 'threePointFieldGoalPct', '3PT %'], ['offensive', 'freeThrowPct', 'FT %'], ['offensive', 'avgAssists', 'Assists'], ['offensive', 'avgTurnovers', 'Turnovers']]],
-    ['Defense & boards', [['general', 'avgRebounds', 'Rebounds'], ['offensive', 'avgOffensiveRebounds', 'Off reb'], ['defensive', 'avgSteals', 'Steals'], ['defensive', 'avgBlocks', 'Blocks']]]],
+    ['Defense & boards', [['general', 'avgRebounds', 'Rebounds'], ['offensive', 'avgOffensiveRebounds', 'Off reb'], ['defensive', 'avgDefensiveRebounds', 'Def reb'], ['defensive', 'avgSteals', 'Steals'], ['defensive', 'avgBlocks', 'Blocks']]]],
   hockey: [['Offense', [['offensive', 'goals', 'Goals'], ['offensive', 'assists', 'Assists'], ['offensive', 'shootingPct', 'Shooting %'], ['offensive', 'powerPlayGoals', 'PP goals'], ['offensive', 'faceoffPercent', 'Faceoff %']]],
     ['Goaltending', [['defensive', 'avgGoalsAgainst', 'GAA'], ['defensive', 'savePct', 'Save %'], ['defensive', 'saves', 'Saves'], ['penalties', 'penaltyMinutes', 'PIM']]]],
   baseball: [['Batting', [['batting', 'avg', 'AVG'], ['batting', 'OPS', 'OPS'], ['batting', 'homeRuns', 'HR'], ['batting', 'runs', 'Runs'], ['batting', 'stolenBases', 'SB']]],
@@ -863,7 +863,7 @@ export async function getTeamStatsFor(lg, id, season) {
   if (year) {
     try {
       const d = await get(`https://sports.core.api.espn.com/v2/sports/${L.sport}/leagues/${L.slug}/seasons/${year}/types/2/teams/${encodeURIComponent(id)}/leaders?lang=en&region=us`);
-      const skip = /leader$|rating|^PER$|minutes|fouls|offensiveRebounds|defensiveRebounds/i;
+      const skip = /leader$|rating|^PER$|minutes|fouls/i;
       // Players who have moved on are not on today's roster: look those few up one by one.
       const ids = [...new Set((d.categories || []).filter((c) => !skip.test(c.name)).flatMap((c) => (c.leaders || []).slice(0, 3).map((l) => /athletes\/(\d+)/.exec(String(l.athlete?.$ref || ''))?.[1]).filter(Boolean)))];
       await Promise.allSettled(ids.filter((x) => !who.has(x)).slice(0, 30).map(async (x) => {
@@ -1652,7 +1652,7 @@ export async function getTeamStats(lg) {
 // Which box-score rows we show, in order, and what we call them. Labels match the plain-English tips.
 const STAT_PICKS = {
   football: [['totalYards', 'Total yards'], ['netPassingYards', 'Passing yards'], ['rushingYards', 'Rushing yards'], ['thirdDownEff', '3rd down'], ['fourthDownEff', '4th down'], ['turnovers', 'Turnovers'], ['possessionTime', 'Time of possession']],
-  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['freeThrowsMade-freeThrowsAttempted', 'Free throws'], ['totalRebounds', 'Rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers'], ['fouls', 'Fouls']],
+  basketball: [['fieldGoalsMade-fieldGoalsAttempted', 'Field goals'], ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3-pointers'], ['freeThrowsMade-freeThrowsAttempted', 'Free throws'], ['totalRebounds', 'Rebounds'], ['offensiveRebounds', 'Offensive rebounds'], ['defensiveRebounds', 'Defensive rebounds'], ['assists', 'Assists'], ['turnovers', 'Turnovers'], ['fouls', 'Fouls']],
   hockey: [['shotsTotal', 'Shots on goal'], ['powerPlayGoals', 'Power play goals'], ['faceoffsWon', 'Faceoffs won'], ['hits', 'Hits'], ['blockedShots', 'Blocked shots']],
   soccer: [['possessionPct', 'Possession'], ['totalShots', 'Shots'], ['shotsOnTarget', 'Shots on goal'], ['wonCorners', 'Corners'], ['foulsCommitted', 'Fouls']],
   baseball: [['hits', 'Hits'], ['runs', 'Runs'], ['errors', 'Errors'], ['homeRuns', 'Home runs'], ['strikeouts', 'Strikeouts']],
@@ -1695,6 +1695,13 @@ function statRows(box, awayId, homeId, sport, drives) {
     const extra = (list) => [['totalTechnicalFouls', 'tech'], ['flagrantFouls', 'flagrant']].map(([k, w]) => { const n = Number(list.find((x) => x.name === k)?.displayValue) || 0; return n ? `${n} ${w}` : ''; }).filter(Boolean).join(' · ');
     const da = extra(a), dh = extra(h);
     if (da || dh) Object.assign(fl, { awayDet: da, homeDet: dh });
+  }
+  // Basketball rebounds: the offensive / defensive split rides under the total's bar too.
+  const rb = rows.find((r) => r.label === 'Rebounds');
+  if (sport === 'basketball' && rb) {
+    const split = (list) => { const o = list.find((x) => x.name === 'offensiveRebounds')?.displayValue, d = list.find((x) => x.name === 'defensiveRebounds')?.displayValue; return o != null && d != null ? `${o} off · ${d} def` : ''; };
+    const da = split(a), dh = split(h);
+    if (da || dh) Object.assign(rb, { awayDet: da, homeDet: dh });
   }
   // The feed names stats differently per sport. If none of ours matched, show the first few it does have.
   if (!rows.length) rows = a.slice(0, 6).map((s) => row(s.name, s.label || s.displayName)).filter(Boolean);
