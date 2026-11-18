@@ -1693,6 +1693,36 @@ export async function getTeamStats(lg) {
     misc.ids = [...misc.ids, ...extra.map((i) => gen.ids[i])];
     cats.splice(cats.indexOf(gen), 1);
   }
+  // Football: one Turnovers group gathered from wherever the feed scatters it (takeaways and margin in Misc,
+  // interceptions thrown under Passing, picks made in their own group, fumbles under General).
+  if (LEAGUE[lg].sport === 'football') {
+    const pick = (key, id) => { const c = cats.find((x) => x.key === key); const i = c ? c.ids.indexOf(id) : -1; return i < 0 ? null : (t) => t.stats[key]?.[i] ?? ''; };
+    const fumbleCat = cats.find((c) => c.ids.includes('fumblesRecovered'))?.key;
+    const cols = [
+      ['TO +/-', 'Turnover margin', pick('miscellaneous', 'turnOverDifferential')],
+      ['TAKE', 'Takeaways', pick('miscellaneous', 'totalTakeaways')],
+      ['GIVE', 'Giveaways', pick('miscellaneous', 'totalGiveaways')],
+      ['INT', 'Interceptions made', pick('defensiveinterceptions', 'interceptions')],
+      ['FR', 'Fumbles recovered', fumbleCat && pick(fumbleCat, 'fumblesRecovered')],
+      ['INT THR', 'Interceptions thrown', pick('passing', 'interceptions')],
+      ['FUM LST', 'Fumbles lost', fumbleCat && pick(fumbleCat, 'fumblesLost')],
+      ['FUM', 'Fumbles', pick('rushing', 'rushingFumbles')],
+    ].filter((c) => c[2]);
+    // No margin in the feed (college): work it out when all four pieces are there.
+    const has = (l) => cols.some((c) => c[0] === l);
+    if (!has('TO +/-') && ['INT', 'FR', 'INT THR', 'FUM LST'].every(has)) {
+      const g = (l) => cols.find((c) => c[0] === l)[2];
+      const m = (t) => { const v = (Number(g('INT')(t)) || 0) + (Number(g('FR')(t)) || 0) - (Number(g('INT THR')(t)) || 0) - (Number(g('FUM LST')(t)) || 0); return (v > 0 ? '+' : '') + v; };
+      cols.unshift(['TO +/-', 'Turnover margin', m]);
+    }
+    if (has('FUM LST')) cols.splice(cols.findIndex((c) => c[0] === 'FUM'), 1);
+    if (cols.length >= 2) {
+      teams.forEach((t) => { t.stats.turnovers = cols.map((c) => String(c[2](t))); });
+      const mi = cats.findIndex((c) => c.key === 'miscellaneous'), ri = cats.findIndex((c) => c.key === 'receiving');
+      const at = mi >= 0 ? mi : ri >= 0 ? ri + 1 : cats.length;
+      cats.splice(at, 0, { key: 'turnovers', title: 'Turnovers', labels: cols.map((c) => c[0]), names: cols.map((c) => c[1]), ids: cols.map((c) => c[1]) });
+    }
+  }
   return { lg, cats: cats.filter((c) => teams.some((t) => t.stats[c.key]?.length)), teams };
 }
 
