@@ -2,7 +2,7 @@ import { FEEDBACK_EMAIL, APP_VERSION } from './config.js';
 import { ALERT_KINDS, readAlerts, alertsBlocker, alertsReady, enableAlerts, disableAlerts, syncAlerts, testAlert } from './alerts.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE } from './data/leagues.js';
-import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
+import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, getTeamLite, normTeam, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, favsNow, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
 import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
@@ -1169,6 +1169,9 @@ const pct1 = (label, v) => {
 /* ---------- Player ---------- */
 const ordinal = (n) => { const v = n % 100; return n + (v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };
 const fmtShort = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }); };
+// A past team from the career row alone, until (or if) its own page loads: the name from its slug, colors from what
+// the app has already seen of that team.
+const oldTeam = (lg, r) => normTeam({ id: r.teamId, abbreviation: r.team, displayName: (r.teamSlug || r.team).split('-').map((w) => (w.length <= 2 && w !== 'la' ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(' ') }, lg);
 function PlayerPage({ lg, id, season: startYr = '' }) {
   const q = useQuery(`player:${lg}:${id}`, () => getPlayer(lg, id), () => 600000);
   const pmq = useQuery(hasPlusMinus(lg) ? `pm:${lg}:${id}` : null, () => getPlusMinus(lg, id), () => 600000);
@@ -1200,9 +1203,9 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
   const picked = logYr && logYr !== latest ? logYr : '';
   // A past season shows the team he played for then (a transfer's old school), not where he is now.
   const pastRow = picked ? career.flatMap((c) => c.rows).find((r) => String(r.year) === picked && r.teamId) : null;
-  const tl = useQuery(pastRow && pastRow.teamId !== String(p?.team?.id) ? `teamlist:${lg}` : null, () => listTeams(lg), () => 3600000);
+  const tl = useQuery(pastRow && pastRow.teamId !== String(p?.team?.id) ? `teamlite:${lg}:${pastRow.teamId}` : null, () => getTeamLite(lg, pastRow.teamId), () => 3600000);
   const seasonTeam = !pastRow || pastRow.teamId === String(p?.team?.id) ? p?.team
-    : tl.data?.find((t) => String(t.id) === pastRow.teamId) || (pastRow.team ? { id: pastRow.teamId, lg, name: pastRow.team, full: pastRow.team, abbr: pastRow.team, color: '#2B3352', color2: '#2B3352' } : p?.team);
+    : tl.data || (pastRow.team ? oldTeam(lg, pastRow) : p?.team);
   const color = seasonTeam?.color || '#2B3352';
   // The game log's bottom row is the feed's per-game averages, so plus-minus there is an average too.
   // Season tab: each stat group's row for the picked year (latest by default). Hoops adds plus-minus to this season's averages and totals.

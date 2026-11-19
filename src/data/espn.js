@@ -1022,6 +1022,11 @@ function normCareer(d) {
   })).filter((c) => c.rows.length && c.labels.length && !/misc/i.test(c.key + ' ' + c.title)); // the misc table is ejections, flagrants and ratings nobody asks for
 }
 
+// One team's name and colors by id (a player's old team). The league team list is blocked for browsers, this is not.
+export async function getTeamLite(lg, id) {
+  const d = await get(url(SITE, lg, `/teams/${encodeURIComponent(id)}`));
+  return d.team?.id ? normTeam(d.team, lg) : null;
+}
 // One player: who they are, this season, game by game, and the career. Any piece can be missing.
 export async function getPlayer(lg, id) {
   const pid = encodeURIComponent(id);
