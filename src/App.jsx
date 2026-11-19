@@ -1190,7 +1190,6 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
     if (Number(pl.replace(/^T/, '')) > 150) return '150+'; // like ESPN: past 150th it's just "150+"
     return pl.startsWith('T') ? 'T' + ordinal(Number(pl.slice(1))) : ordinal(Number(pl));
   };
-  const color = p?.team?.color || '#2B3352';
   const career = d?.career || [];
   // One season picker drives both the Season and Game Log tabs. '' = the latest season.
   // Opened from a past season's leaders: start on that season.
@@ -1199,6 +1198,12 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
   const years = d?.gamelog?.years?.length ? d.gamelog.years : careerYears.map((y) => ({ value: String(y), label: career.flatMap((c) => c.rows).find((r) => r.year === y)?.season || String(y) }));
   const latest = d?.gamelog?.year || years[0]?.value || '';
   const picked = logYr && logYr !== latest ? logYr : '';
+  // A past season shows the team he played for then (a transfer's old school), not where he is now.
+  const pastRow = picked ? career.flatMap((c) => c.rows).find((r) => String(r.year) === picked && r.teamId) : null;
+  const tl = useQuery(pastRow && pastRow.teamId !== String(p?.team?.id) ? `teamlist:${lg}` : null, () => listTeams(lg), () => 3600000);
+  const seasonTeam = !pastRow || pastRow.teamId === String(p?.team?.id) ? p?.team
+    : tl.data?.find((t) => String(t.id) === pastRow.teamId) || (pastRow.team ? { id: pastRow.teamId, lg, name: pastRow.team, full: pastRow.team, abbr: pastRow.team, color: '#2B3352', color2: '#2B3352' } : p?.team);
+  const color = seasonTeam?.color || '#2B3352';
   // The game log's bottom row is the feed's per-game averages, so plus-minus there is an average too.
   // Season tab: each stat group's row for the picked year (latest by default). Hoops adds plus-minus to this season's averages and totals.
   const season = career.map((c) => {
@@ -1258,11 +1263,11 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
               <span className="jersey big" style={{ background: color, color: inkOn(color) }}>{p.jersey || p.pos || '·'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{p.name || 'Player'}</h2>
-                <p>{[p.posName || p.pos, p.team?.full, p.cls].filter(Boolean).join(' · ')}</p>
+                <p>{[p.posName || p.pos, seasonTeam?.full, picked && seasonTeam !== p.team ? '' : p.cls].filter(Boolean).join(' · ')}</p>
                 <p style={{ fontWeight: 600 }}>{[p.ht, p.wt, p.from].filter(Boolean).join(' · ')}</p>
               </div>
             </div>
-            {p.team ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${p.team.id}`)}><Blob team={p.team} size={28} /> {p.team.full}</button></div> : null}
+            {seasonTeam ? <div style={{ display: 'flex', marginTop: 12 }}><button className="btn" style={{ flex: 1 }} onClick={() => go(`team/${lg}/${seasonTeam.id}`)}><Blob team={seasonTeam} size={28} /> {seasonTeam.full}</button></div> : null}
             {d.other ? (
               <div className="seg" role="group" aria-label="College or pro career" style={{ marginTop: 12 }}>
                 {[['college', 'College'], ['pro', 'Pro']].map(([k, label]) => { const here = d.other.kind !== k; return (
