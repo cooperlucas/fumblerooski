@@ -1094,7 +1094,7 @@ function TeamPage({ lg, id, season }) {
                     <div className="card">
                       {ro.data.groups.length > 1 ? <div className="shead"><span className="nm">{gr.title}</span></div> : null}
                       {gr.players.map((p) => (
-                        <button key={p.id} className="lrow" onClick={() => go(`player/${lg}/${p.id}`)}>
+                        <button key={p.id} className="lrow" onClick={() => go(`player/${lg}/${p.id}${isPast && pastRo ? '/' + yr : ''}`)}>
                           <span className="jersey" style={{ background: t.color, color: inkOn(t.color) }}>{p.jersey || '·'}</span>
                           <span className="nm">{p.name}<span className="sub">{[p.pos, p.cls, p.ht, p.wt].filter(Boolean).join(' · ')}</span></span>
                           <span className="chev" aria-hidden="true">›</span>
@@ -1128,7 +1128,7 @@ function TeamSeason({ lg, id, season, team }) {
           <H2>Team Leaders</H2>
           <div className="card">
             {leaders.map((c) => (open[c.key] ? c.rows : c.rows.slice(0, 1)).map((r, i) => (
-              <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}`)}>
+              <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}${isPast ? '/' + yr : ''}`)}>
                 <span className="jersey" style={{ width: 30, height: 30, fontSize: 12, background: team.color, color: inkOn(team.color) }}>{r.jersey || '·'}</span>
                 <span className="nm">{i === 0 ? <small className="lcat">{c.title}</small> : null}{r.name}{r.pos ? <small> {r.pos}</small> : null}{i === 0 && r.detail && r.detail !== r.value ? <small className="ldet">{r.detail}</small> : null}</span>
                 {i === 0 && c.rows.length > 1 ? (
