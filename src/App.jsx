@@ -329,7 +329,16 @@ function Scores() {
     // Finals from an earlier day are gone by 3pm (and stay gone through the midnight-to-3am tail of the sports day), even when Headliners still shows that league's week.
     const now = new Date(), y = new Date(now.getTime() - 86400000);
     const fresh = (g) => g.state !== 'final' || isToday(g, now) || (now.getHours() >= 3 && now.getHours() < YOUR_TEAMS_UNTIL && isToday(g, y));
-    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight, ...upcoming].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
+    const list = [...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id));
+    // A team's next game within four days joins only when the team has nothing else listed, so it is one game per team.
+    const sides = (g) => ['away', 'home'].map((sd) => favKey({ lg: g.lg, id: g[sd].id })).filter((k) => favSet.has(k));
+    const covered = new Set(list.flatMap(sides));
+    [...upcoming].sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).forEach((g) => {
+      const ks = sides(g);
+      if (!ks.length || seen.has(g.lg + g.id) || ks.some((k) => covered.has(k))) return;
+      seen.add(g.lg + g.id); ks.forEach((k) => covered.add(k)); list.push(g);
+    });
+    return sortGames(list, favSet);
   }, [today, hl.q.data, hl.yest, favSet, upcoming]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
   const leagues = useMemo(() => {
