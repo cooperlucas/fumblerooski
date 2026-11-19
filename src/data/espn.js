@@ -1783,13 +1783,6 @@ function statRows(box, awayId, homeId, sport, drives) {
     const da = extra(a), dh = extra(h);
     if (da || dh) Object.assign(fl, { awayDet: da, homeDet: dh });
   }
-  // Basketball rebounds: the offensive / defensive split rides under the total's bar too.
-  const rb = rows.find((r) => r.label === 'Rebounds');
-  if (sport === 'basketball' && rb) {
-    const split = (list) => { const o = list.find((x) => x.name === 'offensiveRebounds')?.displayValue, d = list.find((x) => x.name === 'defensiveRebounds')?.displayValue; return o != null && d != null ? `${o} off · ${d} def` : ''; };
-    const da = split(a), dh = split(h);
-    if (da || dh) Object.assign(rb, { awayDet: da, homeDet: dh });
-  }
   // The feed names stats differently per sport. If none of ours matched, show the first few it does have.
   if (!rows.length) rows = a.slice(0, 6).map((s) => row(s.name, s.label || s.displayName)).filter(Boolean);
   return rows;
