@@ -104,6 +104,19 @@ function usePinnedGames(favs) {
     return { all, today: all.filter((g) => isToday(g, now)), yest: all.filter((g) => g.state !== 'live' && isToday(g, y)) };
   }, [q.data]);
 }
+// Your Teams also lists each pinned team's next games within four days, so a Saturday game shows up midweek even when
+// the league's own Headliners slate is something else (MACtion on a Wednesday night).
+const UPCOMING_DAYS = 4;
+function useUpcoming(favs) {
+  const key = favs.map(favKey).sort().join(',');
+  const q = useQuery(favs.length ? `upcoming:${key}` : null,
+    async () => (await Promise.all(favs.map((f) => getTeamGames(f.lg, f.id).catch(() => [])))).flat(),
+    () => 600000);
+  return useMemo(() => {
+    const t = Date.now();
+    return (q.data || []).filter((g) => g.state === 'pre' && Date.parse(g.date) > t - 3600000 && Date.parse(g.date) - t < UPCOMING_DAYS * 86400000);
+  }, [q.data]);
+}
 function Ticker() {
   const today = useDay(0);
   const morning = isMorning();
@@ -292,6 +305,7 @@ function Scores() {
   const [lg, setLg] = useSticky('lg', 'top');
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
+  const upcoming = useUpcoming(favs);
   const prefs = useLeaguePrefs();
   const pickL = LEAGUE[lg] && isLeagueOn(lg, prefs) ? lg : null;
   // A league's own slate: today, or this week for football.
@@ -315,8 +329,8 @@ function Scores() {
     // Finals from an earlier day are gone by 3pm (and stay gone through the midnight-to-3am tail of the sports day), even when Headliners still shows that league's week.
     const now = new Date(), y = new Date(now.getTime() - 86400000);
     const fresh = (g) => g.state !== 'final' || isToday(g, now) || (now.getHours() >= 3 && now.getHours() < YOUR_TEAMS_UNTIL && isToday(g, y));
-    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
-  }, [today, hl.q.data, hl.yest, favSet]);
+    return sortGames([...today, ...(hl.q.data?.games || []), ...lastNight, ...upcoming].filter((g) => isFavGame(g, favSet) && fresh(g) && !seen.has(g.lg + g.id) && seen.add(g.lg + g.id)), favSet);
+  }, [today, hl.q.data, hl.yest, favSet, upcoming]);
   // Leagues with games today (live or not) sit above leagues showing only other days; your own league order holds within each group.
   const leagues = useMemo(() => {
     const now = new Date();
