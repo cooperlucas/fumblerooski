@@ -1222,14 +1222,21 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
     const did = c.row.stats.some((v, i) => !/^(gp|gs|g|rtg|qbr|rating)$/i.test(String(c.labels[i] || '').trim()) && Number(String(v).replace(/,/g, '')) !== 0 && /\d/.test(String(v)));
     return did || all.length === 1;
   });
+  // A retired player's headline tiles come from the feed as career totals: show his last season's numbers instead.
+  const num = (v) => String(v ?? '').replace(/[,\s]/g, '');
+  const careerTiles = !picked && (d?.summary?.items || []).some((x) => career.some((c) => {
+    const i = (c.names || []).indexOf(x.key);
+    return i >= 0 && c.totals?.[i] != null && num(c.totals[i]) === num(x.value) && c.rows.length > 1 && num(c.rows[c.rows.length - 1].stats[i]) !== num(x.value);
+  }));
+  const tileYr = picked || (careerTiles ? String(Math.max(...career.flatMap((c) => c.rows.map((r) => r.year || 0)))) : '');
   // A past season's headline tiles: the same stats from that season's tables, ranked on that season's boards.
-  const pastTiles = picked ? (d?.summary?.items || []).map((x) => {
+  const pastTiles = tileYr ? (d?.summary?.items || []).map((x) => {
     for (const c of season) { const i = (c.names || []).indexOf(x.key); if (i >= 0 && /\d/.test(String(c.row.stats[i] ?? ''))) return { ...x, value: c.row.stats[i], board: pastBoard(lg, x.key, d.summary.items) }; }
     return null;
   }).filter(Boolean) : [];
   const pastKeys = [...new Set(pastTiles.map((t) => t.board).filter(Boolean))];
-  const pq = useQuery(pastKeys.length ? `pastranks:${lg}:${picked}:${pastKeys.join(',')}` : null,
-    async () => Object.fromEntries(await Promise.all(pastKeys.map(async (k) => { try { return [k, await getDeepLeader(lg, k, Number(picked))]; } catch { return [k, null]; } }))), () => 0);
+  const pq = useQuery(pastKeys.length ? `pastranks:${lg}:${tileYr}:${pastKeys.join(',')}` : null,
+    async () => Object.fromEntries(await Promise.all(pastKeys.map(async (k) => { try { return [k, await getDeepLeader(lg, k, Number(tileYr))]; } catch { return [k, null]; } }))), () => 0);
   const pastRank = (k) => {
     const board = k && pq.data?.[k];
     if (!board?.length) return null;
@@ -1283,18 +1290,18 @@ function PlayerPage({ lg, id, season: startYr = '' }) {
 
             {tab === 'season' ? (
               <>
-                {!picked && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : x.rank) ? (() => {
+                {!tileYr && d.summary.items.length ? <div className="tiles">{d.summary.items.map((x) => <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>{(qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : x.rank) ? (() => {
                   const qr = qualKey(lg, x.key, d.summary.items) ? qRank(qualKey(lg, x.key, d.summary.items)) : null;
                   const txt = qr ? `${qr} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : `${x.rank > 150 ? '150+' : `${x.tied ? 'T' : ''}${ordinal(x.rank)}`} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}`;
                   const k = boardFor(x.key, d.summary.items, leaderCats, lg);
                   return k ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${k}/${id}`)} aria-label={`${txt}: see the ${x.label} leaders`}>{txt}</button> : <em className={'trank' + (txt.length >= 12 ? ' long' : '')}>{txt}</em>;
                 })() : null}</div>)}</div> : null}
-                {picked && pastTiles.length ? <div className="tiles">{pastTiles.map((x) => {
+                {tileYr && pastTiles.length ? <div className="tiles">{pastTiles.map((x) => {
                   const r = pastRank(x.board);
                   const txt = r ? `${r} in ${LEAGUE[lg].college && lg === 'cfb' ? 'FBS' : LEAGUE[lg].short}` : '';
                   return (
                     <div className="tile" key={x.label}><b>{pct1(x.label, x.value)}</b><span>{x.label}</span>
-                      {txt ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${x.board}/${id}/${picked}`)} aria-label={`${txt}: see the ${seasonLabel(lg, Number(picked))} ${x.label} leaders`}>{txt}</button> : null}
+                      {txt ? <button className={'trank tlink' + (txt.length >= 12 ? ' long' : '')} onClick={() => go(`leaders/${lg}/${x.board}/${id}/${tileYr}`)} aria-label={`${txt}: see the ${seasonLabel(lg, Number(tileYr))} ${x.label} leaders`}>{txt}</button> : null}
                     </div>);
                 })}</div> : null}
                 {season.map((c) => (
