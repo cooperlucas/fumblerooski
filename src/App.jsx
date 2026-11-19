@@ -1077,7 +1077,7 @@ function TeamPage({ lg, id, season }) {
                 <button aria-pressed={view === 'stats'} onClick={() => setView('stats')}>Stats</button>
               </div>
             ) : <div style={{ marginTop: 14 }}><H2>Schedule</H2></div>}
-            {view === 'stats' ? <TeamSeason lg={lg} id={id} season={yr || cur} team={t} /> : view === 'schedule' ? (
+            {view === 'stats' ? <TeamSeason lg={lg} id={id} season={yr || cur} past={isPast ? yr : ''} team={t} /> : view === 'schedule' ? (
               <section className="sec" style={{ marginTop: 12 }}>
                 {months.length > 1 ? (
                   <div className="chips" role="group" aria-label="Month" style={{ marginBottom: 12 }}
@@ -1111,7 +1111,7 @@ function TeamPage({ lg, id, season }) {
 }
 
 /* ---------- one team's season: leaders and key stats ---------- */
-function TeamSeason({ lg, id, season, team }) {
+function TeamSeason({ lg, id, season, past = '', team }) {
   const [open, setOpen] = useState({});
   const q = useQuery(season ? `teamseason:${lg}:${id}:${season}` : null, () => getTeamStatsFor(lg, id, season), () => 600000);
   // Hoops: plus-minus slots in as the fifth leader once it has loaded (it takes a few reads more than the rest).
@@ -1128,7 +1128,7 @@ function TeamSeason({ lg, id, season, team }) {
           <H2>Team Leaders</H2>
           <div className="card">
             {leaders.map((c) => (open[c.key] ? c.rows : c.rows.slice(0, 1)).map((r, i) => (
-              <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}${isPast ? '/' + yr : ''}`)}>
+              <button key={c.key + r.id + i} className={'lead tl' + (i === 0 ? ' top' : ' more')} onClick={() => r.id && go(`player/${lg}/${r.id}${past ? '/' + past : ''}`)}>
                 <span className="jersey" style={{ width: 30, height: 30, fontSize: 12, background: team.color, color: inkOn(team.color) }}>{r.jersey || '·'}</span>
                 <span className="nm">{i === 0 ? <small className="lcat">{c.title}</small> : null}{r.name}{r.pos ? <small> {r.pos}</small> : null}{i === 0 && r.detail && r.detail !== r.value ? <small className="ldet">{r.detail}</small> : null}</span>
                 {i === 0 && c.rows.length > 1 ? (
