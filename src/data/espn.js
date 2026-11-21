@@ -394,10 +394,12 @@ function gameDays(lg) {
   p.catch(() => gameDaysMemo.delete(lg));
   return p;
 }
-export async function getScoreboard(lg, day, week) {
+// div: a college division other than the top one (college football: 'fcs', 'd2', 'd3'), whose own scoreboard to read.
+export async function getScoreboard(lg, day, week, div) {
   const L = LEAGUE[lg];
   const wk = week ? { week: String(week.week), seasontype: String(week.type), ...(week.year ? { dates: String(week.year) } : {}) } : {};
-  const data = await get(url(SITE, lg, '/scoreboard', { ...(L.params || {}), ...(day ? { dates: day } : {}), ...wk }));
+  const dg = div ? (DIVISIONS[lg] || []).find((d) => d.id === div)?.groups?.[0] : null;
+  const data = await get(url(SITE, lg, '/scoreboard', { ...(L.params || {}), ...(dg ? { groups: dg } : {}), ...(day ? { dates: day } : {}), ...wk }));
   const games = (data.events || []).map((e) => normEvent(e, lg)).filter((g) => g.id && g.home.id && g.away.id);
   const Lg = data.leagues?.[0] || {};
   const cal = Lg.calendar || [];

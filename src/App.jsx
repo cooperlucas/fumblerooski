@@ -419,13 +419,18 @@ function LeagueScores({ lg, startDay }) {
   const L = LEAGUE[lg];
   const favs = useFavs();
   const favSet = useMemo(() => new Set(favs.map(favKey)), [favs]);
-  const base = useQuery(`board:${lg}`, () => getScoreboard(lg), boardRefresh);
+  // College football: FBS by default, or FCS / D-II / D-III's own slate.
+  const divs = lg === 'cfb' ? DIVISIONS.cfb : null;
+  const [dv, setDv] = useSticky('sdiv', divs ? divs[0].id : null);
+  const sub = divs && dv !== divs[0].id ? dv : null;
+  const bk = sub ? `board:${lg}:${sub}` : `board:${lg}`;
+  const base = useQuery(bk, () => getScoreboard(lg, null, null, sub), boardRefresh);
   const [wk, setWk] = useSticky('wk', null); // 'type:week'
   const [yr, setYr] = useSticky('yr', null); // football season year; null = this season
   const [day, setDay] = useSticky('day', startDay || null); // 'YYYYMMDD'
   const [cal, setCal] = useState(false);
   const [month, setMonth] = useState(null); // first of the month shown in the calendar
-  const gf = useGameFilter(lg);
+  const gf = useGameFilter(lg, sub);
   const b = base.data;
   const weekMode = !!b?.weeks?.length;
   const curWk = b?.current?.week ? `${b.current.type}:${b.current.week}` : null;
@@ -436,16 +441,21 @@ function LeagueScores({ lg, startDay }) {
   // The feed's default slate only counts as a day when it says which day it is (with groups=50 college hoops doesn't, and
   // in the morning that slate is still last night's): otherwise ask for the day by date.
   const isBase = weekMode ? !yr && wkKey === curWk : !!b?.current?.day && dayKey === b.current.day.replace(/-/g, '');
-  const sel = useQuery(b && !isBase ? (weekMode ? `board:${lg}:w${yr || ''}:${wkKey}` : `board:${lg}:d${dayKey}`) : null,
-    () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt, year: yr || undefined }) : getScoreboard(lg, dayKey)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
+  const sel = useQuery(b && !isBase ? (weekMode ? `${bk}:w${yr || ''}:${wkKey}` : `${bk}:d${dayKey}`) : null,
+    () => (weekMode ? getScoreboard(lg, null, { week: wn, type: wt, year: yr || undefined }, sub) : getScoreboard(lg, dayKey, null, sub)), (d) => (d?.games?.some((g) => g.state === 'live') ? 30000 : 0));
   // Past seasons have their own week list (bowl names, playoff rounds), which comes back with that season's slate.
   const weekList = (yr && sel.data?.weeks?.length ? sel.data.weeks : b?.weeks) || [];
   const thisYear = b?.year || new Date().getFullYear();
   const years = Array.from({ length: thisYear - 2001 }, (_, i) => thisYear - i);
   const q = isBase ? base : sel;
   const dates = useMemo(() => new Set([...(b?.dates || []), ...(sel.data?.dates || [])].map((x) => x.replace(/-/g, ''))), [b, sel.data]);
-  if (base.loading && !b) return <Loading rows={5} />;
-  if (base.error && !b) return <Problem error={base.error} retry={base.reload} />;
+  const divBar = divs ? (
+    <div className="seg" role="group" aria-label="Division" style={{ marginTop: 10 }}>
+      {divs.map((d) => <button key={d.id} aria-pressed={d.id === dv} onClick={() => { setDv(d.id); setWk(null); setYr(null); }}>{d.label}</button>)}
+    </div>
+  ) : null;
+  if (base.loading && !b) return <>{divBar}<Loading rows={5} /></>;
+  if (base.error && !b) return <>{divBar}<Problem error={base.error} retry={base.reload} /></>;
 
   const pickDay = (s) => { setDay(s); setCal(false); };
   const strip = Array.from({ length: 7 }, (_, i) => { const d = dateOf(dayKey); d.setDate(d.getDate() + i - 3); return ymdOf(d); });
@@ -461,6 +471,7 @@ function LeagueScores({ lg, startDay }) {
   const games = gf.apply(q.data?.games || []);
   return (
     <>
+      {divBar}
       {weekMode ? (
         <>
           <div className="filters">
@@ -511,7 +522,7 @@ function LeagueScores({ lg, startDay }) {
         </>
       )}
       {q.loading && !q.data ? <Loading rows={4} /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> :
-        games.length ? <Board games={games} pick="all" favSet={favSet} /> : <Empty>No {gf.on ? `${gf.label} ` : `${L.short} `}games {weekMode ? 'this week' : 'on this day'}.</Empty>}
+        games.length ? <Board games={games} pick="all" favSet={favSet} /> : <Empty>No {gf.on ? `${gf.label} ` : sub ? `${divs.find((d) => d.id === sub).label} ` : `${L.short} `}games {weekMode ? 'this week' : 'on this day'}.</Empty>}
       <Stamp at={q.updatedAt} live={games.some((g) => g.state === 'live')} />
     </>
   );
@@ -746,21 +757,21 @@ function useLeaderFilters(lg) {
   }, [lg, st.data]);
 }
 // College slates are huge: one dropdown narrows them to ranked teams, the power leagues, or a single conference.
-function useGameFilter(lg) {
+function useGameFilter(lg, sub) {
   const college = !!LEAGUE[lg]?.college;
-  const div = DIVISIONS[lg]?.[0]?.id;
+  const div = sub || DIVISIONS[lg]?.[0]?.id;
   const st = useQuery(college ? `standings:${lg}${div ? ':' + div : ''}` : null, () => getStandings(lg, div), () => 600000);
-  const [fid, setFid] = useSticky('gf:' + lg, 'all');
+  const [fid, setFid] = useSticky('gf:' + lg + (sub ? ':' + sub : ''), 'all');
   const opts = useMemo(() => {
     const groups = st.data?.groups || [];
     const ids = (gs) => new Set(gs.flatMap((g) => g.rows.map((r) => r.team.id)));
     const out = [{ id: 'top25', label: 'Top 25' }];
-    const p = groups.filter((g) => isPower(lg, g.name)), rest = groups.filter((g) => !isPower(lg, g.name) && !/independ/i.test(g.name));
+    const p = sub ? [] : groups.filter((g) => isPower(lg, g.name)), rest = sub ? [] : groups.filter((g) => !isPower(lg, g.name) && !/independ/i.test(g.name));
     if (p.length) out.push({ id: 'power', label: lg === 'cfb' ? 'Power 4' : 'Power conferences', ids: ids(p) });
     if (rest.length) out.push({ id: 'rest', label: lg === 'cfb' ? 'Group of 6' : 'Mid-majors', ids: ids(rest) });
     [...groups].sort((a, b) => a.name.localeCompare(b.name)).forEach((g) => out.push({ id: 'g:' + g.name, label: g.name, ids: ids([g]) }));
     return out;
-  }, [lg, st.data]);
+  }, [lg, sub, st.data]);
   if (!college) return { el: null, apply: (g) => g, on: false };
   const f = opts.find((x) => x.id === fid);
   const apply = (games) => (!f ? games : f.id === 'top25' ? games.filter((g) => g.home.rank || g.away.rank) : games.filter((g) => f.ids.has(g.home.id) || f.ids.has(g.away.id)));
