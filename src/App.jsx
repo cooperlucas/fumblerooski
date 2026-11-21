@@ -430,7 +430,7 @@ function LeagueScores({ lg, startDay }) {
   const [day, setDay] = useSticky('day', startDay || null); // 'YYYYMMDD'
   const [cal, setCal] = useState(false);
   const [month, setMonth] = useState(null); // first of the month shown in the calendar
-  const gf = useGameFilter(lg, sub);
+  const gf = useGameFilter(lg, sub, divs ? (id) => { setDv(id); setWk(null); setYr(null); } : null);
   const b = base.data;
   const weekMode = !!b?.weeks?.length;
   const curWk = b?.current?.week ? `${b.current.type}:${b.current.week}` : null;
@@ -449,13 +449,8 @@ function LeagueScores({ lg, startDay }) {
   const years = Array.from({ length: thisYear - 2001 }, (_, i) => thisYear - i);
   const q = isBase ? base : sel;
   const dates = useMemo(() => new Set([...(b?.dates || []), ...(sel.data?.dates || [])].map((x) => x.replace(/-/g, ''))), [b, sel.data]);
-  const divBar = divs ? (
-    <div className="seg" role="group" aria-label="Division" style={{ marginTop: 10 }}>
-      {divs.map((d) => <button key={d.id} aria-pressed={d.id === dv} onClick={() => { setDv(d.id); setWk(null); setYr(null); }}>{d.label}</button>)}
-    </div>
-  ) : null;
-  if (base.loading && !b) return <>{divBar}<Loading rows={5} /></>;
-  if (base.error && !b) return <>{divBar}<Problem error={base.error} retry={base.reload} /></>;
+  if (base.loading && !b) return <Loading rows={5} />;
+  if (base.error && !b) return <Problem error={base.error} retry={base.reload} />;
 
   const pickDay = (s) => { setDay(s); setCal(false); };
   const strip = Array.from({ length: 7 }, (_, i) => { const d = dateOf(dayKey); d.setDate(d.getDate() + i - 3); return ymdOf(d); });
@@ -471,7 +466,6 @@ function LeagueScores({ lg, startDay }) {
   const games = gf.apply(q.data?.games || []);
   return (
     <>
-      {divBar}
       {weekMode ? (
         <>
           <div className="filters">
@@ -757,7 +751,9 @@ function useLeaderFilters(lg) {
   }, [lg, st.data]);
 }
 // College slates are huge: one dropdown narrows them to ranked teams, the power leagues, or a single conference.
-function useGameFilter(lg, sub) {
+// pickDiv: when given (college football's Schedule), the other divisions sit at the bottom of the list and switch to
+// that division's slate.
+function useGameFilter(lg, sub, pickDiv) {
   const college = !!LEAGUE[lg]?.college;
   const div = sub || DIVISIONS[lg]?.[0]?.id;
   const st = useQuery(college ? `standings:${lg}${div ? ':' + div : ''}` : null, () => getStandings(lg, div), () => 600000);
@@ -775,11 +771,15 @@ function useGameFilter(lg, sub) {
   if (!college) return { el: null, apply: (g) => g, on: false };
   const f = opts.find((x) => x.id === fid);
   const apply = (games) => (!f ? games : f.id === 'top25' ? games.filter((g) => g.home.rank || g.away.rank) : games.filter((g) => f.ids.has(g.home.id) || f.ids.has(g.away.id)));
+  const divs = pickDiv ? DIVISIONS[lg] || [] : [];
+  const dlabel = sub ? divs.find((d) => d.id === sub)?.label : '';
+  const change = (v) => { if (v.startsWith('div:')) { const id = v.slice(4); if (id !== (sub || divs[0]?.id)) pickDiv(id); return; } setFid(v); };
   const el = (
-    <Picker label="Games" value={f ? fid : 'all'} onChange={setFid} shown={f && f.id.startsWith('g:') ? shortConf(f.label) : undefined}>
-      <option value="all">All games</option>
+    <Picker label="Games" value={f ? fid : 'all'} onChange={change} shown={f && f.id.startsWith('g:') ? shortConf(f.label) : !f && dlabel ? `All ${dlabel}` : undefined}>
+      <option value="all">{dlabel ? `All ${dlabel} games` : 'All games'}</option>
       {opts.slice(0, opts.findIndex((o) => o.id.startsWith('g:')) < 0 ? opts.length : opts.findIndex((o) => o.id.startsWith('g:'))).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
       {opts.some((o) => o.id.startsWith('g:')) ? <optgroup label="Conferences">{opts.filter((o) => o.id.startsWith('g:')).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</optgroup> : null}
+      {divs.length ? <optgroup label="Divisions">{divs.filter((d) => d.id !== (sub || divs[0].id)).map((d) => <option key={d.id} value={'div:' + d.id}>{d.label}</option>)}</optgroup> : null}
     </Picker>
   );
   return { el, apply, on: !!f, label: f?.label };
