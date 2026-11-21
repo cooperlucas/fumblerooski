@@ -3111,7 +3111,7 @@ function Search() {
   }, [term, q.data]);
   // Players come from the feed's own search, asked a beat after typing stops.
   const [asked, setAsked] = useState('');
-  useEffect(() => { const h = setTimeout(() => setAsked(term.length >= 3 ? term : ''), 350); return () => clearTimeout(h); }, [term]);
+  useEffect(() => { const h = setTimeout(() => setAsked(term.length >= 3 ? term : ''), 250); return () => clearTimeout(h); }, [term]);
   const pq = useQuery(asked ? `psearch:${asked}` : null, () => searchPlayers(asked), () => 0);
   const players = asked && asked === term ? (pq.data || []) : [];
   const playersBusy = term.length >= 3 && (asked !== term || (pq.loading && !pq.data));
@@ -3143,7 +3143,7 @@ function Search() {
             {favs.length ? <section className="sec"><H2>Your Teams</H2><div className="card">{favs.map((t) => <TeamRow key={favKey(t)} t={{ ...t, full: t.name }} />)}</div></section> : null}
             <Empty>Type a team, player or league.</Empty>
           </>
-        ) : q.loading && !q.data ? <Loading /> : q.error && !q.data ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !leagues.length && !players.length && !playersBusy ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
+        ) : q.loading && !q.data && !players.length && !playersBusy && !leagues.length ? <Loading /> : q.error && !q.data && !players.length && !playersBusy ? <Problem error={q.error} retry={q.reload} /> : !hits.length && !q.loading && !leagues.length && !players.length && !playersBusy ? <Empty>Nothing matches "{text.trim()}".</Empty> : (
           <>
             {leagues.length ? <div className="card">{leagues.map((l) => <button key={l.id} className="lrow" onClick={() => go(`league/${l.id}`)}><span className="blob" aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 10, background: l.color, color: '#0C1124', fontSize: 9 }}>{l.short}</span><span className="nm">{l.name}</span><span className="chev" aria-hidden="true">›</span></button>)}</div> : null}
             {hits.length ? <div className="card">{hits.map((t) => <TeamRow key={favKey(t)} t={t} />)}</div> : null}

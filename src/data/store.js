@@ -75,7 +75,7 @@ const cache = new Map(); // key -> { data, at }
 const inflight = new Map(); // key -> promise, so two screens asking for the same thing share one read
 const watchers = new Map(); // key -> Set of repaint callbacks
 const FRESH = 4000;
-function fetchShared(key, fn) {
+export function fetchShared(key, fn) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < FRESH) return Promise.resolve(hit.data);
   if (!inflight.has(key)) {
@@ -185,10 +185,18 @@ export function sortGames(games, favSet) {
 /* ---------- team search index (cached on the device for a week) ---------- */
 // One league at a time with a short breath between: asking for every league at once gets some of the reads refused.
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+let rebuilding = null;
 export async function loadAllTeams() {
   const saved = ls.get('fr.teams.v4', null);
-  // A full index (every league's real team list, with colors) is good for a week; a patched one gets rebuilt within the hour.
-  if (!isDemo() && saved?.teams?.length && Date.now() - saved.at < (saved.full ? 7 * 864e5 : 36e5)) return saved.teams;
+  // A full index (every league's real team list, with colors) is good for a week; a patched one gets rebuilt within the
+  // hour. Either way a saved index answers right away, and an old one is rebuilt in the background for next time.
+  if (!isDemo() && saved?.teams?.length) {
+    if (Date.now() - saved.at >= (saved.full ? 7 * 864e5 : 36e5)) rebuilding = rebuilding || buildAllTeams().catch(() => {}).finally(() => { rebuilding = null; });
+    return saved.teams;
+  }
+  return buildAllTeams();
+}
+async function buildAllTeams() {
   const teams = []; let full = true, firstErr = null;
   for (const l of LEAGUES) {
     try { const t = await getTeams(l.id); teams.push(...t); if (t.source !== 'team list') full = false; }
@@ -226,4 +234,10 @@ export function setTheme(t) { ls.set('fr.theme', t); applyTheme(t); }
 if (typeof window !== 'undefined') {
   applyTheme();
   try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (getTheme() === 'system') applyTheme('system'); }); } catch { /* old browsers */ }
+}
+
+// Warm the search index a few seconds after launch, so the first search doesn't wait on it.
+export function warmSearch() {
+  const go = () => { fetchShared('teams:all', loadAllTeams).then(() => fetchShared('teams:lower', loadLowerTeams)).catch(() => {}); };
+  setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(go, { timeout: 4000 }) : go()), 3000);
 }

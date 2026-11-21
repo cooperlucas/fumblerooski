@@ -1199,10 +1199,17 @@ export async function getPlusMinus(lg, id) {
 
 // Player search across every league the app covers. The feed's own search, asked as you type.
 const LEAGUE_NUM = { 28: 'nfl', 23: 'cfb', 46: 'nba', 90: 'nhl', 10: 'mlb', 41: 'ncaam', 54: 'ncaaw', 59: 'wnba', 700: 'epl', 770: 'mls' };
+// The feed's search only matches a partial last word when it is capitalized ("Bo N" finds Bo Nix, "bo n" finds nothing),
+// so ask in title case, and as typed if that comes back empty.
+const titleCase = (t) => t.replace(/(^|[\s'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 export async function searchPlayers(text) {
-  const q = new URLSearchParams({ query: text, limit: '25', type: 'player' }).toString();
-  const data = await get(`${SEARCH}?${q}`);
-  const items = data.items || data.results?.flatMap((r) => r.contents || r.items || []) || [];
+  const ask = async (t) => {
+    const d = await get(`${SEARCH}?${new URLSearchParams({ query: t, limit: '25', type: 'player' })}`);
+    return d.items || d.results?.flatMap((r) => r.contents || r.items || []) || [];
+  };
+  const tc = titleCase(text.trim());
+  let items = await ask(tc);
+  if (!items.length && tc !== text.trim()) items = await ask(text.trim());
   const out = [], seen = new Set();
   for (const it of items) {
     if (it.type && it.type !== 'player') continue;
