@@ -384,7 +384,7 @@ function Scores() {
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
             <H2>{LEAGUE[pickL].name}</H2>
-            <button className="link" onClick={() => go(`league/${pickL}/standings`)}>Standings ›</button>
+            <button className="link" onClick={() => go(`league/${pickL}`)}>Schedule ›</button>
           </div>
           {gf.el ? <div className="filters" style={{ margin: '0 0 10px' }}>{gf.el}</div> : null}
           {baseDay && !sb.data.weeks && baseDay !== todayKey ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{baseDay < todayKey ? 'Last played' : 'Next up'}: {dateOf(baseDay).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p> : null}
