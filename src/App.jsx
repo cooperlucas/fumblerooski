@@ -44,7 +44,7 @@ export default function App() {
   if (name === '' || name === 'scores') { tab = ''; body = <Scores />; }
   else if (name === 'leagues') body = <Leagues />;
   else if (name === 'stats') body = <Stats key={a || 'x'} start={LEAGUE[a] ? a : null} />;
-  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' ? undefined : b} start={b === 'scores' ? 'scores' : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
+  else if (name === 'league' && LEAGUE[a]) { title = LEAGUE[a].name; tab = 'leagues'; body = <LeaguePage key={a + (b || '') + (c || '')} lg={a} focus={b === 'scores' || b === 'standings' ? undefined : b} start={b === 'scores' || b === 'standings' ? b : undefined} startDay={b === 'scores' && /^\d{8}$/.test(c || '') ? c : undefined} />; }
   else if (name === 'team' && LEAGUE[a] && b) { tab = 'leagues'; body = <TeamPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? Number(c) : null} />; }
   else if (name === 'leaders' && LEAGUE[a] && b) { tab = 'stats'; body = <LeaderPage key={a + b + (c || '') + (e4 || '')} lg={a} cat={b} focus={c} season={/^\d{4}$/.test(e4 || '') ? Number(e4) : null} />; }
   else if (name === 'player' && LEAGUE[a] && b) { tab = 'leagues'; body = <PlayerPage key={a + b + (c || '')} lg={a} id={b} season={/^\d{4}$/.test(c || '') ? c : ''} />; }
@@ -384,7 +384,7 @@ function Scores() {
         <>
           <div className="sechead" style={{ marginTop: 14 }}>
             <H2>{LEAGUE[pickL].name}</H2>
-            <button className="link" onClick={() => go(`league/${pickL}`)}>Standings ›</button>
+            <button className="link" onClick={() => go(`league/${pickL}/standings`)}>Standings ›</button>
           </div>
           {gf.el ? <div className="filters" style={{ margin: '0 0 10px' }}>{gf.el}</div> : null}
           {baseDay && !sb.data.weeks && baseDay !== todayKey ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{baseDay < todayKey ? 'Last played' : 'Next up'}: {dateOf(baseDay).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p> : null}
@@ -577,7 +577,7 @@ function CupGroups({ cup, lg, focus }) {
 
 function LeaguePage({ lg, focus, start, startDay }) {
   const L = LEAGUE[lg];
-  const [tab, setTab] = useSticky('tab', start || 'standings');
+  const [tab, setTab] = useSticky('tab', start || (focus ? 'standings' : 'scores')); // opens on the schedule, unless pointed at a team's spot in the standings
   const [by, setBy] = useSticky('by', null);
   const [all, setAll] = useSticky('all', false);
   const divs = DIVISIONS[lg] || [];
@@ -618,9 +618,9 @@ function LeaguePage({ lg, focus, start, startDay }) {
   return (
     <>
       <div className="seg" role="group" aria-label="View">
+        <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Schedule</button>
         <button aria-pressed={tab === 'standings'} onClick={() => setTab('standings')}>Standings</button>
         {L.college ? <button aria-pressed={tab === 'rankings'} onClick={() => setTab('rankings')}>Rankings</button> : null}
-        <button aria-pressed={tab === 'scores'} onClick={() => setTab('scores')}>Schedule</button>
       </div>
       {tab === 'rankings' ? <Rankings lg={lg} focus={focus} /> : tab === 'scores' ? <LeagueScores lg={lg} startDay={startDay} /> : (
         (st.loading && !st.data) || hunting ? <>{divPicker}<Loading rows={6} /></> : st.error && !st.data ? <>{divPicker}<Problem error={st.error} retry={st.reload} /></> :
