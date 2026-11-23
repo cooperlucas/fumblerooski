@@ -124,8 +124,8 @@ h1, h2, h3, p { margin: 0; }
 .grow .rk { font-size: 11px; font-weight: 800; color: var(--gold); margin-right: 4px; }
 .grow .sc { font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 19px; font-variant-numeric: tabular-nums; }
 .grow .lose .nm, .grow .lose .sc { color: var(--mute); font-weight: 700; }
-.grow .meta { flex: none; width: 98px; align-self: stretch; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
-.grow .stat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.grow .meta { flex: none; width: 90px; align-self: stretch; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; padding-left: 10px; border-left: 1px solid var(--line); }
+.grow .stat { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
 .lghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--rule); width: 100%; border-left: 0; border-right: 0; border-top: 0; text-align: left; }
 .lghead b { font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
 .lghead span { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--mute); }
