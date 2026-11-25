@@ -57,6 +57,8 @@ h1, h2, h3, p { margin: 0; }
 .stick { position: sticky; top: 0; z-index: 20; background: var(--bg); }
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; }
 @media (min-width: 560px) { .app { border-left: 1px solid var(--line2); border-right: 1px solid var(--line2); } }
+/* iPad and other touch tablets: use the whole screen. Desktop browsers keep the phone column. */
+@media (min-width: 700px) and (pointer: coarse) { .app, .dock { max-width: none; } .app { border-left: 0; border-right: 0; } }
 .head { flex: none; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 14px) max(18px, env(safe-area-inset-right, 0px)) 10px max(18px, env(safe-area-inset-left, 0px)); }
 .brand { margin: 0; padding-right: 4px; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 22px; line-height: 1.05; white-space: nowrap; display: inline-block; letter-spacing: 0.01em; text-transform: uppercase; background: linear-gradient(180deg, #FFFFFF 0%, #C8FAFB 40%, #22D3D6 52%, #0E6F7A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0.6px #0C1124; filter: drop-shadow(2px 2px 0 #6E3AB5) drop-shadow(1px 1px 0 #0C1124); }
 .tagline { display: inline-block; white-space: nowrap; margin-top: 5px; font-size: 10px; font-weight: 800; font-style: italic; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
