@@ -224,7 +224,7 @@ a.lrow { color: inherit; text-decoration: none; }
 .pbox thead th { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; color: var(--dim); border-bottom: 1px solid var(--rule); }
 .pbox thead th.hot { color: var(--yellow); }
 .pbox thead th.who { color: var(--teal); font-stretch: 125%; font-style: italic; font-weight: 900; font-size: 12px; text-transform: uppercase; }
-.pbox .who { position: sticky; left: 0; z-index: 1; text-align: left; background: var(--panel); padding-left: 14px; min-width: 132px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--rule); }
+.pbox .who { position: sticky; left: 0; z-index: 1; text-align: left; background: var(--panel); padding-left: 14px; width: 140px; min-width: 140px; max-width: 140px; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--rule); }
 .pbox tbody th.who { font-weight: 800; color: var(--ink); }
 .pbox tbody th small { font-size: 10px; font-weight: 700; color: var(--mute); }
 .pbox tbody td { font-weight: 700; color: var(--soft); }
