@@ -5,6 +5,7 @@ import { LEAGUES, LEAGUE } from './data/leagues.js';
 import { getStandings, getFootballSlate, getTeamGames, DIVISIONS, FULL_DIVISIONS, getTeam, getTeamConference, getGame, getScoreboard, getTeams, getRoster, getPlayer, searchPlayers, getRankings, getRecords, getTeamNames, getTeamStatsFor, getLeaders, getDeepLeader, canGoDeep, EXTRA_BOARDS, qualifiedRule, getTeamStats, getPlusMinus, getTeamPlusMinus, breakClock, touchbackSpot, getSchedulePollRanks, fieldMoment, scoringRun, getSummary, gameFromSummary, replaySteps, replayMoments, replayCut, getNbaCup, getGamelog, hasPlusMinus, hasLeaguePlusMinus, getLeaguePlusMinus, signed, ensureColors, onColors, listTeams, getTeamLite, normTeam, pctOf, PCT_COLS, pickClock, CALLED_BACK } from './data/espn.js';
 import { useQuery, useDay, boardRefresh, gameRefresh, useFavs, favsNow, toggleFav, favKey, isFavGame, sortGames, dayOffset, loadAllTeams, loadLowerTeams, isDemo, setDemo, demoLocked, getTheme, setTheme, useLeaguePrefs, orderLeagues, shownLeagues, isLeagueOn, setLeagueOrder, toggleLeague, resetLeagues } from './data/store.js';
 import { chartColors, inkOn, brighten } from './data/colors.js';
+import { gameCard } from './shareCard.js';
 import { headlineGames, footballModes, freshFinal, isToday, MORNING_UNTIL } from './data/headlines.js';
 import { go, swap, useRoute, Blob, Ball, LgTag, H2, GameRow, Loading, Problem, Empty, Stamp, RootHeader, SubHeader, TabBar, DemoBar, statusLabel, fmtDate, fmtTime, shortTv, enterRoute, useSticky, saveScroll, savedScroll, shortEvent, GameNote, overflows, RankBlob, shortStatus, StarCut, Mascot } from './ui.jsx';
 
@@ -195,8 +196,9 @@ function Board({ games, pick, favSet, title }) {
     <>
       {title ? <div className="sechead" style={{ marginTop: 22 }}><H2>{title}</H2></div> : null}
       {!shown.length ? <Empty>No {pick === 'all' ? '' : LEAGUE[pick].short + ' '}games.</Empty> : null}
+      <div className="boardcols">
       {mine.length ? (
-        <div className="card">
+        <div className="card mine">
           <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
           {mine.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={false} />)}
         </div>
@@ -210,6 +212,7 @@ function Board({ games, pick, favSet, title }) {
           </div>
         );
       })}
+      </div>
     </>
   );
 }
@@ -3194,7 +3197,17 @@ function ShareGame({ g, lg }) {
     const url = `${location.origin}/#/game/${lg}/${g.id}`;
     const text = shareText(g);
     try {
-      if (navigator.share) { await navigator.share({ title: 'Fumblerooski', text, url }); return; }
+      // The score card goes along as a picture where the share sheet takes files; otherwise the words and link alone.
+      if (navigator.share) {
+        let files;
+        try {
+          const blob = await gameCard(g, lg);
+          const f = blob ? new File([blob], `${g.away.abbr}-${g.home.abbr}.png`, { type: 'image/png' }) : null;
+          if (f && navigator.canShare?.({ files: [f] })) files = [f];
+        } catch { /* no picture: share the words */ }
+        await navigator.share(files ? { files, text: `${text} ${url}` } : { title: 'Fumblerooski', text, url });
+        return;
+      }
     } catch (err) { if (err?.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(`${text} ${url}`); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* nothing to do */ }
   };
