@@ -1550,6 +1550,7 @@ export function fbHead(p) {
   if (/touchdown/i.test(p.type) || /\btouchdown\b/i.test(p.text) && !/extra point|two-point/i.test(p.type)) return 'Touchdown!';
   if (/field goal/i.test(p.type)) return /good|made/i.test(t) && !/no good|missed/i.test(t) ? 'Field Goal Good' : 'Field Goal Missed';
   if (/extra point/i.test(p.type)) return /good/i.test(p.type) ? 'Extra Point Good' : 'Extra Point Missed';
+  if (/\bfor (a )?safety\b|\bsafety\b\s*$/i.test(p.text || '')) return 'Safety!'; // the feed can file one under "Penalty"
   if (/penalty/i.test(p.type)) return 'Penalty';
   if (/sack/i.test(p.type)) {
     if (p.kept === false && /fumble/i.test(p.text) && /recovered by/i.test(p.text)) return 'Strip Sack, Fumble Lost';

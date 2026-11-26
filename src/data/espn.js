@@ -2635,7 +2635,8 @@ export function gameFromSummary(lg, id, data) {
   const started = game.state === 'live' || game.state === 'final';
   const plays = (data.scoringPlays || []).map((p) => ({
     text: cleanText(p.text),
-    kind: cleanText(p.type?.text || p.scoringType?.displayName || ''),
+    // The feed files a safety that came off a sack and a fumble under "Penalty": call it what it is.
+    kind: /\bfor (a )?safety\b|\bsafety\b\s*$/i.test(cleanText(p.text)) && !/touchdown|field goal/i.test(cleanText(p.text)) ? 'Safety' : cleanText(p.type?.text || p.scoringType?.displayName || ''),
     period: p.period?.number || 0,
     clock: p.clock?.displayValue || '',
     teamId: String(p.team?.id ?? ''),
