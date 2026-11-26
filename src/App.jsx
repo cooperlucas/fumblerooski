@@ -197,7 +197,7 @@ function Board({ games, pick, favSet, title }) {
       {!shown.length ? <Empty>No {pick === 'all' ? '' : LEAGUE[pick].short + ' '}games.</Empty> : null}
       <div className="boardcols">
       {mine.length ? (
-        <div className="card mine wide">
+        <div className={mine.length === 1 ? 'card mine wide one' : 'card mine wide'}>
           <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
           {mine.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={false} />)}
         </div>
