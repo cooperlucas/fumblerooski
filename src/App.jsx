@@ -1782,9 +1782,8 @@ function LiveField({ drives, game, lg, onAll }) {
             {handoff && hSpot != null ? (
               <g className="lfmove" style={{ transform: `translate(${X(hSpot)}px, ${ly}px)` }}>
                 <g className="lfball">
-                  <path d={`M${-dirn * 3} -6.5 L${-dirn * 11} 0 L${-dirn * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
-                  <g transform="translate(0 -19)">{ball(9.5)}</g>
-                  <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
+                  <path d={`M${-dirn * 10} -6.5 L${-dirn * 18} 0 L${-dirn * 10} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
+                  {ball(9.5)}
                 </g>
               </g>
             ) : !half && !defTwo && !kickMine && start != null && at != null ? (
@@ -1795,12 +1794,11 @@ function LiveField({ drives, game, lg, onAll }) {
                 {puntBack0 ? null : steps.slice(0, -1).map((p, i) => <circle key={i} cx={X(p.to)} cy={ly} r="1.5" fill="#0C1124" />)}
                 <g className={'lfmove' + (kickIn ? ' lfwait' : '')} style={{ transform: `translate(${X(ballAt)}px, ${ly}px)`, display: retEnd != null && retFrom != null && !noRet ? 'none' : undefined, '--wait': `${kickIn}s` }}>
                   <g className="lfball">
-                    <path d={`M${arrow * 3} -6.5 L${arrow * 11} 0 L${arrow * 3} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
+                    <path d={`M${arrow * 10} -6.5 L${arrow * 18} 0 L${arrow * 10} 6.5 Z`} fill="#fff" stroke="#0C1124" strokeWidth="1.3" strokeLinejoin="round" />
                     {m.kind === 'fg' || m.kind === 'punt' ? null : (
-                      <g key={turned ? 'spin' + lastKey : 'ball'} className={turned ? 'kspin' : undefined} style={{ transformOrigin: '0 -19px' }}>
-                        <ellipse cx="0" cy="-19" rx="9.5" ry="6" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.5" />
-                        <path d="M-4.2 -19 H4.2 M-2.4 -21 V-17 M0 -21 V-17 M2.4 -21 V-17" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
-                        <path d="M0 -12.5 V-3.5" stroke="#0C1124" strokeWidth="1.3" strokeDasharray="2 2" />
+                      <g key={turned ? 'spin' + lastKey : 'ball'} className={turned ? 'kspin' : undefined} style={{ transformOrigin: '0 0' }}>
+                        <ellipse cx="0" cy="0" rx="9.5" ry="6" fill="#9A5A2B" stroke="#0C1124" strokeWidth="1.5" />
+                        <path d="M-4.2 0 H4.2 M-2.4 -2 V2 M0 -2 V2 M2.4 -2 V2" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
                       </g>)}
                   </g>
                 </g>
