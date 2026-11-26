@@ -1568,6 +1568,14 @@ export function fbHead(p) {
   if (/end (of )?(period|quarter|half|game)/i.test(p.type)) return p.type;
   return p.type || 'Play';
 }
+// End zone lettering: the full team name when it fits along the end zone, the abbreviation when it does not.
+function ezName(t, len) {
+  const name = String(t.name || '').toUpperCase();
+  if (!name) return t.abbr;
+  const w = [...name].reduce((n, ch) => n + (/[IJ1. ]/.test(ch) ? 0.55 : /[MW]/.test(ch) ? 1.2 : 1) * 12.5, 0);
+  return w <= len - 18 ? name : t.abbr;
+}
+
 function LiveField({ drives, game, lg, onAll }) {
   // Right after a kick the feed can open the new drive with no plays yet (and a junk "1st & Goal at the 0"). Until its first
   // snap, stay on the drive that holds the kick, still live, so the field shows the handoff instead.
@@ -1756,8 +1764,8 @@ function LiveField({ drives, game, lg, onAll }) {
             {Array.from({ length: 10 }, (_, n) => <rect key={n} x={(10 + n * 10) * K} y={top} width={10 * K} height={FH - top} fill={n % 2 ? '#39B54A' : '#46C956'} />)}
             <rect x="0" y={top} width={10 * K} height={FH - top} fill={cc.away.main} />
             <rect x={110 * K} y={top} width={10 * K} height={FH - top} fill={cc.home.main} />
-            <text className="ez" transform={`translate(${5 * K} ${mid}) rotate(-90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.away.main)}>{game.away.abbr}</text>
-            <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{game.home.abbr}</text>
+            <text className="ez" transform={`translate(${5 * K} ${mid}) rotate(-90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.away.main)}>{ezName(game.away, FH)}</text>
+            <text className="ez" transform={`translate(${115 * K} ${mid}) rotate(90)`} textAnchor="middle" dominantBaseline="central" fill={inkOn(cc.home.main)}>{ezName(game.home, FH)}</text>
             {Array.from({ length: 11 }, (_, n) => <line key={n} x1={(10 + n * 10) * K} x2={(10 + n * 10) * K} y1={top} y2={FH} stroke="#fff" strokeWidth={n === 0 || n === 10 ? 2.4 : 1.4} opacity={n === 0 || n === 10 ? 1 : 0.85} />)}
             {[10, 20, 30, 40, 50, 40, 30, 20, 10].map((v, n) => <text key={n} className="yd" x={(20 + n * 10) * K} y={FH - 7} textAnchor="middle">{v}</text>)}
             {game.neutral ? null : <text className="ez mid" x={60 * K} y={mid - 8} textAnchor="middle" dominantBaseline="central" fill={game.home.color || cc.home.main}>{game.home.abbr}</text>}
