@@ -60,7 +60,13 @@ h1, h2, h3, p { margin: 0; }
 /* iPad and other touch tablets: use the whole screen. Desktop browsers keep the phone column. */
 @media (min-width: 700px) and (pointer: coarse) { .app, .dock { max-width: none; } .app { border-left: 0; border-right: 0; } }
 /* ...and lay the game cards out two across, with Your Teams spanning the top. */
-@media (min-width: 700px) and (pointer: coarse) { .boardcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: start; } .boardcols > .card.mine { grid-column: 1 / -1; } }
+@media (min-width: 700px) and (pointer: coarse) { .boardcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: start; } .boardcols > .card.mine { grid-column: 1 / -1; }
+  /* A lone league (or Your Teams) spans the screen and puts its games two across, with a hairline between. */
+  .boardcols > .card.wide { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+  .boardcols > .card.wide > .lghead { grid-column: 1 / -1; }
+  .boardcols > .card.wide > .grow { border-top: 0; }
+  .boardcols > .card.wide > .grow:nth-child(n+4) { border-top: 1px solid var(--rule); }
+  .boardcols > .card.wide > .grow:nth-child(even) { border-right: 1px solid var(--rule); } }
 .head { flex: none; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 14px) max(18px, env(safe-area-inset-right, 0px)) 10px max(18px, env(safe-area-inset-left, 0px)); }
 .brand { margin: 0; padding-right: 4px; font-stretch: 125%; font-weight: 900; font-style: italic; font-size: 22px; line-height: 1.05; white-space: nowrap; display: inline-block; letter-spacing: 0.01em; text-transform: uppercase; background: linear-gradient(180deg, #FFFFFF 0%, #C8FAFB 40%, #22D3D6 52%, #0E6F7A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0.6px #0C1124; filter: drop-shadow(2px 2px 0 #6E3AB5) drop-shadow(1px 1px 0 #0C1124); }
 .tagline { display: inline-block; white-space: nowrap; margin-top: 5px; font-size: 10px; font-weight: 800; font-style: italic; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }

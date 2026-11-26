@@ -197,7 +197,7 @@ function Board({ games, pick, favSet, title }) {
       {!shown.length ? <Empty>No {pick === 'all' ? '' : LEAGUE[pick].short + ' '}games.</Empty> : null}
       <div className="boardcols">
       {mine.length ? (
-        <div className="card mine">
+        <div className="card mine wide">
           <div className="lghead" style={{ cursor: 'default' }}><b style={{ color: 'var(--yellow)' }}>Your Teams</b><span>{mine.length} {mine.length === 1 ? 'game' : 'games'}</span></div>
           {mine.map((g) => <GameRow key={g.lg + g.id} g={g} showLg={false} />)}
         </div>
@@ -205,7 +205,7 @@ function Board({ games, pick, favSet, title }) {
       {leagues.map((l) => {
         const list = sortGames(shown.filter((g) => g.lg === l.id && !isFavGame(g, favSet)), favSet);
         return (
-          <div className="card" key={l.id}>
+          <div className={leagues.length === 1 ? 'card wide' : 'card'} key={l.id}>
             <button className="lghead" onClick={() => go(`league/${l.id}/scores${l.sport === 'football' ? '' : '/' + ymdOf(new Date([...list].map((g) => g.date).sort()[0]))}`)}><b style={{ color: l.color }}>{l.name}</b><span>{list.length} {list.length === 1 ? 'game' : 'games'} ›</span></button>
             {list.map((g) => <GameRow key={g.id} g={g} showLg={false} />)}
           </div>
