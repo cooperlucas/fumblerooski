@@ -2238,7 +2238,9 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
     // ("G.Desrosiers to NYG 27 for 24 yards").
     const myAbbr = abbrOf[teamId] || d.team?.abbreviation || '', theirAbbr = Object.entries(abbrOf).find(([id]) => id !== teamId)?.[1] || '';
     const kickText = kickOpen && !tb ? kickReturnSpot(first.text, myAbbr, theirAbbr) : null;
-    const startToEnd = spotToEnd(d.start?.text, myAbbr) ?? tb ?? (kickEnd > 0 && kickEnd < 100 ? kickEnd : null) ?? kickText;
+    // Fresh off the kick the feed can write the drive's start as the goal line itself ("DET 0"): that is not a real spot.
+    const stRaw = spotToEnd(d.start?.text, myAbbr), stJunk = stRaw != null && (stRaw <= 0 || stRaw >= 100);
+    const startToEnd = (stJunk ? null : stRaw) ?? tb ?? (kickEnd > 0 && kickEnd < 100 ? kickEnd : null) ?? kickText;
     const from = kickOpen && startToEnd != null ? startToEnd : num(first?.start?.yardsToEndzone ?? d.start?.yardsToEndzone);
     // Where the drive ended is its start plus the yards it gained. The last play's own end spot is no good:
     // after a punt or field goal it is where the ball landed, not where the offense got to.
@@ -2252,7 +2254,7 @@ export function normDrives(drives, awayId, homeId, live, opts = {}) {
       scoreSide: kind === 'defTd' ? (side === 'away' ? 'home' : 'away') : side, // who the points went to
       summary: cleanText(d.description || ''),
       period: d.start?.period?.number || plays[0]?.period || 0, clock: d.start?.clock?.displayValue || plays[0]?.clock || '',
-      startText: cleanText(d.start?.text || '') || (kickOpen && from != null ? spotText(from, myAbbr, theirAbbr) : ''), startToEnd: kickOpen ? from : null,
+      startText: (stJunk && kickOpen ? '' : cleanText(d.start?.text || '')) || (kickOpen && from != null ? spotText(from, myAbbr, theirAbbr) : ''), startToEnd: kickOpen ? from : null,
       x0: pos(from), x1: pos(to),
       plays,
       live: !!live && !!cur && String(d.id) === String(cur.id),

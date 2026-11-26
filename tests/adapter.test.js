@@ -643,3 +643,13 @@ test('kick return spot from the words, with the feed calling Washington WAS', ()
   assert.equal(kickReturnSpot('D.Zvada kicks 57 yards from NYG 35 to WAS 8. L.McCaffrey to WAS 33 for 25 yards.', 'WSH', 'NYG'), 67);
   assert.equal(kickReturnSpot('kicks 65 yards from WAS 35 to NYG 0. Touchback.', 'NYG', 'WSH'), 100);
 });
+
+test('a drive start the feed writes as the goal line itself is ignored in favor of where the return ended', () => {
+  const kick = { type: { text: 'Kickoff' }, text: 'C.Santos kicks 71 yards from CHI 20 to DET 9. J.Saylors to DET 29 for 20 yards (D.Jackson).', start: { team: { id: '3' } }, end: { yardsToEndzone: 0, possessionText: 'DET 0' }, period: { number: 2 }, clock: { displayValue: '1:13' } };
+  const prev = { id: 'p', team: { id: '3', abbreviation: 'CHI' }, result: 'FG', description: '8 plays', plays: [{ type: { text: 'Rush' }, text: 'run', start: { team: { id: '3' }, yardsToEndzone: 5 }, end: { team: { id: '3' } } }] };
+  const cur = { id: 'k', team: { id: '8', abbreviation: 'DET' }, description: '0 plays, 0 yards, 0:00', start: { text: 'DET 0' }, plays: [kick] };
+  const ds = normDrives({ previous: [prev], current: cur }, '3', '8', true);
+  const d = ds[ds.length - 1];
+  assert.equal(d.startToEnd, 71);
+  assert.equal(d.startText, 'DET 29');
+});
