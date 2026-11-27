@@ -56,6 +56,7 @@ h1, h2, h3, p { margin: 0; }
 .app { min-height: 100vh; min-height: 100dvh; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg); position: relative; padding-bottom: var(--dockh, 0px); }
 .stick { position: sticky; top: 0; z-index: 20; background: var(--bg); }
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; }
+html.typing .dock { visibility: hidden; }
 @media (min-width: 560px) { .app { border-left: 1px solid var(--line2); border-right: 1px solid var(--line2); } }
 /* iPad and other touch tablets: use the whole screen. Desktop browsers keep the phone column. */
 @media (min-width: 700px) and (pointer: coarse) { .app, .dock { max-width: none; } .app { border-left: 0; border-right: 0; } }

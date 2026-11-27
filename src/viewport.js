@@ -14,6 +14,11 @@ const settle = () => {
 };
 if (typeof document !== 'undefined') {
   const field = (el) => /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName || '');
+  // While a text box has the keyboard up, iOS slides the layout under the visible screen as you scroll, which carries the fixed
+  // ticker and tab bar off the bottom. Tuck them away until the keyboard is gone.
+  const typingField = (el) => /^(INPUT|TEXTAREA)$/.test(el?.tagName || '') && !/^(checkbox|radio|button|submit|range)$/.test(el.type || '');
+  document.addEventListener('focusin', (e) => { if (typingField(e.target)) document.documentElement.classList.add('typing'); });
+  document.addEventListener('focusout', (e) => { if (typingField(e.target)) document.documentElement.classList.remove('typing'); });
   document.addEventListener('focusout', (e) => { if (field(e.target)) settle(); });
   // A picked dropdown can stay focused after its wheel closes: let it go, then settle.
   document.addEventListener('change', (e) => { if (e.target?.tagName === 'SELECT') { e.target.blur(); settle(); } });
