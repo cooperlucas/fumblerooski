@@ -1441,7 +1441,7 @@ function LeadChart({ chart, game, L }) {
           <p className="leadnote scrubbing"><b>{[at.per, at.clock].filter(Boolean).join(' · ')}</b><span style={{ color: cc.away.main }}>{game.away.abbr} {at.p.a}</span><span style={{ color: cc.home.main }}>{game.home.abbr} {at.p.h}</span></p>
         ) : chart.coarse ? <p className="leadnote">Score by {L.sport === 'football' || L.sport === 'basketball' && L.periods === 4 ? 'quarter' : 'period'} only: this feed sends no scoring plays</p>
         : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game${game.state === 'final' && end.m ? `, up by as many as ${end.m > 0 ? bigA : bigH}` : ''} · `
-          : game.state === 'final' && end.m ? `${end.m > 0 ? game.away.abbr : game.home.abbr} took the lead at the very end, after trailing by as many as ${end.m > 0 ? bigH : bigA} · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
+          : game.state === 'final' && end.m ? `${lead[0].abbr} led for 0% of the game, after trailing by as many as ${end.m > 0 ? bigH : bigA} · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
         <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
           <svg ref={svgRef} className="flow scrub" viewBox={`0 0 ${W} ${H}`} aria-hidden="true"
             onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); setScrub(tAt(e)); }}
