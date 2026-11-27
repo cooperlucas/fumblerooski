@@ -1440,7 +1440,7 @@ function LeadChart({ chart, game, L }) {
         {at ? (
           <p className="leadnote scrubbing"><b>{[at.per, at.clock].filter(Boolean).join(' · ')}</b><span style={{ color: cc.away.main }}>{game.away.abbr} {at.p.a}</span><span style={{ color: cc.home.main }}>{game.home.abbr} {at.p.h}</span></p>
         ) : chart.coarse ? <p className="leadnote">Score by {L.sport === 'football' || L.sport === 'basketball' && L.periods === 4 ? 'quarter' : 'period'} only: this feed sends no scoring plays</p>
-        : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
+        : <p className="leadnote">{share > 0 ? `${lead[0].abbr} ${game.state === 'final' ? 'led' : 'has led'} for ${share}% of the game${game.state === 'final' && end.m ? `, up by as many as ${end.m > 0 ? bigA : bigH}` : ''} · ` : ''}{changes} lead {changes === 1 ? 'change' : 'changes'}</p>}
         <div role="img" aria-label={`Lead over time. Biggest leads: ${game.away.abbr} ${bigA}, ${game.home.abbr} ${bigH}. ${changes} lead changes.`}>
           <svg ref={svgRef} className="flow scrub" viewBox={`0 0 ${W} ${H}`} aria-hidden="true"
             onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); setScrub(tAt(e)); }}
