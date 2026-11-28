@@ -442,6 +442,7 @@ button.pick.date { cursor: pointer; }
 .lghead .link { font-size: 12px; }
 .lghead .link { margin-left: auto; }
 /* Filter dropdowns always share one line: each takes a fair share of the width and long names trim with an ellipsis. */
+.wkrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
 .filters { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .filters .pick { flex: 1 1 0; min-width: 0; max-width: 60%; }
 .filters .pick:only-child { flex: 0 1 auto; }

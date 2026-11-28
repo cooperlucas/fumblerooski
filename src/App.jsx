@@ -388,9 +388,13 @@ function Scores() {
             <H2>{LEAGUE[pickL].name}</H2>
             <button className="link" onClick={() => go(`league/${pickL}`)}>Schedule ›</button>
           </div>
-          {gf.el ? <div className="filters" style={{ margin: '0 0 10px' }}>{gf.el}</div> : null}
+          {sb.data.weeks && sb.data.current.week || gf.el ? (
+            <div className="wkrow">
+              {sb.data.weeks && sb.data.current.week ? <span className="stamp" style={{ textAlign: 'left', margin: 0 }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</span> : <span />}
+              {gf.el ? <div className="filters" style={{ margin: 0, flex: '1 1 auto' }}>{gf.el}</div> : null}
+            </div>
+          ) : null}
           {baseDay && !sb.data.weeks && baseDay !== todayKey ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{baseDay < todayKey ? 'Last played' : 'Next up'}: {dateOf(baseDay).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p> : null}
-          {sb.data.weeks && sb.data.current.week ? <p className="stamp" style={{ textAlign: 'left', margin: '0 0 8px' }}>{(sb.data.weeks.find((w) => w.week === sb.data.current.week && w.type === sb.data.current.type) || {}).label || ''}</p> : null}
           {gf.apply(sb.data.games).length ? <Board games={gf.apply(sb.data.games)} pick="all" favSet={favSet} /> : gf.on && sb.data.games.length ? <Empty>No {gf.label} games on this slate.</Empty> : <Empty>No {sub ? DIVISIONS.cfb.find((d) => d.id === sub).label : LEAGUE[pickL].short} games right now. Pick dates or weeks on its <button className="link" onClick={() => go(`league/${pickL}`)}>league page</button>.</Empty>}
           {nextDay && sbNext.data?.games?.length ? (
             <>
