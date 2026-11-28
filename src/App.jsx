@@ -2882,10 +2882,13 @@ function Preview({ p, game, lg }) {
   // conference (or conferences) these two play in.
   const lower = !p.standings.length && !!DIVISIONS[lg]?.length;
   const ls = useQuery(lower ? `pvst:${lg}:${game.away.id}:${game.home.id}` : null, async () => {
-    for (const d of DIVISIONS[lg].filter((x) => x.groups.length)) {
+    const mine = (r) => r.team.id === game.away.id || r.team.id === game.home.id;
+    const mk = (title, g, rows) => ({ title, cols: ['REC', g.col2Label || 'CONF'], rows: rows.map((r) => ({ id: r.team.id, name: r.team.name, stats: [r.overall || '', r.col2 || ''] })) });
+    for (const d of DIVISIONS[lg]) {
       try {
-        const hit = (await getStandings(lg, d.id)).groups.filter((g) => g.rows.some((r) => r.team.id === game.away.id || r.team.id === game.home.id));
-        if (hit.length) return hit.map((g) => ({ title: g.name, cols: ['REC', g.col2Label || 'CONF'], rows: g.rows.map((r) => ({ id: r.team.id, name: r.team.name, stats: [r.overall || '', r.col2 || ''] })) }));
+        const hit = (await getStandings(lg, d.id)).groups.filter((g) => g.rows.some(mine));
+        // A conference split into divisions (PSAC East / West): show only the division(s) these teams are in.
+        if (hit.length) return hit.flatMap((g) => g.subs?.length > 1 ? g.subs.filter((x) => x.rows.some(mine)).map((x) => mk(`${g.name} · ${x.name}`, g, x.rows)) : [mk(g.name, g, g.rows)]);
       } catch { /* try the next division */ }
     }
     return [];
